@@ -2592,6 +2592,9 @@ class XCCClient(IMMClient):
             if filename:
                 url = '/download/' + filename
                 savefile = os.path.join(directory, filename)
+                if os.path.exists(savefile):
+                    raise pygexc.InvalidParameterValue(
+                        'File already exists: ' + savefile)
                 wc = await self.wc()
                 fd = webclient.make_downloader(wc, url, savefile)
                 while not fd.completed():

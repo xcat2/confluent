@@ -1697,6 +1697,9 @@ class OEMHandler(generic.OEMHandler):
             if filename:
                 url = '/download/' + filename
                 savefile = os.path.join(directory, filename)
+                if os.path.exists(savefile):
+                    raise pygexc.InvalidParameterValue(
+                        'File {0} already exists'.format(savefile))
                 fd = webclient.make_downloader(wc, url, savefile)
                 while not fd.completed():
                     try:

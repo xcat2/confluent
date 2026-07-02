@@ -789,6 +789,9 @@ class OEMHandler(generic.OEMHandler):
         fname = os.path.basename(durl)
         if autosuffix and not savefile.endswith('.tar.zst'):
             savefile += '-{0}'.format(fname)
+        if os.path.exists(savefile):
+            raise pygexc.InvalidParameterValue(
+                'File {0} already exists'.format(savefile))
         fd = webclient.make_downloader(self.webclient, durl, savefile)
         while not fd.completed():
             try:

@@ -1658,6 +1658,9 @@ class OEMHandler(object):
             if dload:
                 filename = os.path.basename(dload)
                 savefile = os.path.join(directory, filename)
+                if os.path.exists(savefile):
+                    raise exc.PyghmiException(
+                        'File {} already exists'.format(savefile))
                 dler = webclient.make_downloader(fishclient.wc, dload, savefile)
                 await dler.join()
                 yield savefile
