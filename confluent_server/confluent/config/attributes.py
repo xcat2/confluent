@@ -222,8 +222,11 @@ node = {
         'description': ('Indicates whether deployment actions should be impeded. '
                         'If locked, it indicates that a pending profile should not be applied. '
                         'If "autolock", then locked will be set when current pending deployment completes. '
+                        'If unset or "unlocked", deployment is not impeded. '
+                        'Must be manipulated through the {node}/deployment/lock API rather '
+                        'than set directly as a normal attribute.'
                          ),
-        'validlist':    ('autolock', 'locked')
+        'validlist':    ('autolock', 'locked', 'unlocked')
     },
     'deployment.pendingprofile': {
         'description': ('An OS profile that is pending deployment.  This indicates to '
@@ -417,7 +420,9 @@ node = {
     'hardwaremanagement.method': {
         'description': 'The method used to perform operations such as power '
                        'control, get sensor data, get inventory, and so on. '
-                       'ipmi is used if not specified.',
+                       'Must be actively set; if unspecified, hardware '
+                       'management operations are not implemented for the '
+                       'node (formerly this defaulted to ipmi).',
         'validvalues': ('affluent', 'cnos', 'cooltera', 'deltapdu',
                         'eatonpdu', 'enclosure', 'enlogic', 'enos', 'geist',
                         'ipmi', 'null', 'nxos', 'pdu', 'proxmox', 'raritan',
@@ -613,7 +618,8 @@ node = {
                         'step up to SNMPv3'),
     },
     'snmp.privacyprotocol': {
-        'description': 'The privacy protocol to use for SNMPv3',
+        'description': 'The privacy protocol to use for SNMPv3.  If unset, '
+                       '"des" is assumed.',
         'validvalues': ('aes', 'des'),
     },
 #    'secret.snmplocalizedkey': {
