@@ -1348,7 +1348,7 @@ class XCCClient(IMMClient):
                                                 {'Generate_FFDC_status': 1})
         url = '/ffdc/{0}'.format(result['FileName'])
         if autosuffix and not savefile.endswith('.tzz'):
-            savefile += '-{0}'.format(result['FileName'])
+            savefile += '-{0}'.format(os.path.basename(result['FileName']))
         fd = webclient.make_downloader(wc, url, savefile)
         while not fd.completed():
             try:
