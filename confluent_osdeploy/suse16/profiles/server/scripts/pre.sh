@@ -11,6 +11,8 @@ if [ "$cryptboot" != "" ]  && [ "$cryptboot" != "none" ] && [ "$cryptboot" != "n
    echo "****Encrypted boot requested, but not implemented for this OS, halting install"
    while :; do sleep 86400; done
 fi
+cp /etc/confluent/tls/*.pem /etc/pki/trust/anchors/
+update-ca-certificates
 echo "Initializing SSH"
 for pubkey in /etc/ssh/ssh_host_*key.pub; do
     privfile=${pubkey%.pub}
