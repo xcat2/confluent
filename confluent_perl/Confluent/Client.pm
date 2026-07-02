@@ -61,7 +61,7 @@ sub _verify {
         $knownhosts{$peername} = $addfingerprint;
     }
     if (not $knownhosts{$peername}) {
-        die "UKNNOWN_FINGERPRINT: fingerprint=>$fingerprint"
+        die "UNKNOWN_FINGERPRINT: fingerprint=>$fingerprint"
     }
     if ($fingerprint ne $knownhosts{$peername}) {
         die "CONFLICT_FINGERPRINT: fingerprint=>$fingerprint";

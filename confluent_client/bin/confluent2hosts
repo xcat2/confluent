@@ -183,7 +183,6 @@ def main():
                                         names.append(fqdn)
                     names = ' '.join(names)
                     merger.add_entry(ipdb[node][currnet], names)
-        merger.write_out('/etc/whatnowhosts')
     else:
         namesbynode = {}
         ipbynode = {}

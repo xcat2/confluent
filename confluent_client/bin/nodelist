@@ -41,7 +41,7 @@ async def main():
     usage="Usage: %prog noderange\n"
           "   or: %prog [options] noderange <nodeattribute>...")
     argparser.add_option('-b', '--blame', action='store_true',
-                     help='Show information about how attributes inherited')
+                     help='Show information about how attributes are inherited')
     argparser.add_option('-d', '--delim', metavar="STRING", default = "\n",
                      help='Delimiter separating the values')
     (options, args) = argparser.parse_args()

@@ -3,7 +3,7 @@ nodedefine(8) -- Define new confluent nodes
 
 ## SYNOPSIS
 
-`nodedefine <noderange> [nodeattribute1=value1> <nodeattribute2=value2> ...]`  
+`nodedefine <noderange> [<nodeattribute1=value1> <nodeattribute2=value2> ...]`
 
 ## DESCRIPTION
 
@@ -26,4 +26,4 @@ that `nodeattrib(8)` will error if a node does not exist.
 
 ## SEE ALSO
 
-noderange(5), nodeattribexpressions(8)
+noderange(5), nodeattribexpressions(5)

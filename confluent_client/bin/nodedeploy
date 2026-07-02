@@ -80,7 +80,7 @@ def main(args):
     ap.add_argument('-n', '--network', help='Initiate deployment over PXE/HTTP', action='store_true')
     ap.add_argument('-b', '--bootmethod', help='Specify network boot method (e.g., network, http)', default='network')
     ap.add_argument('-p', '--prepareonly', help='Prepare only, skip any interaction with a BMC associated with this deployment action', action='store_true')
-    ap.add_argument('-m', '--maxnodes', help='Specifiy a maximum nodes to be deployed')
+    ap.add_argument('-m', '--maxnodes', help='Specify a maximum nodes to be deployed')
     ap.add_argument('-r', '--redeploy', help='Redeploy nodes with the current or pending profile', action='store_true')
     ap.add_argument('noderange', help='Set of nodes to deploy')
     ap.add_argument('profile', nargs='?', help='Profile name to deploy')

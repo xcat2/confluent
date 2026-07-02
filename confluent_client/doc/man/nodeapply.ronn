@@ -9,7 +9,7 @@ nodeapply(8) -- Execute command on many nodes in a noderange through ssh
 
 Provides shortcut access to a number of common operations against deployed
 nodes.  These operations include refreshing ssh certificates and configuration,
-rerunning syncflies, and executing specified postscripts.
+rerunning syncfiles, and executing specified postscripts.
 
 ## OPTIONS
   

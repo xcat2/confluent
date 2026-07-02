@@ -143,8 +143,8 @@ while [ $ready = "0" ]; do
     elif grep 'SSL' $tmperr > /dev/null; then
         confluent_mgr=${confluent_mgr#[}
         confluent_mgr=${confluent_mgr%]}
-    	echo 'Failure establishing TLS conneection to '$confluent_mgr' (try `osdeploy initialize -t` on the deployment server)'
-	if [ ! -z "$autoconsdev" ]; then echo 'Failure establishing TLS conneection to '$confluent_mgr' (try `osdeploy initialize -t` on the deployment server)' > $autoconsdev; fi
+    	echo 'Failure establishing TLS connection to '$confluent_mgr' (try `osdeploy initialize -t` on the deployment server)'
+	if [ ! -z "$autoconsdev" ]; then echo 'Failure establishing TLS connection to '$confluent_mgr' (try `osdeploy initialize -t` on the deployment server)' > $autoconsdev; fi
     	sleep 10
     else
         ready=1

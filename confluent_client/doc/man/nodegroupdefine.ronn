@@ -3,7 +3,7 @@ nodegroupdefine(8) -- Define new confluent node group
 
 ## SYNOPSIS
 
-`nodegroupdefine <groupname> [nodeattribute1=value1> <nodeattribute2=value2> ...]`  
+`nodegroupdefine <groupname> [<nodeattribute1=value1> <nodeattribute2=value2> ...]`
 
 ## DESCRIPTION
 
@@ -21,4 +21,4 @@ that `nodegroupattrib(8)` will error if a node group does not exist.
 
 ## SEE ALSO
 
-nodeattribexpressions(8), nodegroupattrib(8), nodegroupremove(8)
+nodeattribexpressions(5), nodegroupattrib(8), nodegroupremove(8)

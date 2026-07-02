@@ -247,7 +247,7 @@ node = {
 
     },
     'deployment.state': {
-        'description': ('Profiles may push more specific state, for example, it may set the state to "failed" or "succeded"'),
+        'description': ('Profiles may push more specific state, for example, it may set the state to "failed" or "succeeded"'),
     },
     'deployment.state_detail': {
         'description': ('Detailed state information as reported by an OS profile, when available'),
@@ -268,7 +268,7 @@ node = {
         'description':  'Any specified rules shall be configured on the BMC '
                         'upon discovery.  "expiration=no,loginfailures=no,complexity=no,reuse=no" '
                         'would disable password expiration, login failures '
-                        'triggering a lockout, password complexity requirements,'
+                        'triggering a lockout, password complexity requirements, '
                         'and any restrictions around reusing an old password.',
         'validlistkeys': ('expiration', 'loginfailures', 'complexity', 'reuse'),
     },
@@ -487,7 +487,7 @@ node = {
                        'the discovery process to decide where to place the mac address of a detected PXE nic.',
     },
     'net.connection_name': {
-        'description': 'Name to use when specifiying a name for connection and/or interface name for a team/bond.  This may be the name of a team/bond interface, '
+        'description': 'Name to use when specifying a name for connection and/or interface name for a team/bond.  This may be the name of a team/bond interface, '
                        'the connection name in network manager for the interface, or may be installed as an altname '
                        'as supported by the respective OS deployment profiles.  Default is to accept default name for '
                        'a team/bond consistent with the respective OS, or to use the matching original port name as connection name.'
@@ -593,7 +593,7 @@ node = {
         'description': 'Specifies the managed PDU associated with a power input on the node'
     },
     'power.outlet': {
-        'description': 'Species the outlet identifier on the PDU associoted with a power input on the node'
+        'description': 'Specifies the outlet identifier on the PDU associated with a power input on the node'
     },
 #    'id.modelnumber': {
 #        'description': 'The manufacturer dictated  model number for the node',
@@ -614,7 +614,7 @@ node = {
         'description': 'A one-time use shared secret to authenticate a node api token',
     },
     'secret.snmpcommunity': {
-        'description': ('SNMPv1 community string, it is highly recommended to'
+        'description': ('SNMPv1 community string, it is highly recommended to '
                         'step up to SNMPv3'),
     },
     'snmp.privacyprotocol': {
@@ -676,7 +676,7 @@ node = {
         'validvalues': ('tofu', 'manual', 'ca', 'ca-only'),
     },
     'pubkeys.tls_hardwaremanager': {
-        'description':  ('Fingerprint of the TLS certificate recognized as'
+        'description':  ('Fingerprint of the TLS certificate recognized as '
                          'belonging to the hardware manager of the server'),
     },
     'pubkeys.tls': {

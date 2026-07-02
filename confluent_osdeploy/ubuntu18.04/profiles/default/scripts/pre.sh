@@ -9,7 +9,7 @@ mgr=$(cat /etc/confluent/deployer)
 cryptboot=$(grep encryptboot: $deploycfg|sed -e 's/^encryptboot: //')
 if [ "$cryptboot" != "" ]  && [ "$cryptboot" != "none" ] && [ "$cryptboot" != "null" ]; then
    echo "****Encrypted boot requested, but not implemented for this OS, halting install" > /dev/console
-   [ -f '/tmp/autoconsdev' ] && (echo "****Encryptod boot requested, but not implemented for this OS,halting install" >> $(cat /tmp/autoconsdev))
+   [ -f '/tmp/autoconsdev' ] && (echo "****Encrypted boot requested, but not implemented for this OS, halting install" >> $(cat /tmp/autoconsdev))
    while :; do sleep 86400; done
 fi
 cat > /usr/lib/live-installer.d/confluent-certs << EOF

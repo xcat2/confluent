@@ -895,7 +895,7 @@ async def detected(info):
             rechecktime = util.monotonic_time() + 300
             rechecker = tasks.spawn_task_after(300, _periodic_recheck, cfg)
         unknown_info[info['hwaddr']] = info
-        info['discostatus'] = 'unidentfied'
+        info['discostatus'] = 'unidentified'
         #TODO, spawn after to recheck sooner, or somehow else
         # influence periodic recheck to shorten delay?
         return
@@ -1258,7 +1258,7 @@ async def eval_node(cfg, handler, info, nodename, manual=False):
     except Exception as e:
         unknown_info[info['hwaddr']] = info
         info['discostatus'] = 'unidentified'
-        errorstr = 'An error occured during discovery, check the ' \
+        errorstr = 'An error occurred during discovery, check the ' \
                    'trace and stderr logs, mac was {0} and ip was {1}' \
                    ', the node or the containing enclosure was {2}' \
                    ''.format(info['hwaddr'], handler.ipaddr, nodename)
@@ -1285,7 +1285,7 @@ async def eval_node(cfg, handler, info, nodename, manual=False):
         # might be ambiguous, need to match chassis-uuid as well..
         match = await search_smms_by_cert(nodename, await handler.get_https_cert(), cfg)
         if match:
-            info['verfied'] = True
+            info['verified'] = True
             info['enclosure.bay'] = match[1]
             if match[2]:
                 if not await discover_node(cfg, handler, info, match[2], manual):
@@ -1505,7 +1505,7 @@ async def discover_node(cfg, handler, info, nodename, manual):
                 bmcaddr = cfg.get_node_attributes(nodename, 'hardwaremanagement.manager')
                 bmcaddr = bmcaddr.get(nodename, {}).get('hardwaremanagement.manager', {}).get('value', '')
                 if not bmcaddr:
-                    log.log({'error': 'Unable to get BMC address for {0]'.format(nodename)})
+                    log.log({'error': 'Unable to get BMC address for {0}'.format(nodename)})
                 else:
                     bmcaddr = bmcaddr.split('/', 1)[0]
                     await wait_for_connection(bmcaddr)
