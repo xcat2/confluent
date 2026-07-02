@@ -1285,7 +1285,7 @@ async def eval_node(cfg, handler, info, nodename, manual=False):
         # might be ambiguous, need to match chassis-uuid as well..
         match = await search_smms_by_cert(nodename, await handler.get_https_cert(), cfg)
         if match:
-            info['verfied'] = True
+            info['verified'] = True
             info['enclosure.bay'] = match[1]
             if match[2]:
                 if not await discover_node(cfg, handler, info, match[2], manual):
