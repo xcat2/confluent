@@ -895,7 +895,7 @@ async def detected(info):
             rechecktime = util.monotonic_time() + 300
             rechecker = tasks.spawn_task_after(300, _periodic_recheck, cfg)
         unknown_info[info['hwaddr']] = info
-        info['discostatus'] = 'unidentfied'
+        info['discostatus'] = 'unidentified'
         #TODO, spawn after to recheck sooner, or somehow else
         # influence periodic recheck to shorten delay?
         return
