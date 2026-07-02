@@ -20,6 +20,12 @@ cat /etc/confluent/tls/*.pem > /mnt/etc/confluent/ca.pem
 mkdir -p /mnt/opt/confluent/bin
 cp /opt/confluent/bin/apiclient /mnt/opt/confluent/bin/
 
+instnmcfg=/run/NetworkManager/system-connections/$(cat /run/confluent/ifname).nmconnection
+
+if [ -e "$instnmcfg" ]; then
+	cp $instnmcfg /mnt/etc/NetworkManager/system-connections/
+fi
+
 #run_remote setupssh.sh
 cp /etc/ssh/ssh*key* /mnt/etc/ssh/
 mkdir -p /mnt/etc/ssh/sshd_config.d/

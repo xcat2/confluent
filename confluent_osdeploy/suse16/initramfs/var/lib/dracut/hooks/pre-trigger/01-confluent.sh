@@ -61,6 +61,7 @@ if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
             if [ "$autoconfigmethod" = "dhcp" ]; then
                 /usr/libexec/nm-initrd-generator ip=$NICGUESS:dhcp
                 echo ip=$NICGUESS:dhcp >> /etc/cmdline.d/01-confluent.conf
+                echo " "ip=$NICGUESS:dhcp >> /run/agama/cmdline.d/agama.conf
             else
                 v4addr=$(grep ^ipv4_address: $tcfg)
                 v4addr=${v4addr#ipv4_address: }
@@ -83,6 +84,7 @@ if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
                         rm /run/NetworkManager/system-connections/*
                         /usr/libexec/nm-initrd-generator ip=$v4addr::$v4gw:$v4nm:$hostname:$NICGUESS:none
                         echo ip=$v4addr::$v4gw:$v4nm:$hostname:$NICGUESS:none >> /etc/cmdline.d/01-confluent.conf
+                        echo " "ip=$v4addr::$v4gw:$v4nm:$hostname:$NICGUESS:none >> /run/agama/cmdline.d/agama.conf
                         DETECTED=1
                         ifname=$NICGUESS
                         break
@@ -138,10 +140,12 @@ if ! grep MANAGER: /etc/confluent/confluent.info; then
             confluenthttpsrv=[$confluentsrv]
             /usr/libexec/nm-initrd-generator ip=:dhcp6
             echo ip=:dhcp6 >> /etc/cmdline.d/01-confluent.conf
+            echo " "ip=:dhcp6 >> /run/agama/cmdline.d/agama.conf
         else
             confluenthttpsrv=$confluentsrv
             /usr/libexec/nm-initrd-generator ip=:dhcp
             echo ip=:dhcp >> /etc/cmdline.d/01-confluent.conf
+            echo " "ip=:dhcp >> /run/agama/cmdline.d/agama.conf
         fi
         NetworkManager --configure-and-quit=initrd --no-daemon
         myids=uuid=$(cat /sys/devices/virtual/dmi/id/product_uuid)
@@ -208,6 +212,8 @@ if [ -z "$ifname" ]; then
         ifname=$(cat /tmp/net.ifaces| awk '{print $1}')
     fi
 fi
+mkdir -p /run/confluent
+echo $ifname > /run/confluent/ifname
 
 dnsdomain=$(grep ^dnsdomain: /etc/confluent/confluent.deploycfg)
 dnsdomain=${dnsdomain#dnsdomain: }
@@ -278,6 +284,7 @@ autoconfigmethod=$(grep ipv4_method /etc/confluent/confluent.deploycfg)
 autoconfigmethod=${autoconfigmethod#ipv4_method: }
 if [ "$autoconfigmethod" = "dhcp" ]; then
     echo ip=$ifname:dhcp >>  /etc/cmdline.d/01-confluent.conf
+    echo " "ip=$ifname:dhcp >> /run/agama/cmdline.d/agama.conf
 elif [ "$autoconfigmethod" = "static" ]; then
     v4addr=$(grep ^ipv4_address: /etc/confluent/confluent.deploycfg)
     v4addr=${v4addr#ipv4_address: }
@@ -289,6 +296,7 @@ elif [ "$autoconfigmethod" = "static" ]; then
     v4nm=$(grep ipv4_netmask: /etc/confluent/confluent.deploycfg)
     v4nm=${v4nm#ipv4_netmask: }
     echo ip=$v4addr::$v4gw:$v4nm:$hostname:$ifname:none >> /etc/cmdline.d/01-confluent.conf
+    echo " "ip=$v4addr::$v4gw:$v4nm:$hostname:$ifname:none >> /run/agama/cmdline.d/agama.conf
 fi
 if [ "$v6cfg" = "static" ]; then
     v6addr=$(grep ^ipv6_address: /etc/confluent/confluent.deploycfg)
@@ -304,6 +312,7 @@ if [ "$v6cfg" = "static" ]; then
     v6nm=$(grep ipv6_prefix: /etc/confluent/confluent.deploycfg)
     v6nm=${v6nm#ipv6_prefix: }
     echo ip=$v6addr::$v6gw:$v6nm:$hostname:$ifname:none >> /etc/cmdline.d/01-confluent.conf
+    echo " "ip=$v6addr::$v6gw:$v6nm:$hostname:$ifname:none >> /run/agama/cmdline.d/agama.conf
 fi
 nameserversec=0
 v4dns=0
