@@ -68,7 +68,7 @@ actually be in effect until a reboot.
     `s4: bmc.ipv4_method: DHCP`  
     `s4: bmc.ipv4_gateway: 172.30.0.6`  
 
-* Changing nodes `s3` and `s4` to have the ip addressess 10.1.2.3 and 10.1.2.4 with a 16 bit subnet mask:
+* Changing nodes `s3` and `s4` to have the IP addresses 10.1.2.3 and 10.1.2.4 with a 16 bit subnet mask:
     `# nodeconfig s3,s4 bmc.ipv4_address=10.1.2.{n1}/16`  
 
 ## SEE ALSO

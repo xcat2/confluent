@@ -8,7 +8,7 @@ nodelicense(8) -- Manage license keys on BMC
 ## DESCRIPTION
 
 `nodelicense` manages license keys on supported BMCs. Without an argument, the command
-lists currently installed license.  Using `delete` will remove the specified license name
+lists currently installed licenses.  Using `delete` will remove the specified license name
 from the BMC.  The `save` subcommand will take the passed directory (which may be in the form
 of /path/to/{node}/ to have the node name substituted for each node) and back up installed licenses
 to that directory. The `install` command will take the specified filename and install.  The filename

@@ -42,7 +42,7 @@ commands.
 * `show` **ELEMENT**, `cat` **ELEMENT**:
   Display the result of reading a specific element (by full or relative path)
 * `unset` **ELEMENT** **ATTRIBUTE**
-  For an element with attributes, request to clear the value of the attribue
+  For an element with attributes, request to clear the value of the attribute
 * `set` **ELEMENT** **ATTRIBUTE**=**VALUE**
   Set the specified attribute to the given value
 * `start` **ELEMENT**

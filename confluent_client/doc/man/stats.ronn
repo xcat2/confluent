@@ -3,7 +3,7 @@ stats(8) -- Common basic statistics on typical numeric data in output
 
 ## SYNOPSIS
 
-`<other command> | stats [-c N] [-d D] [-x|-g|-t|-o image.png] [-s N] [-v] [-b N]
+`<other command> | stats [-c N] [-d D] [-x|-g|-t|-o image.png] [-s N] [-v] [-b N]`
 
 ## DESCRIPTION
 
@@ -11,11 +11,11 @@ The **stats** command helps analyze common numerical data such as performance nu
 or temperatures or any other numerical value.
 
 By default it looks for the last numerical output on the first line to identify the numerical column
-and analyze that number. This can be overriden by **-c COLUMN** to indicate a column. By default,
+and analyze that number. This can be overridden by **-c COLUMN** to indicate a column. By default,
 whitespace and commas are treated to delimit columns, and **-d DELIMITER** can be used to override.
 
 By default it outputs basic statistics, but a histogram is available either text or through X11 output
-or sixel or output to an image file depending on whether **-x**, **-g**, **-t*, or **-o image.png** is
+or sixel or output to an image file depending on whether **-x**, **-g**, **-t**, or **-o image.png** is
 used.
 
 ## OPTIONS

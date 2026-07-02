@@ -35,8 +35,8 @@ devices.  Generally every effort is made to passively detect devices as they
 become available (as they boot or are plugged in), however sometimes an active
 scan is the best approach to catch something that appears to be missing.
 
-**nodedsicover clear** requests the server forget about a selection of
-detected device.  It takes the same arguments as **nodediscover list**.
+**nodediscover clear** requests the server to forget about a selection of
+detected devices.  It takes the same arguments as **nodediscover list**.
 
 **nodediscover subscribe** and **unsubscribe** instructs confluent to subscribe to or
 unsubscribe from the designated switch running affluent with system discovery support.

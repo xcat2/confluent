@@ -15,7 +15,7 @@ matching nodes, one line at a time.
 If a list of node attribute names are given, the value of those are also
 displayed.  If `-b` is specified, it will also display information on
 how inherited and expression based attributes are defined.  There is more
-information on node attributes in nodeattributes(5) man page.
+information on node attributes in the nodeattrib(8) man page.
 
 Attributes may be specified by wildcard, for example `net.*switch` will report
 all attributes that begin with `net.` and end with `switch`.
@@ -25,7 +25,7 @@ all attributes that begin with `net.` and end with `switch`.
 * `-b`, `--blame`:
   Annotate inherited and expression based attributes to show their base value.
 * `-d`, `--delim`:
-  Choose a delimiter to separat the values. Default - ENTER.
+  Choose a delimiter to separate the values. Default - ENTER.
 ## EXAMPLES
 * Listing matching nodes of a simple noderange:
   `# nodelist n1-n4`  
@@ -40,7 +40,7 @@ all attributes that begin with `net.` and end with `switch`.
   `n2: hardwaremanagement.manager: 172.30.3.2`  
 
 * Getting a group of attributes while determining what group defines them:
-  `# nodelist n1,n2 hardwaremanegement --blame`  
+  `# nodelist n1,n2 hardwaremanagement --blame`
   `n1: hardwaremanagement.manager: 172.30.3.1`  
   `n1: hardwaremanagement.method: ipmi (inherited from group everything)`  
   `n1: hardwaremanagement.switch: r8e1`  

@@ -1,10 +1,10 @@
-nodel2traceroute(8) -- returns the layer 2 route through an Ethernet network managed by confluent given 2 end points.
+nodel2traceroute(8) -- Returns the layer 2 route through an Ethernet network managed by confluent given 2 end points.
 ==============================
 ## SYNOPSIS
 `nodel2traceroute [options] <start_node> <end_noderange>`  
 
 ## DESCRIPTION  
-**nodel2traceroute** is a command that returns the layer 2 route for the configered interfaces in nodeattrib.
+**nodel2traceroute** is a command that returns the layer 2 route for the configured interfaces in nodeattrib.
 It can also be used with the -i and -e options to check against specific interfaces on the endpoints. If the 
 --interface or --eface option are not used then the command will check for routes against all the defined 
 interfaces in nodeattrib (net.*.switch) for the nodes.
@@ -17,7 +17,7 @@ interfaces in nodeattrib (net.*.switch) for the nodes.
 
 ## OPTIONS
 * ` -e` EFACE, --eface=INTERFACE
-   interface to check against for the second end point or end points if using checking against multiple nodes 
+   interface to check against for the second end point or end points if checking against multiple nodes
 * ` -i` INTERFACE, --interface=INTERFACE
    interface to check against for the first end point  
 * ` -c` CUMULUS, --cumulus=CUMULUS

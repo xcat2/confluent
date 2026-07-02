@@ -10,7 +10,7 @@ confluentdbutil(8) -- Backup or restore confluent database
 **confluentdbutil** is a utility to export/import the confluent attributes
 to/from json files.  The path is a directory that holds the json version.
 In order to perform restore, the confluent service must not be running.  It
-is required to indicate how to treat the usernames/passwords are treated in
+is required to indicate how the usernames/passwords are treated in
 the json files (password protected, removed from the files, or unprotected).
 
 ## OPTIONS
@@ -24,7 +24,7 @@ the json files (password protected, removed from the files, or unprotected).
   
 * `-r`, `--redact`:
   Indicates to replace usernames and passwords with a dummy string rather
-  than included.
+  than including them.
   
 * `-u`, `--unprotected`:
   The keys.json file will include the encryption keys without any protection.
@@ -35,10 +35,10 @@ the json files (password protected, removed from the files, or unprotected).
   suitable for an automated incremental backup, where an
   earlier password protected dump has a protected
   keys.json file, and only the protected data is needed.
-  keys do not change and as such they do not require
+  Keys do not change and as such they do not require
   incremental backup.
-  
-* `-y`, `--yaml
+
+* `-y`, `--yaml`:
   Use YAML instead of JSON as file format
   
   * `-h`, `--help`:

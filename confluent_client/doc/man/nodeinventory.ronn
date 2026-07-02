@@ -9,7 +9,7 @@ nodeinventory(8) -- Get hardware inventory of confluent node
 
 `nodeinventory` pulls information about hardware of a node.  This includes 
 information such as adapters, serial numbers, processors, and memory modules,
-as supported by the platforms hardware management implementation.  It accepts
+as supported by the platform's hardware management implementation.  It accepts
 arguments such as serial or model or others as listed above to filter
 output to specific data.
 

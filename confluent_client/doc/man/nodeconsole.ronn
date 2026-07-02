@@ -37,7 +37,7 @@ console process which will result in the console window closing.
   manager at this time.
 
   * `-T`, `--Timestamp`:
- Dump the log with Timpstamps on the current, local log in /var/log/confluent/consoles.
+ Dump the log with Timestamps on the current, local log in /var/log/confluent/consoles.
   If in collective mode, this only makes sense to use on the current collective
   manager at this time.
 
@@ -65,9 +65,9 @@ console process which will result in the console window closing.
   environment, to open a set of consoles for a range of
   nodes in separate Windows Terminal windows, with the
   title set for each node, set **NODECONSOLE_WINDOWED_COMMAND**
-  to `wt.exe wsl.exe -d AlmaLinux-8 --shell-type login.  If the
+  to `wt.exe wsl.exe -d AlmaLinux-8 --shell-type login`.  If the
   NODECONSOLE_WINDOWED_COMMAND environment variable isn't set,
-  xterm will be used bydefault.
+  xterm will be used by default.
 
 ## ESCAPE SEQUENCE COMMANDS
 
@@ -102,7 +102,7 @@ keystroke will be interpreted as a command.  The following commands are availabl
   Request immediate boot to network
 * `r`:
   [send Resize]
-  This queries the current terminal and sends stty commands to advertise the user termineal
+  This queries the current terminal and sends stty commands to advertise the user terminal
   size to the remote console
 * `?`:
   Get a list of supported commands
@@ -112,10 +112,10 @@ keystroke will be interpreted as a command.  The following commands are availabl
 
 ## PASSTHROUGH OPTIONS
 
-While opening a windowed console with xterm or any other console of choice. The 
-nodeconsole command gives capality to specify passthrough options targeted at 
-the console. All options after the -- will be parsed the console program. For 
-example, opening a windowed console using xterm with a black background. 
-`nodeconconsole -w n1 -- -bg black`  
+While opening a windowed console with xterm or any other console of choice. The
+nodeconsole command gives capability to specify passthrough options targeted at
+the console. All options after the -- will be passed to the console program. For
+example, opening a windowed console using xterm with a black background.
+`nodeconsole -w n1 -- -bg black`
 
 
