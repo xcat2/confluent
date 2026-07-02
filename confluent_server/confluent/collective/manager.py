@@ -782,6 +782,9 @@ async def become_leader(connection):
     global follower
     global retrythread
     global reassimilate
+    # As a non-voting member, this instance should not become leader.
+    # However, a non-voting member is considered equally privileged and trusted
+    # as a voting member
     if cfm.get_collective_member(get_myname()).get('role', None) == 'nonvoting':
         log.log({'info': 'Refraining from being leader of collective (nonvoting)',
             'subsystem': 'collective'})
@@ -929,6 +932,9 @@ async def start_collective():
         for member in sorted(list(cfm.list_collective())):
             if member == myname:
                 continue
+            # Skip attempting to connect to a nonvoting member, which is disqualified
+            # from being a leader, though it is to be considered as trusted and
+            # privileged as a voting member for database and request forwarding.
             if cfm.get_collective_member(member).get('role', None) == 'nonvoting':
                 continue
             if cfm.cfgleader is None:

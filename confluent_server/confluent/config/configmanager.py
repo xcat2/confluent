@@ -694,6 +694,9 @@ def get_myname():
         return myname
 
 def has_quorum():
+    # Count active collective members, ignoring non-voting members
+    # non-voting members are considered equally privileged/trusted as voting members for database
+    # and request forwarding, # just not considered to be important when assessing the current health of availability
     voters = 0
     for follower in cfgstreams:
         if cfgstreams[follower].get('role', None) != 'nonvoting':
