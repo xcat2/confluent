@@ -540,7 +540,7 @@ class NodeHandler(immhandler.NodeHandler):
                     if not nwc:
                         if not pwdchanged:
                             pwdchanged = 'Unknown'
-                        raise Exception('Error converting from sha356account: ' + repr(pwdchanged))
+                        raise Exception('Error converting from sha256account: ' + repr(pwdchanged))
                     if not pwdchanged:
                         await nwc.grab_json_response(
                             '/api/function',

@@ -784,7 +784,7 @@ async def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, 
             if not profile:
                 profile, stgprofile = get_deployment_profile(node, cfg)
             if not profile:
-                log.log({'info': 'No pending profile for {0}, skipping proxyDHCP eply'.format(node)})
+                log.log({'info': 'No pending profile for {0}, skipping proxyDHCP reply'.format(node)})
                 return
             bootfile = 'http://{0}/confluent-public/os/{1}/boot.ipxe'.format(myipn, profile).encode('utf8')
         else:

@@ -45,7 +45,7 @@ async def main():
                 \n       %prog noderange attribute1=value1 attribute2=value,...
                 \n ''')
     argparser.add_option('-b', '--blame', action='store_true',
-                        help='Show information about how attributes inherited')
+                        help='Show information about how attributes are inherited')
     argparser.add_option('-e', '--environment', action='store_true',
                         help='Set attributes, but from environment variable of '
                             'same name')

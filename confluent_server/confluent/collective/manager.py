@@ -533,7 +533,7 @@ async def handle_connection(connection, cert, request, local=False):
             return
         if request['txcount'] < cfm._txcount:
             await tlvdata.send(connection,
-                         {'error': 'Refusing to be assimilated by inferior'
+                         {'error': 'Refusing to be assimilated by inferior '
                                    'transaction count',
                           'txcount': cfm._txcount,})
             return
@@ -637,7 +637,7 @@ async def handle_connection(connection, cert, request, local=False):
         if request['txcount'] > cfm._txcount:
             await retire_as_leader()
             await tlvdata.send(connection,
-                         {'error': 'Client has higher tranasaction count, '
+                         {'error': 'Client has higher transaction count, '
                                    'should assimilate me, connecting..',
                           'txcount': cfm._txcount})
             log.log({'info': 'Connecting to leader due to superior '
@@ -763,7 +763,7 @@ async def get_leader(connection):
             msg = 'Becoming leader as no leader known'
         else:
             msg = 'Becoming leader because {0} attempted to connect and it ' \
-                  'is current leader'.format(currentleader)
+                  'is the current leader'.format(currentleader)
         log.log({'info': msg, 'subsystem': 'collective'})
         await become_leader(connection)
     return currentleader

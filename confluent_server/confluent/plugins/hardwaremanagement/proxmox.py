@@ -306,7 +306,7 @@ class PmxApiClient:
             return 'on'
         elif currstatus == 'stopped':
             return 'off'
-        raise Exception("Unknnown response to status query")
+        raise Exception("Unknown response to status query")
 
     async def set_vm_power(self, vm, state):
         host, guest = await self.get_vm(vm)

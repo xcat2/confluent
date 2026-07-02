@@ -15,7 +15,7 @@ fi
 cryptboot=$(grep encryptboot: /etc/confluent/confluent.deploycfg|sed -e 's/^encryptboot: //')
 if [ "$cryptboot" != "" ]  && [ "$cryptboot" != "none" ] && [ "$cryptboot" != "null" ]; then
    echo "****Encrypted boot requested, but not implemented for this OS, halting install" > /dev/console
-   [ -f '/tmp/autoconsdev' ] && (echo "****Encryptod boot requested, but not implemented for this OS,halting install" >> $(cat /tmp/autoconsdev))
+   [ -f '/tmp/autoconsdev' ] && (echo "****Encrypted boot requested, but not implemented for this OS, halting install" >> $(cat /tmp/autoconsdev))
    while :; do sleep 86400; done
 fi
 

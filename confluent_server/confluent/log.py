@@ -232,7 +232,7 @@ class TimedAndSizeRotatingFileHandler(BaseRotatingHandler):
         if self.maxBytes < 8192:
             raise exc.GlobalConfigError("The minimum value of max_bytes "
                                         "of log rolling size in the log "
-                                        "section should larger than 8192.")
+                                        "section should be larger than 8192.")
         self.utc = conf.get_boolean_option('log', 'utc') or False
 
         # Calculate the real rollover interval, which is just the number of

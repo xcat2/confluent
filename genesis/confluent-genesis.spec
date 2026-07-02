@@ -11,7 +11,7 @@ AutoProv: false
 License: Various
 
 %Description
-A small linux environment to proved a servicing image to boot systems into if needed.
+A small linux environment to provide a servicing image to boot systems into if needed.
 
 %prep
 

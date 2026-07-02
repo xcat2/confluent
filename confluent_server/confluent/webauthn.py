@@ -134,7 +134,7 @@ class User():
 def registration_request(username, cfg, APP_RELYING_PARTY):
     user_model = User.get(username)
     if user_model is None:
-        raise Exception("User not foud")
+        raise Exception("User not found")
 
     options = generate_registration_options(
         rp_name=APP_RELYING_PARTY.name,

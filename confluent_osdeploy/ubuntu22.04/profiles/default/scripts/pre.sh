@@ -49,8 +49,8 @@ if [ "$cryptboot" != "" ]  && [ "$cryptboot" != "none" ] && [ "$cryptboot" != "n
     export lukspass
     run_remote_python addcrypt
     if ! grep 'password:' /autoinstall.yaml > /dev/null; then
-        echo "****Encrypted boot requested, but the user-data does not have a hook to enable,halting install" > /dev/console
-        [ -f '/tmp/autoconsdev' ] && (echo "****Encryptod boot requested, but the user-data does not have a hook to enable,halting install" >> $(cat /tmp/autoconsdev))
+        echo "****Encrypted boot requested, but the user-data does not have a hook to enable, halting install" > /dev/console
+        [ -f '/tmp/autoconsdev' ] && (echo "****Encrypted boot requested, but the user-data does not have a hook to enable, halting install" >> $(cat /tmp/autoconsdev))
         while :; do sleep 86400; done
     fi
     sed -i s!%%CRYPTPASS%%!$lukspass! /autoinstall.yaml

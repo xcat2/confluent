@@ -108,8 +108,8 @@ class BailOut(Exception):
 def print_help():
     print("confetty provides a filesystem like interface to confluent.  "
           "Navigation is done using the same commands as would be used in a "
-          "filesystem.  Tab completion is supported to aid in navigation,"
-          "as is up arrow to recall previous commands and control-r to search"
+          "filesystem.  Tab completion is supported to aid in navigation, "
+          "as is up arrow to recall previous commands and control-r to search "
           "previous command history, similar to using bash\n\n"
           "The supported commands are:\n"
           "cd [location] - Set the current command context, similar to a "

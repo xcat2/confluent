@@ -1349,7 +1349,7 @@ async def dispatch_request(nodes, manager, element, configmanager, inputdata,
         if isinstance(rsp, Exception):
             raise rsp
         if not rsp:
-            raise Exception('Error in cross-collective serialize/deserialze, see remote logs')
+            raise Exception('Error in cross-collective serialize/deserialize, see remote logs')
         yield rsp
 
 

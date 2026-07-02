@@ -1258,7 +1258,7 @@ async def eval_node(cfg, handler, info, nodename, manual=False):
     except Exception as e:
         unknown_info[info['hwaddr']] = info
         info['discostatus'] = 'unidentified'
-        errorstr = 'An error occured during discovery, check the ' \
+        errorstr = 'An error occurred during discovery, check the ' \
                    'trace and stderr logs, mac was {0} and ip was {1}' \
                    ', the node or the containing enclosure was {2}' \
                    ''.format(info['hwaddr'], handler.ipaddr, nodename)
@@ -1505,7 +1505,7 @@ async def discover_node(cfg, handler, info, nodename, manual):
                 bmcaddr = cfg.get_node_attributes(nodename, 'hardwaremanagement.manager')
                 bmcaddr = bmcaddr.get(nodename, {}).get('hardwaremanagement.manager', {}).get('value', '')
                 if not bmcaddr:
-                    log.log({'error': 'Unable to get BMC address for {0]'.format(nodename)})
+                    log.log({'error': 'Unable to get BMC address for {0}'.format(nodename)})
                 else:
                     bmcaddr = bmcaddr.split('/', 1)[0]
                     await wait_for_connection(bmcaddr)

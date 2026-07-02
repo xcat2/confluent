@@ -106,7 +106,7 @@ argparser.add_option('-w','--windowed', action='store_true', default=False,
                           'title set for each node, set NODECONSOLE_WINDOWED_COMMAND'
                           ' to "wt.exe wsl.exe -d AlmaLinux-8 '
                           '--shell-type login".  If the NODECONSOLE_WINDOWED_COMMAND '
-                          'environment variable isn\'t set, xterm will be used by'
+                          'environment variable isn\'t set, xterm will be used by '
                           'default.')
 
 (options, args) = argparser.parse_args()

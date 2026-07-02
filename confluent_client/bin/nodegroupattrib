@@ -42,7 +42,7 @@ argparser = optparse.OptionParser(
              \n       %prog [options] nodegroup nodes=value1,value2
              \n ''')
 argparser.add_option('-b', '--blame', action='store_true',
-                     help='Show information about how attributes inherited')
+                     help='Show information about how attributes are inherited')
 argparser.add_option('-e', '--environment', action='store_true',
                      help='Set attributes, but from environment variable of '
                           'same name')
