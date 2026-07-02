@@ -603,13 +603,23 @@ async def _start_tenant_sessions(cfm):
                           event=log.Events.stacktrace)
     cfm.watch_nodecollection(_nodechange)
 
+running = True
 
+async def run_buffer_daemon():
+    global _bufferdaemon
+    while running:
+        _bufferdaemon = await asyncio.subprocess.create_subprocess_exec(
+            '/opt/confluent/bin/vtbufferd', 'confluent-vtbuffer')
+        await _bufferdaemon.wait()
+        
+    
 async def initialize():
     global _tracelog
     global _bufferdaemon
     _tracelog = log.Logger('trace')
-    _bufferdaemon = await asyncio.subprocess.create_subprocess_exec(
-        '/opt/confluent/bin/vtbufferd', 'confluent-vtbuffer')
+    tasks.spawn(run_buffer_daemon())
+    #_bufferdaemon = await asyncio.subprocess.create_subprocess_exec(
+    #    '/opt/confluent/bin/vtbufferd', 'confluent-vtbuffer')
     #_bufferdaemon = subprocess.Popen(
     #    ['/opt/confluent/bin/vtbufferd', 'confluent-vtbuffer'], bufsize=0, stdin=subprocess.DEVNULL,
     #    stdout=subprocess.DEVNULL)
