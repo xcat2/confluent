@@ -597,14 +597,21 @@ def _start_tenant_sessions(cfm):
                           event=log.Events.stacktrace)
     cfm.watch_nodecollection(_nodechange)
 
+running = True
+
+def run_buffer_daemon():
+    global _bufferdaemon
+    while running:
+        _bufferdaemon = subprocess.Popen(
+            ['/opt/confluent/bin/vtbufferd', 'confluent-vtbuffer'], bufsize=0, stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL)
+        _bufferdaemon.wait()
 
 def initialize():
     global _tracelog
     global _bufferdaemon
     _tracelog = log.Logger('trace')
-    _bufferdaemon = subprocess.Popen(
-        ['/opt/confluent/bin/vtbufferd', 'confluent-vtbuffer'], bufsize=0, stdin=subprocess.DEVNULL,
-        stdout=subprocess.DEVNULL)
+    eventlet.spawn(run_buffer_daemon)
 
 def start_console_sessions():
     configmodule.hook_new_configmanagers(_start_tenant_sessions)
