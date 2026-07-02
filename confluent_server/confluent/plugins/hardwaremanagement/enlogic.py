@@ -46,9 +46,7 @@ class EnlogicClient(object):
     @property
     def wc(self):
         if self._wc:
-            print("done cache")
             return self._wc
-        print("logging")
         targcfg = self.configmanager.get_node_attributes(
             self.node, ['hardwaremanagement.manager'], decrypt=True
         )
