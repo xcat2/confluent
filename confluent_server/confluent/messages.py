@@ -657,8 +657,11 @@ class InputFirmwareUpdate(ConfluentMessage):
                                 value, curruser)
                             raise Exception(errstr)
                     except KeyError:
-                        pass # We can't check ownership for confluent users without system users, as is the case in a prominent container usage,
-                            # We must rely upon the banned paths to mitigate risk instead
+                        # non-system backed user, restrict them to either web curated assets or identity images
+                        if not (value.startswith('/var/lib/confluent/client_assets/') or value.startswith('/var/lib/confluent/private/identity_images')):
+                            raise Exception(
+                                'File transfer using non-system user {} is not supported for {}'.format(curruser, value))
+                        
                 checkedfiles.add(value)
             self.filebynode[node] = value
 
