@@ -655,13 +655,19 @@ node = {
     },
     'pubkeys.addpolicy': {
         'description': ('Policy to use when encountering unknown public '
-                        'keys.  Choices are "automatic" to accept and '
-                        'store new key if no key known and "manual" '
-                        'to always reject a new key, even if no key known'
-                        'Note that if the trusted CA verifies the certificate,'
-                        ' that is accepted ignoring this policy.  Default '
-                        'policy is "automatic"'),
-        'validvalues': ('automatic', 'manual'),
+                        'keys.  If unset (default), behaves as "tofu" '
+                        '(trust-on-first-use): accept and store a new key '
+                        'if no key is currently known.  "manual" always '
+                        'rejects a new key, even if no key is known, '
+                        'requiring it to be pinned manually.  "ca" requires '
+                        'the trusted CA to validate the certificate before '
+                        'pinning a new or changed key, but a previously '
+                        'pinned key that still matches is trusted without '
+                        're-checking the CA.  "ca-only" is stricter: it '
+                        'requires the trusted CA to validate the '
+                        'certificate on every check, even when a '
+                        'previously pinned key would otherwise match.'),
+        'validvalues': ('tofu', 'manual', 'ca', 'ca-only'),
     },
     'pubkeys.tls_hardwaremanager': {
         'description':  ('Fingerprint of the TLS certificate recognized as'
