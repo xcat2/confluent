@@ -20,6 +20,8 @@
 # time
 
 import asyncio
+
+import confluent.exceptions as exc
 import confluent.config.configmanager as configmanager
 
 from concurrent.futures import ProcessPoolExecutor
@@ -208,7 +210,7 @@ def authorize(name, element, tenant=False, operation='create',
     # even if pam does authentication.
     if operation not in ('create', 'start', 'update', 'retrieve', 'delete', None):
         return False
-    if operation != 'retrieve' and (element.startswith('/users') or element.startswith('/usergroups')):
+    if operation != 'retrieve' and element and (element.startswith('/users') or element.startswith('/usergroups')):
         return False
     user, tenant = _get_usertenant(name, tenant)
     if tenant is not None and not configmanager.is_tenant(tenant):
@@ -216,6 +218,11 @@ def authorize(name, element, tenant=False, operation='create',
     manager = configmanager.ConfigManager(tenant, username=user)
     userobj = manager.get_user(user)
     if element and (element.startswith('/sessions/current/webauthn/registered_credentials/') or  element.startswith('/sessions/current/webauthn/validate/')):
+        name = element.rsplit('/')[-1]
+        baseelement = element.rsplit(name, 1)[0]
+        if baseelement not in ['/sessions/current/webauthn/registered_credentials/',
+                               '/sessions/current/webauthn/validate/']:
+            raise exc.InvalidParameterValue('Invalid username for passkey operation')
         return userobj, manager, user, tenant, skipuserobj
     if userobj and userobj.get('role', None) == 'Stub':
         userobj = None
