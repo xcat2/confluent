@@ -300,7 +300,7 @@ async def _authorize_request(req, operation, reqbody):
             baseelement = element.rsplit(name, 1)[0]  
             if baseelement not in ['/sessions/current/webauthn/registered_credentials/',
                                '/sessions/current/webauthn/validate/']:
-                raise exc.InvalidParameterValue('Invalid username for passkey operation')
+                raise exc.InvalidArgumentExceptionIn('Invalid username for passkey operation')
             authdata = auth.authorize(name, element=element, operation=operation)
         else:
             element = None
