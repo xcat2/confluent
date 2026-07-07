@@ -222,7 +222,7 @@ def authorize(name, element, tenant=False, operation='create',
         baseelement = element.rsplit(name, 1)[0]
         if baseelement not in ['/sessions/current/webauthn/registered_credentials/',
                                '/sessions/current/webauthn/validate/']:
-            raise exc.InvalidArgumentExceptionIn('Invalid username for passkey operation')
+            raise exc.InvalidArgumentException('Invalid username for passkey operation')
         return userobj, manager, user, tenant, skipuserobj
     if userobj and userobj.get('role', None) == 'Stub':
         userobj = None
