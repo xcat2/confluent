@@ -297,6 +297,10 @@ async def _authorize_request(req, operation, reqbody):
         if (element.startswith('/sessions/current/webauthn/registered_credentials/')
                 or element.startswith('/sessions/current/webauthn/validate/')):
             name = element.rsplit('/')[-1]
+            baseelement = element.rsplit(name, 1)[0]  
+            if baseelement not in ['/sessions/current/webauthn/registered_credentials/',
+                               '/sessions/current/webauthn/validate/']:
+                raise exc.InvalidParameterValue('Invalid username for passkey operation')
             authdata = auth.authorize(name, element=element, operation=operation)
         else:
             element = None
@@ -600,7 +604,7 @@ async def wsock_handler(req):
 
         try:
             if shellsession:
-                consession = shellserver.ShellSession(
+                consession = await shellserver.ShellSession.create(
                     node=nodename, configmanager=cfgmgr,
                     username=username, skipreplay=skipreplay,
                     datacallback=datacallback, width=width, height=height
@@ -881,7 +885,7 @@ async def resourcehandler_backend(req, make_response):
             asynchdl = None
             try:
                 if shellsession:
-                    consession = shellserver.ShellSession(
+                    consession = await shellserver.ShellSession.create(
                         node=nodename, configmanager=cfgmgr,
                         username=authorized['username'], skipreplay=skipreplay,
                         datacallback=datacallback, width=width, height=height
@@ -903,7 +907,7 @@ async def resourcehandler_backend(req, make_response):
             if asynchdl:
                 asynchdl.add_console_session(sessid)
             rsp = await make_response('application/json', 200, cookies=cookies)
-            rsp.write(b'{"session":"%s","data":""}' % sessid)
+            await rsp.write(b'{"session":"%s","data":""}' % sessid)
             return rsp
         elif 'bytes' in querydict.keys():  # not keycodes...
             myinput = querydict['bytes']
@@ -912,7 +916,7 @@ async def resourcehandler_backend(req, make_response):
                 rsp = await make_response('text/plain', 400, 'Expired Session')
                 return rsp
             consolesessions[sessid]['expiry'] = time.time() + 90
-            consolesessions[sessid]['session'].write(myinput)
+            await consolesessions[sessid]['session'].write(myinput)
             rsp = await make_response('application/json', 200)
             await rsp.write(json.dumps({'session': querydict['session']}))
             return rsp # client has requests to send or receive, not both...
