@@ -1,0 +1,275 @@
+name: Build test packages
+
+# Builds confluent rpms (EL9/EL10, x86_64 + aarch64) and debs (Ubuntu noble)
+# and publishes them ONLY as workflow run artifacts - no releases, no tags.
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  utils:
+    name: osdeploy utils (${{ matrix.tag }})
+    runs-on: ${{ matrix.runner }}
+    container: ${{ matrix.image }}
+    strategy:
+      matrix:
+        include:
+          - { tag: el8-x86_64,  image: "almalinux:8", runner: ubuntu-24.04 }
+          - { tag: el9-x86_64,  image: "almalinux:9", runner: ubuntu-24.04 }
+          - { tag: el8-aarch64, image: "almalinux:8", runner: ubuntu-24.04-arm }
+          - { tag: el9-aarch64, image: "almalinux:9", runner: ubuntu-24.04-arm }
+    steps:
+      - name: Install build dependencies
+        run: |
+          dnf -y install dnf-plugins-core
+          dnf config-manager --set-enabled crb || dnf config-manager --set-enabled powertools || true
+          dnf -y install gcc make binutils libcurl-devel fuse-devel libxcrypt-devel
+      - uses: actions/checkout@v4
+      - name: Build utils
+        run: make -C confluent_osdeploy/utils
+      - uses: actions/upload-artifact@v4
+        with:
+          name: utilsbin-${{ matrix.tag }}
+          path: |
+            confluent_osdeploy/utils/confluent_imginfo
+            confluent_osdeploy/utils/copernicus
+            confluent_osdeploy/utils/clortho
+            confluent_osdeploy/utils/autocons
+            confluent_osdeploy/utils/start_root
+            confluent_osdeploy/utils/urlmount
+          retention-days: 7
+
+  rpms:
+    name: rpms (${{ matrix.dist }}-${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    container: ${{ matrix.image }}
+    strategy:
+      matrix:
+        include:
+          - { dist: el9,  arch: x86_64,  image: "almalinux:9",  runner: ubuntu-24.04,     noarch: true }
+          - { dist: el10, arch: x86_64,  image: "almalinux:10", runner: ubuntu-24.04,     noarch: true }
+          - { dist: el9,  arch: aarch64, image: "almalinux:9",  runner: ubuntu-24.04-arm, noarch: false }
+          - { dist: el10, arch: aarch64, image: "almalinux:10", runner: ubuntu-24.04-arm, noarch: false }
+    steps:
+      - name: Install build dependencies
+        run: dnf -y install rpm-build python3-setuptools python3-devel gcc make git-core tar xz
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Prepare rpmbuild tree
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          mkdir -p ~/rpmbuild/SOURCES ~/rpmbuild/SPECS
+      - name: Build vtbufferd (arch-specific)
+        run: ./confluent_vtbufferd/buildrpm
+      - name: Build noarch rpms (client, server, imgutil)
+        if: ${{ matrix.noarch }}
+        run: |
+          ./confluent_client/buildrpm
+          ./confluent_server/buildrpm
+          ./imgutil/buildrpm
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rpms-${{ matrix.dist }}-${{ matrix.arch }}
+          path: ~/rpmbuild/RPMS/
+          retention-days: 7
+
+  osdeploy:
+    name: osdeploy rpm (${{ matrix.arch }})
+    runs-on: ubuntu-24.04
+    container: almalinux:9
+    needs: utils
+    strategy:
+      matrix:
+        arch: [x86_64, aarch64]
+    steps:
+      - name: Install build dependencies
+        run: dnf -y install rpm-build git-core tar xz cpio
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Prepare
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - uses: actions/download-artifact@v4
+        with:
+          name: utilsbin-el8-${{ matrix.arch }}
+          path: el8utils
+      - uses: actions/download-artifact@v4
+        with:
+          name: utilsbin-el9-${{ matrix.arch }}
+          path: el9utils
+      - name: Build osdeploy rpm
+        run: bash .github/scripts/build-osdeploy.sh ${{ matrix.arch }} el8utils el9utils
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rpms-osdeploy-${{ matrix.arch }}
+          path: ~/rpmbuild/RPMS/
+          retention-days: 7
+
+  debs:
+    name: debs (${{ matrix.name }})
+    runs-on: ubuntu-24.04
+    container: ${{ matrix.image }}
+    continue-on-error: true
+    strategy:
+      matrix:
+        include:
+          - { name: noble, image: "ubuntu:24.04" }
+    steps:
+      - name: Install build dependencies
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get -y install \
+            git build-essential debhelper devscripts dh-python fakeroot \
+            python3-all python3-setuptools python3-stdeb xz-utils
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Build debs
+        run: |
+          git config --global --add safe.directory '*'
+          mkdir -p /tmp/debout
+          ./confluent_vtbufferd/builddeb /tmp/debout
+          ./confluent_client/builddeb /tmp/debout
+          ./confluent_server/builddeb /tmp/debout
+          ls -la /tmp/debout
+      - uses: actions/upload-artifact@v4
+        with:
+          name: debs-${{ matrix.name }}
+          path: /tmp/debout/*.deb
+          retention-days: 7
+          if-no-files-found: error
+
+  smoketest:
+    name: smoketest (${{ matrix.dist }})
+    runs-on: ubuntu-24.04
+    container: ${{ matrix.image }}
+    needs: [rpms, osdeploy]
+    strategy:
+      matrix:
+        include:
+          - { dist: el9,  image: "almalinux:9" }
+          - { dist: el10, image: "almalinux:10" }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: rpms-${{ matrix.dist }}-x86_64
+          path: testrpms/main
+      - uses: actions/download-artifact@v4
+        with:
+          name: rpms-osdeploy-x86_64
+          path: testrpms/osdeploy
+      - name: Install and smoke test
+        run: bash .github/scripts/smoketest.sh testrpms
+
+  assemble:
+    name: assemble download bundles
+    runs-on: ubuntu-24.04
+    needs: [rpms, osdeploy, debs, smoketest]
+    if: ${{ always() && needs.rpms.result == 'success' && needs.osdeploy.result == 'success' && needs.smoketest.result == 'success' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Determine version
+        id: ver
+        run: echo "version=$(git describe --tags)" >> "$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: rpms-*
+          path: art
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          pattern: debs-*
+          path: art
+      - name: Compose per-target bundles
+        run: |
+          set -e
+          VERSION="${{ steps.ver.outputs.version }}"
+          for dist in el9 el10; do
+            for arch in x86_64 aarch64; do
+              out="bundle/confluent-$VERSION-$dist-$arch"
+              mkdir -p "$out"
+              # noarch rpms (client, server, imgutil) are built in the x86_64 leg
+              find "art/rpms-$dist-x86_64" -name '*.noarch.rpm' -exec cp {} "$out/" \;
+              # arch-specific vtbufferd
+              find "art/rpms-$dist-$arch" -name "*.$arch.rpm" -exec cp {} "$out/" \;
+              # osdeploy (noarch rpm containing $arch binaries)
+              find "art/rpms-osdeploy-$arch" -name '*.rpm' -exec cp {} "$out/" \;
+              cat > "$out/INSTALL.txt" <<EOF
+          confluent test build $VERSION ($dist $arch)
+          =============================================
+
+          Unofficial CI build for testing, built from
+          https://github.com/${GITHUB_REPOSITORY} commit ${GITHUB_SHA}.
+
+          Install:
+            dnf install epel-release
+            dnf config-manager --set-enabled crb
+            dnf install ./confluent_client-*.rpm ./confluent_vtbufferd-*.rpm ./confluent_imgutil-*.rpm
+            dnf install ./confluent_server-*.rpm
+
+          Known gaps (packages not in EPEL yet):
+            - python3-webauthn is required by confluent_server but not available;
+              install the server with: rpm -ivh --nodeps confluent_server-*.rpm
+              (after installing the other dependencies via dnf), or grab it from
+              https://hpc.lenovo.com/yum/latest/
+            - el9 only: python3-eficompressor (same handling)
+            - el10 only: python3-pycdlib is missing (UDF/Windows ISO import
+              will not work)
+            - confluent_osdeploy requires confluent_ipxe (Lenovo-only); install
+              with rpm -ivh --nodeps for testing without PXE.
+          EOF
+            done
+          done
+          if [ -d art/debs-noble ]; then
+            out="bundle/confluent-$VERSION-debs-noble"
+            mkdir -p "$out"
+            cp art/debs-noble/*.deb "$out/" || true
+          fi
+          find bundle -type f | sort
+      - name: Write run summary
+        run: |
+          VERSION="${{ steps.ver.outputs.version }}"
+          {
+            echo "## confluent test build $VERSION"
+            echo
+            echo "Download the artifact matching your target below (Artifacts section of this run)."
+            echo
+            echo "| Artifact | Target |"
+            echo "|---|---|"
+            for d in bundle/*/; do
+              n=$(basename "$d")
+              echo "| $n | $(echo "$n" | sed "s/confluent-$VERSION-//") |"
+            done
+            echo
+            echo "See INSTALL.txt inside each bundle for install steps and known dependency gaps."
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: confluent-${{ steps.ver.outputs.version }}-el9-x86_64
+          path: bundle/confluent-${{ steps.ver.outputs.version }}-el9-x86_64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: confluent-${{ steps.ver.outputs.version }}-el9-aarch64
+          path: bundle/confluent-${{ steps.ver.outputs.version }}-el9-aarch64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: confluent-${{ steps.ver.outputs.version }}-el10-x86_64
+          path: bundle/confluent-${{ steps.ver.outputs.version }}-el10-x86_64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: confluent-${{ steps.ver.outputs.version }}-el10-aarch64
+          path: bundle/confluent-${{ steps.ver.outputs.version }}-el10-aarch64
+      - uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: confluent-${{ steps.ver.outputs.version }}-debs-noble
+          path: bundle/confluent-${{ steps.ver.outputs.version }}-debs-noble
