@@ -29,9 +29,11 @@ if path.startswith('/opt'):
 import confluent.config.configmanager as cfm
 import confluent.config.conf as conf
 import confluent.main as main
+import confluent.noderange as noderange
 
 argparser = optparse.OptionParser(
-    usage="Usage: %prog [options] [dump|restore|merge] [path]")
+    usage="Usage: %prog [options] [dump|restore|merge] [path]\n"
+          "       %prog [-u] [-v] showattrib <noderange> <attribute>...")
 argparser.add_option('-p', '--password',
                      help='Password to use to protect/unlock a protected dump')
 argparser.add_option('-i', '--interactivepassword', help='Prompt for password',
@@ -42,7 +44,10 @@ argparser.add_option('-u', '--unprotected', action='store_true',
                       help='Specify that no password should be used to protect'
                            ' the key information.  Fields will be encrypted, '
                            'but keys.json will contain unencrypted decryption'
-                           ' keys that may be used to read the dump')
+                           ' keys that may be used to read the dump.  With '
+                           'showattrib, show secret.* values decrypted to '
+                           'plaintext and crypted.* values as their stored '
+                           'hashes rather than masking them')
 argparser.add_option('-s', '--skipkeys', action='store_true',
                       help='This specifies to dump the encrypted data without '
                            'dumping the keys needed to decrypt it.  This is '
@@ -53,7 +58,109 @@ argparser.add_option('-s', '--skipkeys', action='store_true',
                            'they do not require incremental backup')
 argparser.add_option('-y', '--yaml', action='store_true',
                       help='Use YAML instead of JSON as file format')
+argparser.add_option('-v', '--value-only', dest='valueonly',
+                     action='store_true',
+                     help='With showattrib, print only the values '
+                          'without node and attribute names')
 (options, args) = argparser.parse_args()
+
+
+def _dispval(value):
+    # Render a single scalar for display: decode bytes (e.g. decrypted
+    # secrets) and stringify anything else, including non-string values
+    if isinstance(value, bytes):
+        return value.decode('utf-8', errors='replace')
+    return str(value)
+
+
+def show_attrib(options, args):
+    if len(args) < 3:
+        sys.stderr.write('Usage: confluentdbutil showattrib [-u] [-v] '
+                         '<noderange> <attribute> [<attribute>...]\n')
+        sys.exit(1)
+    nr = args[1]
+    requested = args[2:]
+    # Load the config store and unlock the master key, mirroring the daemon
+    # startup sequence in confluent.main.  _initsecurity handles the
+    # externalcfgkey case (key protected by the contents of a key file);
+    # otherwise the key is stored unprotected and init_masterkey unlocks it
+    # without any password.  autogen=False keeps this read-only (never create a
+    # key).
+    cfm.init()
+    try:
+        main._initsecurity(conf.get_config())
+        if not cfm._masterkey:
+            cfm.init_masterkey(autogen=False)
+    except Exception:
+        sys.stderr.write("Error unlocking credential store\n")
+        sys.exit(1)
+    if not cfm._masterkey:
+        sys.stderr.write("Error unlocking credential store\n")
+        sys.exit(1)
+    cfg = cfm.ConfigManager(None)
+    try:
+        nodes = noderange.NodeRange(nr, config=cfg).nodes
+    except Exception as e:
+        sys.stderr.write("Invalid Noderange: " + str(e) + "\n")
+        sys.exit(1)
+    attrs = cfg.get_node_attributes(list(nodes), requested,
+                                    decrypt=options.unprotected)
+    # Order nodes and attributes exactly as the server/nodeattrib do:
+    # natural sort via humanify_nodename (identical to the client's
+    # naturalize_string), with the same TypeError fallback as core.py.
+    nodelist = list(attrs)
+    try:
+        nodelist.sort(key=noderange.humanify_nodename)
+    except TypeError:
+        nodelist.sort()
+    for node in nodelist:
+        nodeattrs = attrs[node]
+        anames = list(nodeattrs)
+        try:
+            anames.sort(key=noderange.humanify_nodename)
+        except TypeError:
+            anames.sort()
+        for aname in anames:
+            adata = nodeattrs[aname]
+            # Format like nodeattrib: a plain, list, or (decrypted) secret.*
+            # value lives in 'value'; some attributes come back as a bare list;
+            # crypted.* is a one-way hash stored as 'hashvalue'.  Without -u,
+            # sensitive values are masked the same way nodeattrib does.
+            if isinstance(adata, (list, tuple)):
+                val = ','.join(_dispval(x) for x in adata)
+            elif 'value' in adata:
+                aval = adata['value']
+                if aval is None:
+                    val = ''
+                elif isinstance(aval, (list, tuple)):
+                    val = ','.join(_dispval(x) for x in aval)
+                else:
+                    val = _dispval(aval)
+            elif 'hashvalue' in adata:
+                if options.unprotected:
+                    val = _dispval(adata['hashvalue'])
+                else:
+                    val = '******** (hidden: use -u to show)'
+            elif 'cryptvalue' in adata:
+                val = '******** (hidden: use -u to show)'
+            else:
+                val = ''
+            if options.valueonly:
+                print(val)
+            else:
+                print('{0}: {1}: {2}'.format(node, aname, val))
+        # Report explicitly named (non-glob) attributes that are not set.
+        for attr in requested:
+            if '*' not in attr and attr not in nodeattrs:
+                if options.valueonly:
+                    print('')
+                else:
+                    print('{0}: {1}:'.format(node, attr))
+    sys.exit(0)
+
+
+if args and args[0] == 'showattrib':
+    show_attrib(options, args)
 if len(args) != 2 or args[0] not in ('dump', 'restore', 'merge'):
     argparser.print_help()
     sys.exit(1)

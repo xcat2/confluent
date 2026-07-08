@@ -23,6 +23,10 @@ node after using the nodeattrib(8) command will not have attributes change autom
 It's easiest to see by using the `nodeattrib <noderange> -b` to understand how
 the attributes are set on the node versus a group to which a node belongs.
 
+The values of `secret.*` and `crypted.*` attributes are never shown here; they
+can only be retrieved on the confluent server with
+`confluentdbutil -u showattrib`.
+
 ## OPTIONS
 
 * `-b`, `--blame`:

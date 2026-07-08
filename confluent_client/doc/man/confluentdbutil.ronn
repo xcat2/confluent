@@ -4,6 +4,7 @@ confluentdbutil(8) -- Backup or restore confluent database
 ## SYNOPSIS
 
 `confluentdbutil [options] [dump|restore] <path>`
+`confluentdbutil [-u] [-v] showattrib <noderange> <attribute>...`
 
 ## DESCRIPTION
 
@@ -12,6 +13,15 @@ to/from json files.  The path is a directory that holds the json version.
 In order to perform restore, the confluent service must not be running.  It
 is required to indicate how the usernames/passwords are treated in
 the json files (password protected, removed from the files, or unprotected).
+
+The `showattrib` subcommand prints the stored value of any attribute for the
+given noderange, reading directly from the configuration store.  Because it
+does not talk to the confluent daemon, it can be used to read attribute values
+even while confluent is stopped.  It must be run directly on the confluent
+server as root.  By default, `secret.*` and `crypted.*` values are masked as
+`********`, just as nodeattrib(8) shows them.  With `-u`, they are revealed:
+`secret.*` values decrypted to plaintext and `crypted.*` values as their
+stored one-way hashes.
 
 ## OPTIONS
 
@@ -27,7 +37,10 @@ the json files (password protected, removed from the files, or unprotected).
   than including them.
   
 * `-u`, `--unprotected`:
-  The keys.json file will include the encryption keys without any protection.
+  With `dump`, the keys.json file will include the encryption keys without
+  any protection.  With `showattrib`, show `secret.*` values decrypted to
+  plaintext and `crypted.*` values as their stored hashes rather than
+  masking them as `********`.
   
 * `-s`, `--skipkeys`:
   This specifies to dump the encrypted data without
@@ -40,6 +53,21 @@ the json files (password protected, removed from the files, or unprotected).
 
 * `-y`, `--yaml`:
   Use YAML instead of JSON as file format
-  
-  * `-h`, `--help`:
+
+* `-v`, `--value-only`:
+  With `showattrib`, print only the values, without node and attribute names
+  (useful for scripting).
+
+* `-h`, `--help`:
   Show help message and exit
+
+## EXAMPLES
+
+* Show the decrypted BMC password confluent uses for a node (run on the
+  server as root):
+    `# confluentdbutil -u showattrib n1 secret.hardwaremanagementpassword`
+    `n1: secret.hardwaremanagementpassword: mypassword123`
+
+* Get just the value, for use in a script:
+    `# confluentdbutil -u -v showattrib n1 secret.hardwaremanagementpassword`
+    `mypassword123`
