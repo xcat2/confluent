@@ -43,6 +43,16 @@
 * `-s`, `--source` <directory>:
   Directory to pull installation from, typically a subdirectory of `/var/lib/confluent/distributions`. By default, the repositories for the build system are used. For Ubuntu, this is not supported; the build system repositories are always used.
 
+* `--arch` <architecture>:
+  Target architecture to build for (`x86_64` or `aarch64`). For Ubuntu, the
+  Debian-style names `amd64` and `arm64` are accepted as aliases. Building
+  for a foreign architecture is supported on EL and Ubuntu build hosts and
+  requires a statically linked qemu-user emulator registered in binfmt_misc
+  with the F (fix-binary) flag; on Ubuntu this is provided by the
+  qemu-user-static package (qemu-user-binfmt as of Ubuntu 26.04). For EL,
+  the architecture is also detected automatically when building from a `-s`
+  source tree.
+
 * `-y`, `--non-interactive`:
   Avoid prompting for confirmation.
 
@@ -98,6 +108,15 @@
 Build a diskless image from a distribution:
 
     imgutil build -s  alma-9.6-x86_64 /tmp/myimage
+
+Build an aarch64 EL diskless image on an x86_64 host (the architecture is
+detected from the source tree):
+
+    imgutil build -s alma-9.6-aarch64 /tmp/myimage
+
+Build an aarch64 Ubuntu diskless image on an amd64 Ubuntu host:
+
+    imgutil build --arch aarch64 /tmp/myimage
 
 Execute a shell in an unpacked image:
 
