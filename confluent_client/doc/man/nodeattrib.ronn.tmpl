@@ -38,6 +38,10 @@ If the word all is specified, then all available attributes are given.
 Omitting any attribute name or the word 'all' will display only attributes
 that are currently set.
 
+The values of `secret.*` and `crypted.*` attributes are never shown here; they
+can only be retrieved on the confluent server with
+`confluentdbutil -u showattrib`.
+
 For the `groups` attribute, it is possible to add a group by doing
 `groups,=<newgroup>` and to remove by doing `groups^=<oldgroup>`
 
