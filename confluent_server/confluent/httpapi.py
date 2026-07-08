@@ -864,7 +864,7 @@ async def resourcehandler_backend(req, make_response):
         await rsp.write(b'Our princess is in another castle!')
         return rsp
     elif (operation == 'create' and ('/console/session' in reqpath or
-            '/shell/sessions/' in reqpath)) and (reqpath.startswith('/nodes/') or reqpath.startswith('/noderange/')):
+            '/shell/sessions/' in reqpath)) and (reqpath.startswith(('/nodes/', '/noderange/'))):
         if '/console/session' in reqpath:
             prefix, _, _ = reqpath.partition('/console/session')
             shellsession = False
@@ -949,7 +949,7 @@ async def resourcehandler_backend(req, make_response):
             return rsp
         else:  # no keys, but a session, means it's hooking to receive data
             raise Exception("long polling console sessions are discontinued")
-    elif (operation == 'create' and ('/firmware/updates/active' in reqpath)):
+    elif (operation == 'create' and ('/firmware/updates/active' in reqpath)) and (reqpath.startswith(('/nodes/', '/noderange/'))):
         if 'application/json' in reqtype:
             if not isinstance(reqbody, str):
                 reqbody = reqbody.decode('utf8')
@@ -969,7 +969,7 @@ async def resourcehandler_backend(req, make_response):
             rsp = await make_response(mimetype, 200, 'OK')
             await rsp.write(json.dumps({'data': nodeurls}).encode('utf8'))
             return rsp
-    elif (operation == 'create' and ('/staging' in reqpath)):
+    elif (operation == 'create' and (reqpath.startswith('/staging'))):
         url = reqpath
         args_dict = {}
         content_length = int(req.content_length)
