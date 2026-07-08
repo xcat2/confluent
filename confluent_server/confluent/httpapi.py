@@ -357,15 +357,16 @@ async def _authorize_request(req, operation, reqbody):
             return {'code': 401}
         sessid = _establish_http_session(req, authdata, name, cookie)
     if authdata and element and element.startswith('/sessions/current/webauthn/validate/'):
-        if webauthn:
-            rsp = await webauthn.handle_api_request(element, req, authdata[2], authdata[1], reqbody, None)
-            if rsp['verified']:
-                if rsp.get('username', None):
-                    name = rsp['username']
-                    authdata = (authdata[0], authdata[1], name, authdata[3], authdata[4])
-                sessid = _establish_http_session(req, authdata, name, cookie)
-            else:
-                return {'code': 403}
+        if not webauthn:
+            raise exc.NotFoundException('WebAuthn support not available')
+        rsp = await webauthn.handle_api_request(element, req, authdata[2], authdata[1], reqbody, None)
+        if rsp['verified']:
+            if rsp.get('username', None):
+                name = rsp['username']
+                authdata = (authdata[0], authdata[1], name, authdata[3], authdata[4])
+            sessid = _establish_http_session(req, authdata, name, cookie)
+        else:
+            return {'code': 403}
     skiplog = _should_skip_authlog(req)
     if authdata:
         auditmsg = {
@@ -756,7 +757,12 @@ async def resourcehandler_backend(req, make_response):
     if operation != 'retrieve' and 'restexplorerop' in querydict:
         operation = querydict['restexplorerop']
         del querydict['restexplorerop']
-    authorized = await _authorize_request(req, operation, reqbody)
+    try:
+        authorized = await _authorize_request(req, operation, reqbody)
+    except exc.NotFoundException as e:
+        rsp = await make_response(mimetype, 404, 'Not Found')
+        await rsp.write(e.get_error_body().encode('utf8'))
+        return rsp
     if 'logout' in authorized:
         rsp = await make_response("application/json", 200, 'Successful logout')
         await rsp.write(b'{"result": "200 - Successful logout"}')
@@ -779,7 +785,7 @@ async def resourcehandler_backend(req, make_response):
                 if not isinstance(prompt, str):
                     prompt = prompt.decode('utf8')
                 response['prompts'].append(prompt)
-        await rsp.write(json.dumps(response))
+        await rsp.write(json.dumps(response).encode('utf8'))
         return rsp
     if authorized['code'] != 200:
         raise Exception("Unrecognized code from auth engine")
@@ -858,7 +864,7 @@ async def resourcehandler_backend(req, make_response):
         await rsp.write(b'Our princess is in another castle!')
         return rsp
     elif (operation == 'create' and ('/console/session' in reqpath or
-            '/shell/sessions/' in reqpath)):
+            '/shell/sessions/' in reqpath)) and (reqpath.startswith('/nodes/') or reqpath.startswith('/noderange/')):
         if '/console/session' in reqpath:
             prefix, _, _ = reqpath.partition('/console/session')
             shellsession = False
@@ -907,7 +913,7 @@ async def resourcehandler_backend(req, make_response):
             if asynchdl:
                 asynchdl.add_console_session(sessid)
             rsp = await make_response('application/json', 200, cookies=cookies)
-            await rsp.write(b'{"session":"%s","data":""}' % sessid)
+            await rsp.write(b'{"session":"%s","data":""}' % sessid.encode('utf8'))
             return rsp
         elif 'bytes' in querydict.keys():  # not keycodes...
             myinput = querydict['bytes']
