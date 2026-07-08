@@ -361,11 +361,12 @@ def _authorize_request(env, operation, reqbody):
             return {'code': 401}
         sessid = _establish_http_session(env, authdata, name, cookie)
     if authdata and element and element.startswith('/sessions/current/webauthn/validate/'):
-        if webauthn:
-            for rsp in webauthn.handle_api_request(element, env, None, authdata[2], authdata[1], None, reqbody, None):
-                if rsp['verified']:
-                    sessid = _establish_http_session(env, authdata, name, cookie)
-                    break
+        if not webauthn:
+            return {'code': 501}
+        for rsp in webauthn.handle_api_request(element, env, None, authdata[2], authdata[1], None, reqbody, None):
+            if rsp['verified']:
+                sessid = _establish_http_session(env, authdata, name, cookie)
+                break
     skiplog = _should_skip_authlog(env)
     if authdata:
         auditmsg = {
@@ -847,7 +848,7 @@ def resourcehandler_backend(env, start_response):
         yield 'Our princess is in another castle!'
         return
     elif (operation == 'create' and ('/console/session' in env['PATH_INFO'] or
-            '/shell/sessions/' in env['PATH_INFO'])):
+            '/shell/sessions/' in env['PATH_INFO']) and env['PATH_INFO'].startswith(('/nodes/', '/noderange/'))):
         #hard bake JSON into this path, do not support other incarnations
         if '/console/session' in env['PATH_INFO']:
             prefix, _, _ = env['PATH_INFO'].partition('/console/session')
@@ -985,9 +986,7 @@ def resourcehandler_backend(env, start_response):
             start_response('200 OK', headers)
             yield rsp
             return
-    
-
-    elif (operation == 'create' and ('/firmware/updates/active' in env['PATH_INFO'])):    
+    elif (operation == 'create' and ('/firmware/updates/active' in env['PATH_INFO']) and env['PATH_INFO'].startswith(('/nodes/', '/noderange/'))):    
         url = env['PATH_INFO']
         if 'application/json' in reqtype:
             if not isinstance(reqbody, str):
@@ -1008,8 +1007,7 @@ def resourcehandler_backend(env, start_response):
             yield json.dumps({'data': nodeurls})
             start_response('200 OK', headers)
             return
-    
-    elif (operation == 'create' and ('/staging' in env['PATH_INFO'])):
+    elif (operation == 'create' and (env['PATH_INFO'].startswith('/staging'))):
         url = env['PATH_INFO']
         args_dict = {}
         content_length = int(env.get('CONTENT_LENGTH', 0))
