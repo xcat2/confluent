@@ -78,6 +78,7 @@ import confluent.discovery.handlers.xcc as xcc
 import confluent.discovery.handlers.xcc3 as xcc3
 import confluent.discovery.handlers.smm3 as smm3
 import confluent.discovery.handlers.megarac as megarac
+import confluent.discovery.handlers.dell as dell
 import confluent.discovery.handlers.eureka as eureka
 import confluent.exceptions as exc
 import confluent.log as log
@@ -122,6 +123,7 @@ nodehandlers = {
     'lenovo-xcc': xcc,
     'lenovo-xcc3': xcc3,
     'megarac-bmc': megarac,
+    'dell-idrac': dell,
     'megware-chassis': eureka,
     'service:management-hardware.IBM:integrated-management-module2': imm,
     'pxe-client': pxeh,
@@ -145,6 +147,7 @@ servicenames = {
     'lenovo-xcc': 'lenovo-xcc',
     'lenovo-xcc3': 'lenovo-xcc3',
     'megarac-bmc': 'megarac-bmc',
+    'dell-idrac': 'dell-idrac',
     'megware-chassis': 'megware-chassis',
     #'openbmc': 'openbmc',
     'service:management-hardware.IBM:integrated-management-module2': 'lenovo-imm2',
@@ -164,6 +167,7 @@ servicebyname = {
     'lenovo-xcc': 'lenovo-xcc',
     'lenovo-xcc3': 'lenovo-xcc3',
     'megarac-bmc': 'megarac-bmc',
+    'dell-idrac': 'dell-idrac',
     'megware-chassis': 'megware-chassis',
     'lenovo-imm2': 'service:management-hardware.IBM:integrated-management-module2',
     'lenovo-switch': 'service:io-device.Lenovo:management-module',

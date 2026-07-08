@@ -466,16 +466,22 @@ async def _find_service(service, target):
         elif '/redfish/v1/' not in peerdata[nid].get('urls', ()) and '/redfish/v1' not in peerdata[nid].get('urls', ()):
             continue
         else:
+            isxml = False
             for targurl in peerdata[nid]['urls']:
                 if targurl and targurl.endswith('.xml'):
+                    isxml = True
                     pooltargs.append(('/redfish/v1/', peerdata[nid], 'megarac-bmc'))
-        # For now, don't interrogate generic redfish bmcs
+            if not isxml:
+                # Interrogate the service root solely to recognize vendors
+                # with an explicit handler (e.g. Dell iDRAC); check_fish
+                # will not claim unrecognized vendors for this targtype,
+                # preserving the deduplication described below.
+                pooltargs.append(('/redfish/v1/', peerdata[nid], 'redfish-server'))
+        # For now, don't claim generic redfish bmcs
         # This is due to a need to deduplicate from some supported SLP
         # targets (IMM, TSM, others)
-        # activate this else once the core filters/merges duplicate uuid
-        # or we drop support for those devices
-        #else:
-        #    pooltargs.append(('/redfish/v1/', peerdata[nid]))
+        # activate claiming of generic redfish once the core filters/merges
+        # duplicate uuid or we drop support for those devices
     tsks = []
     for targ in pooltargs:
         tsks.append(tasks.spawn_task(check_fish(targ)))
@@ -486,6 +492,32 @@ async def _find_service(service, target):
             if dt is None:
                 continue
             yield dt
+
+def _vendor_from_fishroot(peerinfo, data):
+    """Identify a device by the Vendor field of its redfish service root.
+
+    Returns the augmented peer data for vendors that have an explicit
+    discovery handler, or None for unrecognized vendors, which must not
+    be claimed (they may duplicate SLP-discovered IMM/TSM targets).
+    """
+    if not peerinfo or 'UUID' not in peerinfo:
+        return None
+    vendor = peerinfo.get('Vendor', '')
+    if vendor == 'Megware':
+        data['services'] = ['megware-chassis']
+    elif vendor == 'Dell':
+        data['services'] = ['dell-idrac']
+        # iDRAC exposes the service tag (system serial number)
+        # unauthenticated at the service root
+        servicetag = peerinfo.get('Oem', {}).get('Dell', {}).get(
+            'ServiceTag', None)
+        if servicetag:
+            data['serialnumber'] = servicetag
+    else:
+        return None
+    data['uuid'] = peerinfo['UUID'].lower()
+    return data
+
 
 async def check_fish(urldata, port=443, verifycallback=None):
     if not verifycallback:
@@ -503,11 +535,16 @@ async def check_fish(urldata, port=443, verifycallback=None):
     if url == '/DeviceDescription.json':
         if not peerinfo:
             if data.get('services', None) == ['urn::dmtf-org:service:redfish-rest:']:
-                peerinfo = wc.grab_json_response('/redfish/v1/')
+                peerinfo = await wc.grab_json_response('/redfish/v1/')
                 if peerinfo:
                     data['services'] = ['lenovo-smm3']
                     data['uuid'] = peerinfo['UUID'].lower()
                     return data
+            if targtype == 'redfish-server':
+                # No DeviceDescription.json; may still be a vendor
+                # recognizable from the service root (e.g. Dell iDRAC)
+                peerinfo = await wc.grab_json_response('/redfish/v1/')
+                return _vendor_from_fishroot(peerinfo, data)
             return None
         try:
             peerinfo = peerinfo[0]
@@ -544,12 +581,14 @@ async def check_fish(urldata, port=443, verifycallback=None):
             peerinfo = await wc.grab_json_response('/redfish/v1/')
     if url == '/redfish/v1/':
         if 'UUID' in peerinfo:
-            vendor = peerinfo.get('Vendor', '')
-            # NOTE: Specific path for EUREKA MEGWARE Chassis
-            if vendor == 'Megware':
-                data['services'] = ['megware-chassis']
-            else:
-                data['services'] = [targtype]
+            vdata = _vendor_from_fishroot(peerinfo, data)
+            if vdata:
+                return vdata
+            if targtype == 'redfish-server':
+                # Unrecognized vendor; do not claim generic redfish
+                # (deduplication with SLP-discovered targets)
+                return None
+            data['services'] = [targtype]
             data['uuid'] = peerinfo['UUID'].lower()
             return data
     return None
