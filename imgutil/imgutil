@@ -15,7 +15,6 @@ import glob
 import json
 import argparse
 import os
-import platform
 import pwd
 import re
 import shutil
@@ -259,7 +258,7 @@ async def capture_remote(args):
     os.symlink('/var/lib/confluent/public/site/initramfs.cpio',
                os.path.join(outdir, 'boot/initramfs/site.cpio'))
     confdir = '/opt/confluent/lib/osdeploy/{}-diskless'.format(oscat)
-    archaddon = '/opt/confluent/lib/osdeploy/{}-diskless/initramfs/{}/addons.cpio'.format(oscat, platform.machine())
+    archaddon = '/opt/confluent/lib/osdeploy/{}-diskless/initramfs/{}/addons.cpio'.format(oscat, os.uname().machine)
     if os.path.exists(archaddon):
         os.symlink(archaddon, os.path.join(outdir, 'boot/initramfs/addons.cpio'))
     else:
@@ -462,6 +461,8 @@ def get_mydir(oscategory):
     return gencopy
 
 class OsHandler(object):
+    crossbuild = False
+
     def __init__(self, name, version, arch, args):
         self.name = name
         self._interactive = True
@@ -495,6 +496,10 @@ class OsHandler(object):
 
     def set_interactive(self, shouldbeinteractive):
         self._interactive = shouldbeinteractive
+
+    def set_arch(self, arch):
+        self.arch = arch
+        self.osname = '{}-{}-{}'.format(self.name, self.version, arch)
 
     def get_json(self):
         odata = [self.oscategory, self.version, self.arch, self.name]
@@ -653,7 +658,22 @@ class SuseHandler(OsHandler):
         run_constrainedx(fancy_chroot, (args, self.targpath))
 
 
+deb_arch_map = {
+    'aarch64': 'arm64',
+    'x86_64': 'amd64',
+}
+uname_arch_map = {
+    'arm64': 'aarch64',
+    'amd64': 'x86_64',
+}
+
+
 class DebHandler(OsHandler):
+    crossbuild = True
+
+    def set_arch(self, arch):
+        super().set_arch(uname_arch_map.get(arch, arch))
+
     def __init__(self, name, version, arch, args, codename, hostpath):
         self.includepkgs = []
         self.targpath = None
@@ -684,7 +704,10 @@ class DebHandler(OsHandler):
         shutil.copytree(srcdir, targdir)
         os.chmod(os.path.join(targdir, 'hooks/confluent'), 0o755)
         #cmd = ['debootstrap', '--include={0}'.format(','.join(self.includepkgs)), self.codename, self.targpath]
-        cmd = ['debootstrap', self.codename, self.targpath]
+        if self.arch != os.uname().machine:
+            cmd = ['debootstrap', '--arch={0}'.format(deb_arch_map.get(self.arch, self.arch)), self.codename, self.targpath]
+        else:
+            cmd = ['debootstrap', self.codename, self.targpath]
         subprocess.check_call(cmd)
 
     def _apt(self, args, cmd):
@@ -736,6 +759,8 @@ class DebHandler(OsHandler):
 
 
 class ElHandler(OsHandler):
+    crossbuild = True
+
     def __init__(self, name, version, arch, args, hostpath='/'):
         self.oscategory = 'el{0}'.format(version.split('.')[0])
         self.yumargs = []
@@ -774,7 +799,10 @@ class ElHandler(OsHandler):
         self.targpath = targpath
         self.yumargs.extend(
             ['--installroot={0}'.format(targpath),
-             '--releasever={0}'.format(self.version), 'install'])
+             '--releasever={0}'.format(self.version)])
+        if self.arch != os.uname().machine:
+            self.yumargs.append('--forcearch={0}'.format(self.arch))
+        self.yumargs.append('install')
 
     def prep_root(self, args):
         mkdirp(os.path.join(self.targpath, 'usr/lib/dracut/modules.d'))
@@ -929,16 +957,17 @@ def run_constrained(function, args):
 
 
 def main():
-    if sys.argv[1] == 'getfingerprint':
+    firstarg = sys.argv[1] if len(sys.argv) > 1 else None
+    if firstarg == 'getfingerprint':
         print(fingerprint_host(None).get_json())
         return
-    elif sys.argv[1] == 'capturelocal':
+    elif firstarg == 'capturelocal':
         capture_system()
         return
-    elif sys.argv[1] == 'capturelocalboot':
+    elif firstarg == 'capturelocalboot':
         build_boot_tree('/run/imgutil/capout')
         return
-    elif sys.argv[1] == 'capturelocalcleanup':
+    elif firstarg == 'capturelocalcleanup':
         capture_local_cleanup()
         return
     parser = argparse.ArgumentParser(description='Work with confluent OS cloning and diskless images')
@@ -949,6 +978,7 @@ def main():
     buildp.add_argument('-a', '--addpackagelist', action='append', default=[],
                         help='A list of additional packages to include, may be specified multiple times')
     buildp.add_argument('-s', '--source', help='Directory to pull installation from, typically a subdirectory of /var/lib/confluent/distributions. By default, the repositories for the build system are used.  For Ubuntu, this is not supported, the build system repositories are always used.')
+    buildp.add_argument('--arch', default=None, help='Target architecture to build for (e.g. aarch64). When it differs from the build host architecture, statically linked qemu-user emulator registered in binfmt_misc with the F flag is required')
     buildp.add_argument('-y', '--non-interactive', help='Avoid prompting for confirmation', action='store_true')
     buildp.add_argument('-v', '--volume',
         help='Directory to make available in the build environment.  -v / will '
@@ -992,6 +1022,16 @@ def main():
 
 
 def exec_root(args):
+    imgarch = None
+    try:
+        with open(os.path.join(args.scratchdir, 'etc/confluentimg.buildinfo')) as imginfo:
+            for line in imginfo.readlines():
+                if line.startswith('ARCH='):
+                    imgarch = line.split('=', 1)[1].strip()
+    except IOError:
+        pass
+    if imgarch and imgarch != os.uname().machine:
+        check_binfmt(imgarch, args)
     exitcode = run_constrained(exec_root_backend, args)
     if exitcode:
         sys.exit(exitcode)
@@ -1077,6 +1117,7 @@ def build_root_backend(optargs):
     mkdirp(os.path.join(installroot, 'etc/'))
     with open(os.path.join(installroot, 'etc/confluentimg.buildinfo'), 'w') as imginfo:
         imginfo.write('BUILDDATE={}\n'.format(datetime.datetime.now().strftime('%Y-%m-%dT%H:%M')))
+        imginfo.write('ARCH={}\n'.format(oshandler.arch))
         if args.source:
             imginfo.write('BUILDSRC={}\n'.format(args.source))
 
@@ -1115,6 +1156,81 @@ def check_root(installroot):
     # Ensure that the target is an adequate filesystem to
     # be root
     mkdirp(installroot)
+
+
+qemu_arch_map = {
+    'aarch64': 'qemu-aarch64',
+    'x86_64': 'qemu-x86_64',
+}
+
+
+def check_binfmt(targetarch, args):
+    qname = qemu_arch_map.get(targetarch, 'qemu-' + targetarch)
+    binfmtdir = '/proc/sys/fs/binfmt_misc'
+    hostdeb = fingerprint_host_deb(args)
+    if hostdeb:
+        # as of ubuntu 26.04, qemu-user-static is a virtual package and the
+        # statically linked emulators come from qemu-user-binfmt instead
+        qpkg = 'qemu-user-static'
+        if float(hostdeb.version) >= 26.04:
+            qpkg = 'qemu-user-binfmt'
+        setupmsg = (
+            'Emulating {0} requires the {2} package, which '
+            'registers {1} in binfmt_misc with the F (fix-binary) flag '
+            '("apt-get install {2}", then "update-binfmts '
+            '--enable {1}" if the handler is disabled)\n'.format(
+                targetarch, qname, qpkg))
+    elif fingerprint_host_el(args):
+        setupmsg = (
+            'Emulating {0} requires /usr/bin/qemu-{0}-static registered in '
+            '/etc/binfmt.d/qemu-{0}.conf with the F (fix-binary) flag, '
+            'followed by "systemctl restart systemd-binfmt"\n'.format(
+                targetarch))
+    else:
+        sys.stderr.write(
+            'Cross-architecture builds are only supported on EL and Ubuntu '
+            'build hosts\n')
+        sys.exit(1)
+    try:
+        with open(os.path.join(binfmtdir, 'status')) as statusin:
+            enabled = statusin.read().strip() == 'enabled'
+    except IOError:
+        enabled = False
+    if not enabled:
+        sys.stderr.write(
+            'binfmt_misc is not enabled on this system. ' + setupmsg)
+        sys.exit(1)
+    for entry in glob.glob(os.path.join(binfmtdir, '*')):
+        entryname = os.path.basename(entry)
+        if entryname in ('register', 'status'):
+            continue
+        try:
+            with open(entry) as entryin:
+                entryinfo = entryin.read().split('\n')
+        except IOError:
+            continue
+        interpreter = ''
+        flags = ''
+        for line in entryinfo[1:]:
+            if line.startswith('interpreter '):
+                interpreter = line.split(' ', 1)[1]
+            elif line.startswith('flags:'):
+                flags = line.split(':', 1)[1].strip()
+        if entryname != qname and qname not in interpreter:
+            continue
+        if entryinfo[0].strip() != 'enabled':
+            continue
+        if 'F' not in flags:
+            sys.stderr.write(
+                'binfmt_misc handler {0} lacks the F (fix-binary) flag, so '
+                'the emulator would not be reachable from within the image '
+                'chroot. '.format(entryname) + setupmsg)
+            sys.exit(1)
+        return
+    sys.stderr.write(
+        'No enabled binfmt_misc handler for {0} found. '.format(targetarch)
+        + setupmsg)
+    sys.exit(1)
 
 
 def fingerprint_source_suse(files, sourcepath, args):
@@ -1293,6 +1409,22 @@ def build_root(args):
             sys.stderr.write(
                 'Unable to recognize build system os\n')
         sys.exit(1)
+    hostarch = os.uname().machine
+    if args.arch and args.arch != oshandler.arch:
+        if args.source:
+            sys.stderr.write(
+                'Requested architecture {0} conflicts with source directory '
+                'architecture {1}\n'.format(args.arch, oshandler.arch))
+            sys.exit(1)
+        oshandler.set_arch(args.arch)
+    if oshandler.arch != hostarch:
+        if not oshandler.crossbuild:
+            sys.stderr.write(
+                'Building {0} images on a {1} host is currently not '
+                'supported on this distribution\n'.format(
+                    oshandler.arch, hostarch))
+            sys.exit(1)
+        check_binfmt(oshandler.arch, args)
     if args.non_interactive:
         oshandler.set_interactive(False)
     oshandler.set_target(args.scratchdir)
@@ -1425,12 +1557,15 @@ async def pack_image(args):
         sys.exit(1)
     imginfofile = os.path.join(args.scratchdir, 'etc/confluentimg.buildinfo')
     distpath = None
+    imgarch = None
     try:
         with open(imginfofile) as imginfoin:
             imginfo = imginfoin.read().split('\n')
             for lineinfo in imginfo:
                 if lineinfo.startswith('BUILDSRC='):
                     distpath = lineinfo.replace('BUILDSRC=', '')
+                elif lineinfo.startswith('ARCH='):
+                    imgarch = lineinfo.replace('ARCH=', '')
     except IOError:
         pass
     kerns = glob.glob(os.path.join(args.scratchdir, 'boot/vmlinuz-*'))
@@ -1502,12 +1637,24 @@ async def pack_image(args):
                 profiley.write('label: {0}\nkernelargs: quiet # confluent_imagemethod=untethered|tethered # tethered is default when unspecified to save on memory, untethered will use more ram, but will not have any ongoing runtime root fs dependency on the http servers.\n'.format(label))
             oscat = oshandler.oscategory
             confdir = '/opt/confluent/lib/osdeploy/{}-diskless'.format(oscat)
-            archaddon = '/opt/confluent/lib/osdeploy/{}-diskless/initramfs/{}/addons.cpio'.format(oscat, platform.machine())
+            packarch = imgarch if imgarch else os.uname().machine
+            archaddon = '/opt/confluent/lib/osdeploy/{}-diskless/initramfs/{}/addons.cpio'.format(oscat, packarch)
+            addonlink = os.path.join(outdir, 'boot/initramfs/addons.cpio')
             if os.path.exists(archaddon):
-                os.symlink(archaddon, os.path.join(outdir, 'boot/initramfs/addons.cpio'))
-            else:
+                os.symlink(archaddon, addonlink)
+            elif packarch == 'x86_64':
+                # the unsuffixed addons path carries the x86_64 payload
                 os.symlink('{}/initramfs/addons.cpio'.format(confdir),
-                    os.path.join(outdir, 'boot/initramfs/addons.cpio'))
+                    addonlink)
+            else:
+                # addons of another architecture would contain foreign
+                # binaries that break boot, so link to the (currently
+                # missing) target arch path rather than falling back
+                sys.stderr.write(
+                    'Warning: {0} does not exist, the profile will not be '
+                    'bootable until the confluent_osdeploy-{1} package is '
+                    'installed\n'.format(archaddon, packarch))
+                os.symlink(archaddon, addonlink)
             indir = '{}/profiles/default'.format(confdir)
             if os.path.exists(indir):
                 copy_tree(indir, outdir)
