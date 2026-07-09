@@ -42,7 +42,9 @@ if ! grep console= /proc/cmdline >& /dev/null; then
     autocons=$(/opt/confluent/bin/autocons)
     autoconsdev=${autocons%,*}
     autocons=${autocons##*/}
-    echo "Automatic console configured for $autocons"
+    if [ ! -z "$autocons" ]; then
+        echo "Automatic console configured for $autocons"
+    fi
 fi
 echo "Initializing confluent diskless environment"
 echo -n "udevd: "

@@ -39,7 +39,9 @@ echo sshd:x:30:30:SSH User:/var/empty/sshd:/sbin/nologin >> /etc/passwd
 if ! grep console= /proc/cmdline >& /dev/null; then
     autocons=$(/opt/confluent/bin/autocons)
     autocons=${autocons##*/}
-    echo "Automatic console configured for $autocons"
+    if [ ! -z "$autocons" ]; then
+        echo "Automatic console configured for $autocons"
+    fi
 fi
 echo "Initializing confluent diskless environment"
 echo -n "udevd: "
