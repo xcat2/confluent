@@ -469,7 +469,7 @@ def do_command(command, server):
         height, width = 31, 100
         if not opts.headless:
             height, width = struct.unpack(
-                'hh', fcntl.ioctl(sys.stdout, termios.TIOCGWINSZ, b'....'))[:2]
+                'hh', fcntl.ioctl(sys.stdout, termios.TIOCGWINSZ, b'........')[:4])[:2]
         startrequest['parameters']['width'] = width
         startrequest['parameters']['height'] = height
         for param in argv[2:]:
@@ -625,7 +625,7 @@ def do_resize(a, b):
     if not inconsole:
         return
     height, width = struct.unpack(
-        'hh', fcntl.ioctl(sys.stdout, termios.TIOCGWINSZ, b'....'))[:2]
+        'hh', fcntl.ioctl(sys.stdout, termios.TIOCGWINSZ, b'........')[:4])[:2]
     tlvdata.send(session.connection, {'operation': 'resize', 'width': width,
                                       'height': height})
 
