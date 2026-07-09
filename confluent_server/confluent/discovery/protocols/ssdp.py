@@ -57,7 +57,7 @@ smsg = ('M-SEARCH * HTTP/1.1\r\n'
 
 async def active_scan(handler, protocol=None):
     known_peers = set([])
-    async for scanned in scan(['urn:dmtf-org:service:redfish-rest:1', 'urn::dmtf-org:service:redfish-rest:', 'urn::service:affluent']):
+    async for scanned in scan(['urn:dmtf-org:service:redfish-rest:1', 'urn::service:affluent']):
         for addr in scanned['addresses']:
             addr = addr[0:1] + addr[2:]
             if addr in known_peers:
@@ -115,7 +115,6 @@ def _process_snoop(peer, rsp, mac, known_peers, newmacs, peerbymacaddress, byeha
                 if '/eth' in value and value.endswith('.xml'):
                     targurl = '/redfish/v1/'
                     targtype = 'megarac-bmc'
-                    continue # MegaRAC redfish
                 elif value.endswith('/DeviceDescription.json'):
                     targurl = '/DeviceDescription.json'
                     targtype = 'lenovo-xcc'
@@ -128,7 +127,7 @@ def _process_snoop(peer, rsp, mac, known_peers, newmacs, peerbymacaddress, byeha
             tasks.spawn(check_fish_handler(handler, peerdata, known_peers, newmacs, peerbymacaddress, machandlers, mac, peer, targurl, targtype))
 
 async def check_fish_handler(handler, peerdata, known_peers, newmacs, peerbymacaddress, machandlers, mac, peer, targurl, targtype):
-    retdata = await check_fish(('/DeviceDescription.json', peerdata, targtype))
+    retdata = await check_fish((targurl, peerdata, targtype))
     if retdata:
         known_peers.add(peer)
         newmacs.add(mac)
@@ -497,7 +496,7 @@ async def check_fish(urldata, port=443, verifycallback=None):
         targtype = 'service:redfish-bmc'
     try:
         wc = webclient.WebConnection(_get_svrip(data), port, verifycallback=verifycallback)
-        peerinfo = await wc.grab_json_response(url, headers={'Accept': 'application/json'})
+        peerinfo = await wc.grab_json_response(url, headers={'Accept': 'application/json', 'Host': 'credible-bmc'})
     except socket.error:
         return None
     if url == '/DeviceDescription.json':
@@ -609,6 +608,6 @@ async def _parse_ssdp(peer, rsp, peerdata):
 if __name__ == '__main__':
     def printit(rsp):
         pass # print(repr(rsp))
-    active_scan(printit)
+    asyncio.run(active_scan(printit))
 
 

@@ -21,6 +21,25 @@ class NodeHandler(redfishbmc.NodeHandler):
     def get_firmware_default_account_info(self):
         return ('admin', 'admin')
 
+    async def get_manager_url(self, wc):
+        mgrs = (await self.srvroot(wc)).get('Managers', {}).get('@odata.id', None)
+        if not mgrs:
+            raise Exception("No Managers resource on BMC")
+        rsp = await wc.grab_json_response(mgrs)
+        if len(rsp.get('Members', [])) != 1:
+            urls = []
+            for member in rsp.get('Members', []):
+                url = member.get('@odata.id', 'Unknown')
+                if 'HGX_BMC' in url:
+                    continue
+                urls.append(url)
+            if len(urls) == 1:
+                return urls[0]
+            raise Exception("Can not handle multiple Managers")
+        mgrurl = rsp['Members'][0]['@odata.id']
+        return mgrurl
+
+
 
 async def remote_nodecfg(nodename, cfm):
     cfg = cfm.get_node_attributes(
