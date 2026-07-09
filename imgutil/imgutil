@@ -957,16 +957,17 @@ def run_constrained(function, args):
 
 
 def main():
-    if sys.argv[1] == 'getfingerprint':
+    firstarg = sys.argv[1] if len(sys.argv) > 1 else None
+    if firstarg == 'getfingerprint':
         print(fingerprint_host(None).get_json())
         return
-    elif sys.argv[1] == 'capturelocal':
+    elif firstarg == 'capturelocal':
         capture_system()
         return
-    elif sys.argv[1] == 'capturelocalboot':
+    elif firstarg == 'capturelocalboot':
         build_boot_tree('/run/imgutil/capout')
         return
-    elif sys.argv[1] == 'capturelocalcleanup':
+    elif firstarg == 'capturelocalcleanup':
         capture_local_cleanup()
         return
     parser = argparse.ArgumentParser(description='Work with confluent OS cloning and diskless images')
