@@ -15,11 +15,61 @@
 import asyncio
 
 import confluent.discovery.handlers.redfishbmc as redfishbmc
+from aiohmi.util import webclient
+from urllib.parse import urlencode
+
 
 class NodeHandler(redfishbmc.NodeHandler):
 
     def get_firmware_default_account_info(self):
         return ('admin', 'admin')
+
+    async def _get_wc(self):
+        await self.get_https_cert()
+        defuser, defpass = self.get_firmware_default_account_info()
+        wc = webclient.WebConnection(self.ipaddr, 443, verifycallback=self.validate_cert)
+        wc.set_basic_credentials(self.targuser, self.targpass)
+        wc.set_header('Host', 'credible-bmc')
+        wc.set_header('Content-Type', 'application/json')
+        wc.set_header('Accept', 'application/json')
+        self.curruser = self.targuser
+        rsp, status = await wc.grab_json_response_with_status('/redfish/v1/Managers')
+        if status == 200:
+            self.currpass = self.targpass
+            return wc
+        wc.set_header('Content-Type', 'application/x-www-form-urlencoded')
+        if self.targuser != defuser:
+            wc.set_basic_credentials(defuser, self.targpass)
+            rsp, status = await wc.grab_json_response_with_status('/redfish/v1/Managers')
+            if status == 200:
+                self.curruser = defuser
+                self.currpass = self.targpass
+                return wc
+        authdata = {
+            'username': defuser,
+            'password': defpass
+        }
+        rsp, status = await wc.grab_json_response_with_status('/api/session', data=urlencode(authdata))
+        if status != 200:
+            raise Exception("Target BMC does not recognize firmware default credentials nor the confluent stored credential")
+        if rsp.get('passwordStatus', None) == 1:  # change required
+            xsrf = rsp.get('CSRFToken', None)
+            if xsrf:
+                wc.set_header('X-Csrftoken', xsrf)
+            authdata = {
+                'username': self.targuser,
+                'password': self.targpass
+            }
+            rsp, status = await wc.grab_json_response_with_status('/api/updatenew_password', data=urlencode(authdata))
+            if status == 200:
+                self.curruser = self.targuser
+                self.currpass = self.targpass
+                wc.set_header('Content-Type', 'application/json')
+                wc.set_basic_credentials(self.targuser, self.targpass)
+                return wc
+            raise Exception('Failure updating password: ' + repr(rsp))
+        self.curruser = defuser
+        return wc
 
     async def get_manager_url(self, wc):
         mgrs = (await self.srvroot(wc)).get('Managers', {}).get('@odata.id', None)

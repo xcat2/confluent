@@ -123,6 +123,7 @@ class NodeHandler(generic.NodeHandler):
         wc.set_basic_credentials(defuser, defpass)
         wc.set_header('Content-Type', 'application/json')
         wc.set_header('Accept', 'application/json')
+        wc.set_header('Host', 'credible-bmc')
         authmode = 0
         if not self.trieddefault:
             rsp, status = await wc.grab_json_response_with_status('/redfish/v1/Managers')
