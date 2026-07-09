@@ -33,6 +33,7 @@ copy_exec /usr/bin/tpm2_pcrextend
 copy_exec /usr/bin/ssh-keygen
 copy_exec /usr/sbin/sshd
 copy_exec /usr/sbin/mkfs.xfs
+[ -e /usr/lib/openssh/sshd-session ] && copy_exec /usr/lib/openssh/sshd-session
 [ -e /usr/lib/x86_64-linux-gnu/libfuse.so.2 ] && copy_exec /usr/lib/x86_64-linux-gnu/libfuse.so.2
 [ -e /usr/lib/aarch64-linux-gnu/libfuse.so.2 ] && copy_exec /usr/lib/aarch64-linux-gnu/libfuse.so.2
 copy_exec /usr/bin/dirname
