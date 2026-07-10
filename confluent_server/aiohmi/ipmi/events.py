@@ -541,6 +541,18 @@ class EventHandler(object):
         elif 0xc0 <= selentry[2] <= 0xdf:
             event['oemid'] = selentry[7:10]
             event['oemdata'] = selentry[10:]
+        elif selentry[2] == 0xf0:
+            # De facto standard from the Linux kernel ipmi panic logger,
+            # also recognized by ipmitool and freeipmi: byte 4 is a chunk
+            # sequence number and bytes 5-15 carry a piece of the panic
+            # string
+            event['event'] = 'Linux kernel panic: {0}'.format(
+                selentry[5:16].partition(b'\x00')[0].decode(
+                    'utf-8', 'replace'))
+            event['severity'] = pygconst.Health.Critical
+            # this layout is defined by the kernel convention rather than
+            # the BMC vendor, so bypass the OEM handler
+            return event
         elif selentry[2] >= 0xe0:
             # In this class of OEM message, all bytes are OEM, interpretation
             # is wholly left up to the OEM layer, using the OEM ID of the BMC
