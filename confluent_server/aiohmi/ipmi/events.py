@@ -529,9 +529,7 @@ class EventHandler(object):
             try:
                 self._decode_standard_event(selentry[7:], event)
             except Exception:
-                if selentry[2] == 2:
-                    raise
-                # a reserved type that does not actually follow the standard
+                # a record body that does not actually follow the standard
                 # layout; discard any partially decoded fields and pass it
                 # through raw rather than aborting the fetch
                 for key in list(event):
