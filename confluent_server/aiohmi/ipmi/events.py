@@ -519,12 +519,25 @@ class EventHandler(object):
         selentry = bytearray(origselentry)
         event = {}
         event['record_id'] = struct.unpack_from('<H', origselentry[:2])[0]
-        if selentry[2] == 2 or (0xc0 <= selentry[2] <= 0xdf):
+        if selentry[2] < 0xe0 and len(selentry) >= 7:
             # Either standard, or at least the timestamp is standard
             event['timecode'] = struct.unpack_from('<I', buffer(selentry[3:7])
                                                    )[0]
-        if selentry[2] == 2:  # ipmi defined standard format
-            self._decode_standard_event(selentry[7:], event)
+        if selentry[2] < 0xc0:
+            # ipmi defined standard format (0x02); like ipmitool, extend the
+            # same treatment to reserved types some BMCs use (e.g. AMI 0x04)
+            try:
+                self._decode_standard_event(selentry[7:], event)
+            except Exception:
+                if selentry[2] == 2:
+                    raise
+                # a reserved type that does not actually follow the standard
+                # layout; discard any partially decoded fields and pass it
+                # through raw rather than aborting the fetch
+                for key in list(event):
+                    if key not in ('record_id', 'timecode'):
+                        del event[key]
+                event['oemdata'] = selentry[3:]
         elif 0xc0 <= selentry[2] <= 0xdf:
             event['oemid'] = selentry[7:10]
             event['oemdata'] = selentry[10:]
