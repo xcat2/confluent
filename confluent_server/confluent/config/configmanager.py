@@ -550,6 +550,26 @@ def attribute_is_invalid(attrname, attrval):
     return False
 
 
+def validate_attribute_value(attrname, attrval, owner):
+    # Apply any format validator declared for the attribute in the
+    # attribute schema, raising ValueError for a malformed value.
+    # Expression values are deferred and not evaluated here.
+    validator = allattributes.node.get(
+        _get_valid_attrname(attrname), {}).get('validate')
+    if not validator:
+        return
+    if isinstance(attrval, dict):
+        if 'expression' in attrval:
+            return
+        attrval = attrval.get('value', None)
+    if not attrval or not isinstance(attrval, str):
+        return
+    try:
+        validator(attrval)
+    except ValueError as e:
+        raise ValueError('{0} on {1}: {2}'.format(attrname, owner, e))
+
+
 def _get_valid_attrname(attrname):
     if attrname.startswith('net.') or attrname.startswith('power.'):
         # For net.* attribtues, split on the dots and put back together
@@ -2075,6 +2095,8 @@ class ConfigManager(object):
                     if attribute_is_invalid(attr, attrval):
                         errstr = "{0} attribute is invalid".format(attr)
                         raise ValueError(errstr)
+                    validate_attribute_value(attr, attrval,
+                                             'group {0}'.format(group))
                     attribmap[group][attr] = attrval
                 if attr == 'nodes':
                     if isinstance(attribmap[group][attr], dict):
@@ -2600,6 +2622,8 @@ class ConfigManager(object):
                         errstr = "{0} attribute on node {1} is invalid".format(
                             attrname, node)
                         raise ValueError(errstr)
+                    validate_attribute_value(attrname, attrval,
+                                             'node {0}'.format(node))
                     attribmap[node][attrname] = attrval
         for node in confluent.util.natural_sort(attribmap):
             node = confluent.util.stringify(node)

@@ -80,6 +80,65 @@
 #    },
 #}
 
+import re
+import socket
+
+
+def _validate_ipaddress(family, famname, val, allowprefix):
+    addr = val
+    if '/' in val:
+        if not allowprefix:
+            raise ValueError(
+                '"{0}" must be a plain {1} address without a '
+                '/prefix'.format(val, famname))
+        addr, prefix = val.split('/', 1)
+        try:
+            prefix = int(prefix)
+        except ValueError:
+            prefix = -1
+        maxprefix = 32 if family == socket.AF_INET else 128
+        if not 0 <= prefix <= maxprefix:
+            raise ValueError(
+                '"{0}" has an invalid prefix length'.format(val))
+    try:
+        socket.inet_pton(family, addr)
+    except OSError:
+        raise ValueError(
+            '"{0}" is not a valid {1} address'.format(val, famname))
+
+
+def validate_ipv4_address(val):
+    _validate_ipaddress(socket.AF_INET, 'IPv4', val, True)
+
+
+def validate_ipv4_gateway(val):
+    _validate_ipaddress(socket.AF_INET, 'IPv4', val, False)
+
+
+def validate_ipv6_address(val):
+    _validate_ipaddress(socket.AF_INET6, 'IPv6', val, True)
+
+
+def validate_ipv6_gateway(val):
+    _validate_ipaddress(socket.AF_INET6, 'IPv6', val, False)
+
+
+_hwaddr_pattern = re.compile(r'^[0-9a-f]{2}(:[0-9a-f]{2})+$')
+
+
+def validate_hwaddr(val):
+    normval = val.lower().replace('-', ':')
+    if not _hwaddr_pattern.match(normval):
+        raise ValueError(
+            '"{0}" is not a valid hardware address (expected colon or '
+            'hyphen delimited hex octets)'.format(val))
+    octets = normval.count(':') + 1
+    if octets not in (6, 8, 20):
+        raise ValueError(
+            '"{0}" has {1} octets, expected 6 (Ethernet), 8 (EUI-64) or '
+            '20 (InfiniBand)'.format(val, octets))
+
+
 user = {
     'password': {
         'description':  'The passphrase used to authenticate this user'
@@ -507,6 +566,7 @@ node = {
                        'Specify the parent device using net.interface_names.'
     },
     'net.ipv4_address': {
+        'validate': validate_ipv4_address,
         'description': 'When configuring static, use this address.  If '
                        'unspecified, it will check if the node name resolves '
                        'to an IP address.  Additionally, the subnet prefix '
@@ -524,11 +584,13 @@ node = {
         'validvalues': ('dhcp', 'static', 'firmwaredhcp', 'firmwarenone', 'none')
     },
     'net.ipv4_gateway': {
+        'validate': validate_ipv4_gateway,
         'description':  'The IPv4 gateway to use if applicable.  As is the '
                         'case for other net attributes, net.eth0.ipv4_gateway '
                         'and similar is accepted.'
     },
     'net.ipv6_address': {
+        'validate': validate_ipv6_address,
         'description': 'When configuring static, use this address.  If '
                        'unspecified, it will check if the node name resolves '
                        'to an IP address.  Additionally, the subnet prefix '
@@ -546,11 +608,13 @@ node = {
         'validvalues': ('dhcp', 'static', 'firmwaredhcp', 'firmwarenone', 'none')
     },
     'net.ipv6_gateway': {
+        'validate': validate_ipv6_gateway,
         'description':  'The IPv6 gateway to use if applicable.  As is the '
                         'case for other net attributes, net.eth0.ipv6_gateway '
                         'and similar is accepted.'
     },
     'net.hwaddr': {
+        'validate': validate_hwaddr,
         'description': 'The hardware address, aka MAC address of the interface indicated, generally populated by the '
                        'PXE discovery mechanism'
     },
