@@ -147,6 +147,41 @@ def existing_regen_args(targetpath):
 
 
 
+def warn_conflicts(hostentries):
+    """Warn about reservations that conflict with one another: the same
+    hostname on different IPs, one IP reserved more than once (dnsmasq
+    refuses to start on a duplicate dhcp-host IP), or one MAC reserved
+    more than once.  Diagnostics only; every entry is still emitted."""
+    byname = {}
+    byip = {}
+    bymac = {}
+    for e in hostentries:
+        if e['hostname']:
+            prev = byname.setdefault(e['hostname'], e)
+            if prev is not e and prev['ip'] != e['ip']:
+                sys.stderr.write(
+                    "WARNING: hostname '{0}' maps to both {1} ({2}) and "
+                    '{3} ({4})\n'.format(
+                        e['hostname'], prev['ip'], prev['node'],
+                        e['ip'], e['node']))
+        prev = byip.setdefault(e['ip'], e)
+        if prev is not e:
+            sys.stderr.write(
+                'WARNING: address {0} is reserved for both {1} ({2}) and '
+                '{3} ({4}); dnsmasq refuses to start on a duplicate '
+                'dhcp-host IP address\n'.format(
+                    e['ip'], ','.join(prev['macs']), prev['node'],
+                    ','.join(e['macs']), e['node']))
+        for mac in e['macs']:
+            prev = bymac.setdefault(mac.lower(), e)
+            if prev is not e:
+                sys.stderr.write(
+                    'WARNING: MAC {0} is reserved for both {1} ({2}) and '
+                    '{3} ({4})\n'.format(
+                        mac, prev['ip'], prev['node'],
+                        e['ip'], e['node']))
+
+
 def main():
     ap = argparse.ArgumentParser(
         description='Create /etc/dnsmasq.d static DHCP reservations for a '
@@ -336,7 +371,10 @@ def main():
 
             hostentries.append({'subnetkey': subnetkey,
                                 'macs': split_list(hwaddr),
-                                'ip': ip, 'hostname': hostname})
+                                'ip': ip, 'hostname': hostname,
+                                'node': node})
+
+    warn_conflicts(hostentries)
 
     # Resolve optional per-subnet options from the aggregated values.
     def resolve(values, what, subnetkey):
