@@ -59,6 +59,7 @@ if [ -e /sys/firmware/efi ]; then
         efibootmgr -D
     fi
 fi
+run_remote setuplogging
 run_remote_python syncfileclient
 run_remote_parts post.d
 run_remote_config post

@@ -40,6 +40,9 @@ setup(
     data_files=[('/etc/init.d', ['sysvinit/confluent']),
                 ('/usr/lib/sysctl.d', ['sysctl/confluent.conf']),
                 ('/opt/confluent/share/licenses/confluent_server', ['LICENSE', 'COPYRIGHT']),
+                ('/opt/confluent/share/examples/logging/rsyslog', ['logging/rsyslog/confluent-nodes.conf',
+                                                                   'logging/rsyslog/confluent-nodes.logrotate']),
+                ('/opt/confluent/share/examples/logging/journal-remote', ['logging/journal-remote/confluent-journal-remote.conf']),
                 ('/usr/lib/systemd/system', ['systemd/confluent.service']),
 		('/opt/confluent/lib/python/confluent/plugins/console/', [])],
 

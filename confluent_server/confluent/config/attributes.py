@@ -705,4 +705,30 @@ node = {
     'dns.servers': {
         'description': 'DNS Server or servers to provide to node',
     },
+    'logging.servers': {
+        'description': 'Remote logging server or servers (comma separated) '
+                       'for the OS deployment to configure the node to '
+                       'forward logs to, using the method indicated by '
+                       'logging.method. May be set to the address of the '
+                       'deployment server or any other logging server. See '
+                       '/opt/confluent/share/examples/logging for cfg '
+                       'examples. If unset, no forwarding is configured.',
+    },
+    'logging.method': {
+        'description': 'Method used to forward logs to logging.servers. '
+                       '"rsyslog" (the default if unset) forwards syslog '
+                       'using rsyslog over UDP port 514. "journal-remote" '
+                       'uploads the systemd journal using '
+                       'systemd-journal-upload to systemd-journal-remote on '
+                       'port 19532; note that systemd-journal-upload supports '
+                       'only a single destination, so only the first entry of '
+                       'logging.servers is used.',
+        'validvalues': ('rsyslog', 'journal-remote', ''),
+    },
+    'logging.tls': {
+        'description': 'Whether to encrypt the forwarded logs with TLS, '
+                       'authenticated via the confluent TLS certificate '
+                       'authority.',
+        'type': bool,
+    },
 }
