@@ -101,8 +101,8 @@ class TsmHandler(generic.OEMHandler):
     @classmethod
     async def create(cls, sysinfo, sysurl, webclient, cache=None, fish=None,
                  gpool=None):
-        self = await super(TsmHandler, cls).create(sysinfo, sysurl, webclient, cache, fish,
-                                         gpool)
+        self = await super(TsmHandler, cls).create(sysinfo, sysurl, webclient, cache,
+                                                  gpool=gpool)
         if cache is None:
             cache = {}
         self._wc = None

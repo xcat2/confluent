@@ -39,7 +39,7 @@ async def get_handler(sysinfo, sysurl, webclient, cache, cmd, rootinfo={}):
     if not leninf:
         bmcinfo = await cmd.bmcinfo()
         if 'Ami' in bmcinfo.get('Oem', {}):
-            return tsma.TsmHandler(sysinfo, sysurl, webclient, cache)
+            return await tsma.TsmHandler.create(sysinfo, sysurl, webclient, cache, gpool=cmd._gpool)
     elif 'xclarity controller' in mgrinfo.get('Model', '').lower():
         if mgrinfo['Model'].endswith('3'):
             return await xcc3.OEMHandler.create(sysinfo, sysurl, webclient, cache,
@@ -60,9 +60,9 @@ async def get_handler(sysinfo, sysurl, webclient, cache, cmd, rootinfo={}):
         devdesc = await webclient.grab_json_response_with_status('/DeviceDescription.json')
         if devdesc[1] == 200:
             if devdesc[0]['type'].lower() in ('lenovo-smm3', 'smm3'):
-                return smm3.OEMHandler(sysinfo, sysurl, webclient, cache,
-                                      gpool=cmd._gpool)
+                return await smm3.OEMHandler.create(sysinfo, sysurl, webclient, cache,
+                                                    gpool=cmd._gpool)
     except Exception:
         pass
-    return generic.OEMHandler(sysinfo, sysurl, webclient, cache,
-                            gpool=cmd._gpool)
+    return await generic.OEMHandler.create(sysinfo, sysurl, webclient, cache,
+                                           gpool=cmd._gpool)
