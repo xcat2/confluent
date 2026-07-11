@@ -1,0 +1,80 @@
+#!/bin/sh
+# Configure the deployed node to forward logs to the servers from the
+# logging.servers attribute (surfaced as loggingservers in
+# confluent.deploycfg), using the method from the logging.method attribute
+# (surfaced as loggingmethod): rsyslog (the default) or journal-remote.
+# Does nothing when logging.servers is unset.
+
+if ! grep '^loggingservers:' /etc/confluent/confluent.deploycfg > /dev/null 2>&1; then
+    exit 0
+fi
+loggingservers=$(sed -n '/^loggingservers:/,/^[^-]/p' /etc/confluent/confluent.deploycfg|sed 1d|sed '$d' | sed -e 's/^- //')
+loggingmethod=$(sed -n 's/^loggingmethod: //p' /etc/confluent/confluent.deploycfg)
+if [ -z "$loggingmethod" ]; then
+    loggingmethod=rsyslog
+fi
+if [ "$loggingmethod" = journal-remote ]; then
+    # drop forwarding state left by a previous rsyslog-method configuration
+    if [ -f /etc/rsyslog.d/60-confluent.conf ]; then
+        rm -f /etc/rsyslog.d/60-confluent.conf
+        if [ -d /run/systemd/system ]; then
+            systemctl try-restart rsyslog.service 2>/dev/null
+        fi
+    fi
+    uploadbin=""
+    for candidate in /usr/lib/systemd/systemd-journal-upload /lib/systemd/systemd-journal-upload; do
+        if [ -x $candidate ]; then
+            uploadbin=$candidate
+            break
+        fi
+    done
+    if [ -z "$uploadbin" ]; then
+        echo "systemd-journal-upload does not appear to be installed, skipping log forwarding setup"
+        exit 0
+    fi
+    loggingsrv=$(echo "$loggingservers" | sed -n 1p)
+    if [ "$(echo "$loggingservers" | wc -l)" -gt 1 ]; then
+        echo "journal-remote supports only a single destination, forwarding to $loggingsrv and ignoring the other logging.servers entries"
+    fi
+    case $loggingsrv in
+        *:*) loggingsrv="[$loggingsrv]" ;;  # bracket IPv6 literals for the URL
+    esac
+    mkdir -p /etc/systemd/journal-upload.conf.d
+    journalconf=/etc/systemd/journal-upload.conf.d/confluent.conf
+    echo '# Log forwarding configured by confluent during deployment' > $journalconf
+    echo '[Upload]' >> $journalconf
+    echo 'URL=http://'$loggingsrv':19532' >> $journalconf
+    if [ -x /usr/sbin/restorecon ]; then
+        /usr/sbin/restorecon $journalconf 2>/dev/null
+    fi
+    systemctl enable systemd-journal-upload.service 2>/dev/null
+    if [ -d /run/systemd/system ]; then
+        systemctl restart systemd-journal-upload.service 2>/dev/null
+    fi
+else
+    # drop forwarding state left by a previous journal-remote-method
+    # configuration
+    if [ -f /etc/systemd/journal-upload.conf.d/confluent.conf ]; then
+        rm -f /etc/systemd/journal-upload.conf.d/confluent.conf
+        systemctl disable systemd-journal-upload.service 2>/dev/null
+        if [ -d /run/systemd/system ]; then
+            systemctl stop systemd-journal-upload.service 2>/dev/null
+        fi
+    fi
+    if [ ! -d /etc/rsyslog.d ]; then
+        echo "rsyslog does not appear to be installed, skipping log forwarding setup"
+        exit 0
+    fi
+    syslogconf=/etc/rsyslog.d/60-confluent.conf
+    echo '# Syslog forwarding configured by confluent during deployment' > $syslogconf
+    for loggingsrv in $loggingservers; do
+        echo '*.* action(type="omfwd" target="'$loggingsrv'" port="514" protocol="udp")' >> $syslogconf
+    done
+    if [ -x /usr/sbin/restorecon ]; then
+        /usr/sbin/restorecon $syslogconf 2>/dev/null
+    fi
+    if [ -d /run/systemd/system ]; then
+        systemctl try-restart rsyslog.service 2>/dev/null
+    fi
+fi
+exit 0
