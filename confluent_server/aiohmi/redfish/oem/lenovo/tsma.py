@@ -731,7 +731,7 @@ class TsmHandler(generic.OEMHandler):
             hddslots += 1
         else:
             raise exc.UnsupportedFunctionality('Unknown slot type requested')
-        gensettings = wc.grab_json_response('/api/settings/media/general')
+        gensettings = await wc.grab_json_response('/api/settings/media/general')
         samesettings = gensettings['same_settings'] == 1
         if samesettings:
             hds = gensettings['cd_remote_server_address']
@@ -772,10 +772,10 @@ class TsmHandler(generic.OEMHandler):
         gensettings['remote_media_support'] = 1
         gensettings['cd_remote_password'] = ''
         gensettings['hd_remote_password'] = ''
-        wc.grab_json_response_with_status('/api/settings/media/general',
+        await wc.grab_json_response_with_status('/api/settings/media/general',
                                           gensettings, method='PUT')
         # need to calibrate instances correctly
-        currinfo, status = wc.grab_json_response_with_status(
+        currinfo, status = await wc.grab_json_response_with_status(
             '/api/settings/media/instance')
         currinfo['num_cd'] = cdslots
         currinfo['num_hd'] = hddslots
@@ -783,9 +783,9 @@ class TsmHandler(generic.OEMHandler):
             currinfo['kvm_num_cd'] = cdslots
         if currinfo['kvm_num_hd'] > hddslots:
             currinfo['kvm_num_hd'] = hddslots
-        wc.grab_json_response_with_status(
+        await wc.grab_json_response_with_status(
             '/api/settings/media/instance', currinfo, method='PUT')
-        images = wc.grab_json_response('/api/settings/media/remote/images')
+        images = await wc.grab_json_response('/api/settings/media/remote/images')
         tries = 20
         while tries and not images:
             tries -= 1

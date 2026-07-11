@@ -696,14 +696,14 @@ class OEMHandler(generic.OEMHandler):
             if write_policy:
                 request_data["WriteCachePolicy"] = write_policy
             
-            msg, code=self.webclient.grab_json_response_with_status(
+            msg, code = await self.webclient.grab_json_response_with_status(
                 f'/redfish/v1/Systems/1/Storage/{cid}/Volumes',
                 method='POST',
                 data=request_data)
             if code == 500 and not stripsize:
                     # Mystery error can be a mandatory strip size, default to 64k to match WebUI behavior
                     request_data["StripSizeBytes"] = 65536
-                    msg, code=self.webclient.grab_json_response_with_status(
+                    msg, code = await self.webclient.grab_json_response_with_status(
                         f'/redfish/v1/Systems/1/Storage/{cid}/Volumes',
                         method='POST',
                         data=request_data)

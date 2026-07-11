@@ -1581,7 +1581,7 @@ class Command(object):
         }
         b |= privilege_levels[privilege_level] & 0b00000111
         data.append(b)
-        response = self.raw_command(netfn=0x06, command=0x40, data=data)
+        response = await self.raw_command(netfn=0x06, command=0x40, data=data)
         if 'error' in response:
             raise Exception(response['error'])
         return True
