@@ -1586,6 +1586,10 @@ class Command(object):
         return await oem.apply_license(filename, self, progress, data)
 
 if __name__ == '__main__':
-    print(repr(
-        Command(sys.argv[1], os.environ['BMCUSER'], os.environ['BMCPASS'],
-                verifycallback=lambda x: True).get_power()))
+    async def main():
+        cmd = await Command.create(
+            sys.argv[1], os.environ['BMCUSER'], os.environ['BMCPASS'],
+            verifycallback=lambda x: True)
+        print(repr(await cmd.get_power()))
+
+    asyncio.run(main())

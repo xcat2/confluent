@@ -349,7 +349,7 @@ class OEMHandler(generic.OEMHandler):
         elif await self.is_fpc():
             return await self.smmhandler.get_ntp_enabled(self._fpc_variant)
         elif self.has_tsma:
-            return self.tsmahandler.get_ntp_enabled()
+            return await self.tsmahandler.get_ntp_enabled()
         return None
 
     async def get_ntp_servers(self):
@@ -362,7 +362,7 @@ class OEMHandler(generic.OEMHandler):
         if await self.is_fpc():
             return await self.smmhandler.get_ntp_servers()
         if self.has_tsma:
-            return self.tsmahandler.get_ntp_servers()
+            return await self.tsmahandler.get_ntp_servers()
         return ()
 
     async def set_ntp_enabled(self, enabled):
@@ -522,15 +522,16 @@ class OEMHandler(generic.OEMHandler):
     async def get_sensor_data(self):
         if await self.has_imm():
             async for name in self.immhandler.get_oem_sensor_names(self.ipmicmd):
-                yield self.immhandler.get_oem_sensor_reading(name,
-                                                             self.ipmicmd)
+                yield await self.immhandler.get_oem_sensor_reading(name,
+                                                                   self.ipmicmd)
         elif await self.is_fpc():
             for name in nextscale.get_sensor_names(self.ipmicmd,
                                                    self._fpc_variant):
-                yield nextscale.get_sensor_reading(name, self.ipmicmd,
-                                                   self._fpc_variant)
+                yield await nextscale.get_sensor_reading(name, self.ipmicmd,
+                                                         self._fpc_variant)
         elif await self.has_ami():
-            self.get_ami_sensor_data()
+            async for reading in self.get_ami_sensor_data():
+                yield reading
 
     async def get_sensor_descriptions(self):
         if await self.has_imm():
@@ -548,13 +549,13 @@ class OEMHandler(generic.OEMHandler):
 
     async def get_sensor_reading(self, sensorname):
         if await self.has_imm():
-            return self.immhandler.get_oem_sensor_reading(sensorname,
-                                                          self.ipmicmd)
+            return await self.immhandler.get_oem_sensor_reading(sensorname,
+                                                                self.ipmicmd)
         elif await self.is_fpc():
-            return nextscale.get_sensor_reading(sensorname, self.ipmicmd,
-                                                self._fpc_variant)
+            return await nextscale.get_sensor_reading(sensorname, self.ipmicmd,
+                                                      self._fpc_variant)
         elif await self.has_ami():
-            self.get_ami_sensor_reading(sensorname)
+            return await self.get_ami_sensor_reading(sensorname)
         return ()
 
     async def get_inventory_of_component(self, component):
@@ -1135,9 +1136,9 @@ class OEMHandler(generic.OEMHandler):
         targshortname = _megarac_abbrev_image(imagename)
         shortnames = await self._megarac_fetch_image_shortnames()
         while targshortname not in shortnames:
-            self.ipmicmd.wait_for_rsp(1)
+            await self.ipmicmd.wait_for_rsp(1)
             shortnames = await self._megarac_fetch_image_shortnames()
-        self.ipmicmd.ipmi_session.pause(10)
+        await self.ipmicmd.ipmi_session.pause(10)
         try:
             await self.ipmicmd.raw_command(netfn=0x32, command=0xa0, data=(1, 0))
             await self.ipmicmd.ipmi_session.pause(5)

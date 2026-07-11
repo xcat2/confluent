@@ -784,7 +784,7 @@ class SMMClient(object):
         if progress:
             progress({'phase': 'initializing', 'progress': initpct})
         while bytearray(rsp['data'])[0] != 0:
-            ipmisession.Session.pause(3)
+            await ipmisession.Session.pause(3)
             initpct += 3.0
             if initpct > 99.0:
                 initpct = 99.0
@@ -1039,7 +1039,7 @@ class SMMClient(object):
         complete = False
         tries = 0
         while not complete:
-            ipmisession.Session.pause(3)
+            await ipmisession.Session.pause(3)
             wc.request('POST', '/data', 'get=fwProgress,fwUpdate')
             try:
                 rsp = wc.getresponse()

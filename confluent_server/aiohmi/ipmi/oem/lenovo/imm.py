@@ -2365,7 +2365,7 @@ class XCCClient(IMMClient):
             if verifystatus == 2:
                 raise Exception('Failed to verify firmware image')
             if verifystatus != 1:
-                ipmisession.Session.pause(1)
+                await ipmisession.Session.pause(1)
             if verifystatus not in (0, 1, 255):
                 errmsg = repr(rsp) if rsp else wc.lastjsonerror
                 raise Exception(
@@ -2435,7 +2435,7 @@ class XCCClient(IMMClient):
         complete = False
         while not complete:
             await self._refresh_token()
-            ipmisession.Session.pause(3)
+            await ipmisession.Session.pause(3)
             rsp = await wc.grab_json_response(
                 '/api/dataset/imm_firmware_progress')
             progress({'phase': 'apply',
