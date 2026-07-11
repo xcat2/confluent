@@ -589,6 +589,16 @@ node = {
                        'To support this scenario, the switch should be set up to allow independent operation of member ports (e.g. lacp bypass mode or fallback mode).',
         'validvalues': ('lacp', 'loadbalance', 'roundrobin', 'activebackup', 'none')
     },
+    'net.extra_settings': {
+        'description': 'Additional network settings to apply to the connection, as '
+                       'semicolon-delimited key=value pairs (e.g. '
+                       '"connection.zone=internal;ipv4.routes=10.0.0.0/8 192.168.1.254"). '
+                       'The keys are passed through to the network configuration backend of '
+                       'the deployed OS and use its native syntax: nmcli property names on '
+                       'NetworkManager based systems, netplan YAML keys (values in YAML flow '
+                       'syntax, nested keys dotted) on netplan based systems, or ifcfg '
+                       'variables on wicked based systems.',
+    },
     'power.pdu': {
         'description': 'Specifies the managed PDU associated with a power input on the node'
     },

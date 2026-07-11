@@ -246,6 +246,9 @@ class NetManager(object):
         teammod = attribs.get('team_mode', None)
         if teammod:
             myattribs['team_mode'] = teammod
+        extrastgs = attribs.get('extra_settings', None)
+        if extrastgs:
+            myattribs['extra_settings'] = extrastgs
         method = attribs.get('ipv4_method', None)
         if method != 'dhcp':
             ipv4addr = attribs.get('ipv4_address', None)
