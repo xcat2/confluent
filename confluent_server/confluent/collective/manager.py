@@ -656,8 +656,8 @@ async def handle_connection(connection, cert, request, local=False):
             retrythread = None
         async with leader_init:
             cnn = tlvdata.get_socket(connection)
-            cfm.update_collective_address(request['name'],
-                                          cnn.getpeername()[0])
+            await cfm.update_collective_address(request['name'],
+                                                cnn.getpeername()[0])
             await tlvdata.send(connection, cfm._dump_keys(None, False))
             await tlvdata.send(connection, cfm._cfgstore['collective'])
             await tlvdata.send(connection, {'confluent_uuid': cfm.get_global('confluent_uuid')}) # cfm.get_globals())

@@ -743,7 +743,7 @@ async def relay_slaved_requests(name, listener):
                 _newquorum = has_quorum()
             _hasquorum = _newquorum
             if _hasquorum and _pending_collective_updates:
-                apply_pending_collective_updates()
+                await apply_pending_collective_updates()
             msg = await lh.get_next_msg()
             while msg:
                 if name not in cfgstreams:
@@ -1050,23 +1050,23 @@ def _true_del_collective_member(name, sync=True):
 _pending_collective_updates = {}
 
 
-def update_collective_address(name ,address):
+async def update_collective_address(name, address):
     fprint = _cfgstore['collective'][name]['fingerprint']
     oldaddress = _cfgstore['collective'][name]['address']
     if oldaddress == address:
         return
     try:
         check_quorum()
-        add_collective_member(name, address, fprint)
+        await add_collective_member(name, address, fprint)
     except exc.DegradedCollective:
         _pending_collective_updates[name] = address
 
 
-def apply_pending_collective_updates():
+async def apply_pending_collective_updates():
     for name in list(_pending_collective_updates):
         fprint = _cfgstore['collective'][name]['fingerprint']
         address = _pending_collective_updates[name]
-        add_collective_member(name, address, fprint)
+        await add_collective_member(name, address, fprint)
         del _pending_collective_updates[name]
 
 
