@@ -399,7 +399,7 @@ class IpmiHandler:
         tenant = cfg.tenant
         if (node, tenant) not in persistent_ipmicmds:
             try:
-                await persistent_ipmicmds[(node, tenant)].close_confluent()
+                persistent_ipmicmds[(node, tenant)].close_confluent()
             except KeyError:  # was no previous session
                 pass
             try:
@@ -830,7 +830,7 @@ class IpmiHandler:
 
     async def make_sensor_map(self, sensors=None):
         if sensors is None:
-            sensors = await self.ipmicmd.get_sensor_descriptions()
+            sensors = self.ipmicmd.get_sensor_descriptions()
         async for sensor in sensors:
             resourcename = sensor['name']
             self.sensormap[simplify_name(resourcename)] = resourcename
@@ -1075,7 +1075,7 @@ class IpmiHandler:
                     volsfound = True
                     volumes.append(vol)
         if not volsfound:
-            self.output.put(msg.ConfluentTargetNotFound(
+            await self.output.put(msg.ConfluentTargetNotFound(
                 self.node, "No volume named '{0}' found".format(volname)))
             return
         await self.ipmicmd.remove_storage_configuration(toremove)
@@ -1128,14 +1128,14 @@ class IpmiHandler:
                                            vol.status, arrname))
                 return
             else:
-                self._show_storage(storelem[:1] + [vol['name']])
+                await self._show_storage(storelem[:1] + [vol['name']])
 
     async def _update_storage(self, storelem):
         if storelem[0] == 'disks':
             if len(storelem) == 1:
                 raise exc.InvalidArgumentException('Must target a disk')
-            self.set_disk(storelem[-1],
-                          self.inputdata.inputbynode[self.node])
+            await self.set_disk(storelem[-1],
+                                self.inputdata.inputbynode[self.node])
         await self._show_storage(storelem)
 
     async def _show_storage(self, storelem):
@@ -1292,7 +1292,7 @@ class IpmiHandler:
 
     async def list_sensors(self):
         try:
-            sensors = await self.ipmicmd.get_sensor_descriptions()
+            sensors = [sensor async for sensor in self.ipmicmd.get_sensor_descriptions()]
         except pygexc.IpmiException:
             await self.output.put(msg.ConfluentTargetTimeout(self.node))
             return

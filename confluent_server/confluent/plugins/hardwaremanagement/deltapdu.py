@@ -163,7 +163,7 @@ class PDUClient(object):
         self.wc.grab_response('/logout_wait.htm')
 
     async def get_outlet(self, outlet):
-        rsp = await self.wc.grab_response('/setting_admin4.xml')
+        rsp = self.wc.grab_response('/setting_admin4.xml')
         xd = fromstring(rsp[0])
         for ch in xd:
             if 'relay' not in ch.tag:
@@ -177,7 +177,7 @@ class PDUClient(object):
         outlet = int(outlet)
         ident = self.map_outlets[outlet]
         sitem = '/SetParm?item={}?content={}'.format(ident, state)
-        await self.wc.grab_response(sitem)
+        self.wc.grab_response(sitem)
 
 async def retrieve(nodes, element, configmanager, inputdata):
     if 'outlets' not in element:
