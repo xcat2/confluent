@@ -108,7 +108,7 @@ class NodeHandler(generic.NodeHandler):
                 # Use existing account that has been created
                 newuserslot = uid
                 if newpass != passwd:  # don't mess with existing if no change
-                    ic.set_user_password(newuserslot, password=newpass)
+                    await ic.set_user_password(newuserslot, password=newpass)
                     ic = await self._get_ipmicmd(user, passwd)
                     if vc:
                         ic.register_key_handler(vc)
@@ -118,8 +118,8 @@ class NodeHandler(generic.NodeHandler):
             if newuserslot < 2:
                 newuserslot = 2
             if newpass != passwd:  # don't mess with existing if no change
-                ic.set_user_password(newuserslot, password=newpass)
-            ic.set_user_name(newuserslot, newuser)
+                await ic.set_user_password(newuserslot, password=newpass)
+            await ic.set_user_name(newuserslot, newuser)
             if havecustomcreds:
                 ic = await self._get_ipmicmd(user, passwd)
                 if vc:
@@ -132,17 +132,17 @@ class NodeHandler(generic.NodeHandler):
         for uid in currusers:
             if uid != newuserslot:
                 if uid <= lockedusers:  # we cannot delete, settle for disable
-                    ic.disable_user(uid, 'disable')
+                    await ic.disable_user(uid, 'disable')
                 else:
                     # lead with the most critical thing, removing user access
-                    ic.set_user_access(uid, channel=None, callback=False,
-                                       link_auth=False, ipmi_msg=False,
-                                       privilege_level='no_access')
+                    await ic.set_user_access(uid, channel=None, callback=False,
+                                             link_auth=False, ipmi_msg=False,
+                                             privilege_level='no_access')
                     # next, try to disable the password
-                    ic.set_user_password(uid, mode='disable', password=None)
+                    await ic.set_user_password(uid, mode='disable', password=None)
                     # ok, now we can be less paranoid
                     try:
-                        ic.user_delete(uid)
+                        await ic.user_delete(uid)
                     except pygexc.IpmiException as ie:
                         if ie.ipmicode != 0xd5:  # some response to the 0xff
                             # name...
@@ -165,14 +165,14 @@ class NodeHandler(generic.NodeHandler):
             netconfig = await netutil.get_nic_config(cfg, nodename, ip=newip)
             plen = netconfig['prefix']
             newip = '{0}/{1}'.format(newip, plen)
-            currcfg = ic.get_net_configuration()
+            currcfg = await ic.get_net_configuration()
             if currcfg['ipv4_address'] != newip:
                 # do not change the ipv4_config if the current config looks
                 # like it is already accurate
-                ic.set_net_configuration(ipv4_address=newip,
-                                         ipv4_configuration='static',
-                                         ipv4_gateway=netconfig[
-                                             'ipv4_gateway'])
+                await ic.set_net_configuration(ipv4_address=newip,
+                                                ipv4_configuration='static',
+                                                ipv4_gateway=netconfig[
+                                                    'ipv4_gateway'])
         elif self.ipaddr.startswith('fe80::'):
             await cfg.set_node_attributes(
                 {nodename: {'hardwaremanagement.manager': self.ipaddr}})
@@ -180,5 +180,5 @@ class NodeHandler(generic.NodeHandler):
             raise exc.TargetEndpointUnreachable(
                 'hardwaremanagement.manager must be set to desired address')
         if reset:
-            ic.reset_bmc()
+            await ic.reset_bmc()
         return ic
