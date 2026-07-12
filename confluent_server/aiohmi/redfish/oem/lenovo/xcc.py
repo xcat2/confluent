@@ -1757,18 +1757,18 @@ class OEMHandler(generic.OEMHandler):
                 else:
                     return days
 
-    def get_inventory_descriptions(self, withids=False):
-        hwmap = self.hardware_inventory_map()
+    async def get_inventory_descriptions(self, withids=False):
+        hwmap = await self.hardware_inventory_map()
         yield "System"
         for key in natural_sort(hwmap):
             yield key
-        for cpuinv in self._get_cpu_inventory():
+        async for cpuinv in self._get_cpu_inventory():
             yield cpuinv[0]
-        for meminv in self._get_mem_inventory():
+        async for meminv in self._get_mem_inventory():
             yield meminv[0]
 
 
-    def get_inventory_of_component(self, compname):
+    async def get_inventory_of_component(self, compname):
         if compname.lower() == 'system':
             sysinfo = {
                 'UUID': self._varsysinfo.get('UUID', ''),
@@ -1779,14 +1779,14 @@ class OEMHandler(generic.OEMHandler):
                     'SKU', self._varsysinfo.get('PartNumber', '')),
             }
             return sysinfo
-        hwmap = self.hardware_inventory_map()
+        hwmap = await self.hardware_inventory_map()
         try:
             return hwmap[compname]
         except KeyError:
-            for cpuinv in self._get_cpu_inventory():
+            async for cpuinv in self._get_cpu_inventory():
                 if cpuinv[0] == compname:
                     return cpuinv[1]
-            for meminv in self._get_mem_inventory():
+            async for meminv in self._get_mem_inventory():
                 if meminv[0] == compname:
                     return meminv[1]
 

@@ -336,9 +336,9 @@ class OEMHandler(generic.OEMHandler):
             event['component'] += ' {0}'.format(evdata[1] & 0b11111)
 
     async def reseat_bay(self, bay):
-        if self.is_fpc:
+        if await self.is_fpc():
             return await self.smmhandler.reseat_bay(bay)
-        elif self.has_xcc and bay == -1:
+        elif await self.has_xcc() and bay == -1:
             return await self.immhandler.reseat()
         return await super(OEMHandler, self).reseat_bay(bay)
 
@@ -347,7 +347,7 @@ class OEMHandler(generic.OEMHandler):
             ntpres = await self.ipmicmd.raw_command(netfn=0x32, command=0xa7)
             return ntpres['data'][0] == '\x01'
         elif await self.is_fpc():
-            return await self.smmhandler.get_ntp_enabled(self._fpc_variant)
+            return self.smmhandler.get_ntp_enabled(self._fpc_variant)
         elif self.has_tsma:
             return await self.tsmahandler.get_ntp_enabled()
         return None
@@ -360,7 +360,7 @@ class OEMHandler(generic.OEMHandler):
             srvs.append(ntpres['data'][129:257].rstrip('\x00'))
             return srvs
         if await self.is_fpc():
-            return await self.smmhandler.get_ntp_servers()
+            return self.smmhandler.get_ntp_servers()
         if self.has_tsma:
             return await self.tsmahandler.get_ntp_servers()
         return ()
@@ -375,7 +375,7 @@ class OEMHandler(generic.OEMHandler):
                     netfn=0x32, command=0xa8, data=(3, 0), timeout=15)
             return True
         if await self.is_fpc():
-            await self.smmhandler.set_ntp_enabled(enabled)
+            self.smmhandler.set_ntp_enabled(enabled)
             return True
         if self.has_tsma:
             await self.tsmahandler.set_ntp_enabled(enabled)
@@ -393,7 +393,7 @@ class OEMHandler(generic.OEMHandler):
             if not 0 <= index <= 2:
                 raise pygexc.InvalidParameterValue(
                     'SMM supports indexes 0 through 2')
-            await self.smmhandler.set_ntp_server(server, index)
+            self.smmhandler.set_ntp_server(server, index)
             return True
         elif self.has_tsma:
             if not (0 <= index <= 1):
@@ -516,7 +516,7 @@ class OEMHandler(generic.OEMHandler):
         elif await self.is_fpc():
             async for compname in self.smmhandler.get_inventory_descriptions(
                     self.ipmicmd, await self.is_fpc()):
-                yield (compname, self.smmhandler.get_inventory_of_component(
+                yield (compname, await self.smmhandler.get_inventory_of_component(
                     self.ipmicmd, compname))
 
     async def get_sensor_data(self):
@@ -561,14 +561,14 @@ class OEMHandler(generic.OEMHandler):
     async def get_inventory_of_component(self, component):
         if await self.has_tsm() or await self.has_ami() or await self.has_asrock():
             await self._collect_tsm_inventory()
-            return await self.oem_inventory_info.get(component, None)
+            return self.oem_inventory_info.get(component, None)
         if await self.has_imm():
             return await self.immhandler.get_component_inventory(component)
         if await self.is_fpc():
-            return await self.smmhandler.get_inventory_of_component(component)
+            return await self.smmhandler.get_inventory_of_component(self.ipmicmd, component)
 
-    def get_cmd_type(self, categorie_item, catspec):
-        if self.has_asrock:
+    async def get_cmd_type(self, categorie_item, catspec):
+        if await self.has_asrock():
             cmd_type = catspec["command"]["asrock"]
         elif categorie_item in categorie_items:
             cmd_type = catspec["command"]["lenovo"]
@@ -579,9 +579,7 @@ class OEMHandler(generic.OEMHandler):
 
     async def _collect_tsm_inventory(self):
         self.oem_inventory_info = {}
-        asrock = False
-        if self.has_asrock:
-            asrock = True
+        asrock = await self.has_asrock()
         for catid, catspec in inventory.categories.items():
             # skip the inventory fields if the system is RS160
             if asrock and catid not in categorie_items:
@@ -590,7 +588,7 @@ class OEMHandler(generic.OEMHandler):
                     and catspec["workaround_bmc_bug"](
                         "ami" if await self.has_ami() else "lenovo")):
                 rsp = None
-                cmd = self.get_cmd_type(catid, catspec)
+                cmd = await self.get_cmd_type(catid, catspec)
                 tmp_command = dict(cmd)
                 tmp_command["data"] = list(tmp_command["data"])
                 count = 0
@@ -617,7 +615,7 @@ class OEMHandler(generic.OEMHandler):
                 rsp["data"] = buffer(bytearray(rsp["data"]))
             else:
                 try:
-                    cmd = self.get_cmd_type(catid, catspec)
+                    cmd = await self.get_cmd_type(catid, catspec)
                     rsp = await self.ipmicmd.raw_command(**cmd)
                 except pygexc.IpmiException:
                     continue
@@ -852,7 +850,7 @@ class OEMHandler(generic.OEMHandler):
     async def get_oem_firmware(self, bmcver, components, category):
         if await self.has_tsm() or await self.has_ami() or await self.has_asrock():
             command = firmware.get_categories()["firmware"]
-            fw_cmd = self.get_cmd_type("firmware", command)
+            fw_cmd = await self.get_cmd_type("firmware", command)
             rsp = await self.ipmicmd.raw_command(**fw_cmd)
 
             # the newest Lenovo ThinkServer versions are returning Bios version
@@ -860,7 +858,7 @@ class OEMHandler(generic.OEMHandler):
             bios_versions = None
             if await self.has_tsm() or await self.has_asrock():
                 bios_command = firmware.get_categories()["bios_version"]
-                bios_cmd = self.get_cmd_type("bios_version", bios_command)
+                bios_cmd = await self.get_cmd_type("bios_version", bios_command)
                 bios_rsp = await self.ipmicmd.raw_command(**bios_cmd)
                 if await self.has_asrock():
                     bios_versions = bios_rsp['data']
@@ -943,7 +941,7 @@ class OEMHandler(generic.OEMHandler):
                 name += rsp['data'][:]
             return name.rstrip('\x00')
         elif await self.is_fpc():
-            return await self.smmhandler.get_domain()
+            return self.smmhandler.get_domain()
 
     async def set_oem_domain_name(self, name):
         if await self.has_tsm():
@@ -962,20 +960,20 @@ class OEMHandler(generic.OEMHandler):
             await self._restart_dns()
             return
         elif await self.is_fpc():
-            await self.smmhandler.set_domain(name)
+            self.smmhandler.set_domain(name)
 
     async def set_hostname(self, hostname):
         if await self.has_xcc():
             return await self.immhandler.set_hostname(hostname)
         elif await self.is_fpc():
-            return await self.smmhandler.set_hostname(hostname)
+            return self.smmhandler.set_hostname(hostname)
         return await super(OEMHandler, self).set_hostname(hostname)
 
     async def get_hostname(self):
         if await self.has_xcc():
             return await self.immhandler.get_hostname()
         elif await self.is_fpc():
-            return await self.smmhandler.get_hostname()
+            return self.smmhandler.get_hostname()
         return await super(OEMHandler, self).get_hostname()
 
     """ Gets a remote console launcher for a Lenovo ThinkServer.

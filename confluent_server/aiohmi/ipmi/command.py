@@ -738,7 +738,8 @@ class Command(object):
         This provides a detailed view of the LEDs of the managed system.
         """
         await self.oem_init()
-        return await self._oem.get_leds()
+        async for led in self._oem.get_leds():
+            yield led
 
     async def get_ntp_enabled(self):
         await self.oem_init()
@@ -806,7 +807,7 @@ class Command(object):
                 rsp = await self.raw_command(command=0x2d, netfn=4,
                                        rslun=currsensor.sensor_lun,
                                        data=(currsensor.sensor_number,))
-                return self._sdr.sensors[sensor].decode_sensor_reading(
+                return await self._sdr.sensors[sensor].decode_sensor_reading(
                     self, rsp['data'])
         await self.oem_init()
         return await self._oem.get_sensor_reading(sensorname)
@@ -1091,7 +1092,7 @@ class Command(object):
                 if rsp['code'] == 203:  # Sensor does not exist, optional dev
                     continue
                 raise exc.IpmiException(rsp['error'], code=rsp['code'])
-            yield self._sdr.sensors[sensor].\
+            yield await self._sdr.sensors[sensor].\
                 decode_sensor_reading(self, rsp['data'])
         await self.oem_init()
         async for reading in self._oem.get_sensor_data():

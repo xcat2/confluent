@@ -660,8 +660,8 @@ class OEMHandler(object):
                 procurl = sysinfo.get('Processors', {}).get('@odata.id',
                                                           None)
                 if procurl:
-                    for cpu in await fishclient._do_web_request(procurl).get(
-                            'Members', []):
+                    procinfo = await fishclient._do_web_request(procurl)
+                    for cpu in procinfo.get('Members', []):
                         cinfo = await fishclient._do_web_request(cpu['@odata.id'])
                         if cinfo.get('Status', {}).get(
                                 'State', None) == 'Absent':
@@ -1004,8 +1004,9 @@ class OEMHandler(object):
     def _extract_fwinfo(self, inf):
         return {}
 
-    def get_firmware_inventory(self, components, fishclient, category=None):
-        return []
+    async def get_firmware_inventory(self, components, fishclient, category=None):
+        return
+        yield
 
     def set_credentials(self, username, password):
         try:
@@ -1240,7 +1241,7 @@ class OEMHandler(object):
         if not foundmacs:
             # No PCIe device inventory, but *maybe* ethernet inventory...
             idxsbyname = {}
-            for nicinfo in self._get_eth_urls():
+            for nicinfo in await self._get_eth_urls():
                 nicinfo = await self._do_web_request(nicinfo)
                 nicname = nicinfo.get('Name', None)
                 nicinfo = nicinfo.get('MACAddress', nicinfo.get('PermanentAddress', None))
@@ -1675,7 +1676,7 @@ class OEMHandler(object):
         await fishclient._do_web_request(licenses, licinfo)
 
 
-    def get_user_expiration(self, uid):
+    async def get_user_expiration(self, uid):
         return None
 
     async def reseat_bay(self, bay):

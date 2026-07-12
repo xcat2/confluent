@@ -1061,16 +1061,16 @@ class SMMClient(object):
             complete = percent >= 100.0
         return 'complete'
 
-    def get_inventory_descriptions(self, ipmicmd, variant):
+    async def get_inventory_descriptions(self, ipmicmd, variant):
         if variant >> 5 == 0:
             return
-        psucount = get_psu_count(ipmicmd, variant)
+        psucount = await get_psu_count(ipmicmd, variant)
         for idx in range(psucount):
             yield 'PSU {}'.format(idx + 1)
 
-    def get_inventory_of_component(self, ipmicmd, component):
+    async def get_inventory_of_component(self, ipmicmd, component):
         psuidx = int(component.replace('PSU ', ''))
-        return self.get_psu_info(ipmicmd, psuidx)
+        return await self.get_psu_info(ipmicmd, psuidx)
 
     async def get_psu_info(self, ipmicmd, psunum):
         psuinfo = await ipmicmd.raw_command(0x34, 0x6, data=(psunum,))
