@@ -57,8 +57,8 @@ class AsyncTermRelation(object):
         self.asynchdl = asynchdl
         self.termid = termid
 
-    def got_data(self, data):
-        self.asynchdl.add(self.termid, data)
+    async def got_data(self, data):
+        await self.asynchdl.add(self.termid, data)
 
 
 class AsyncSession(object):

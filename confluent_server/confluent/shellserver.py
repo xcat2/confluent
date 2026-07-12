@@ -54,7 +54,7 @@ class _ShellHandler(consoleserver.ConsoleHandler):
             _reaper = tasks.spawn(reapsessions())
 
 
-    def check_collective(self, attrvalue):
+    async def check_collective(self, attrvalue):
         return
 
     def log(self, *args, **kwargs):
@@ -69,7 +69,7 @@ class _ShellHandler(consoleserver.ConsoleHandler):
     #    #retdata, connstate = await super(_ShellHandler, self).get_recent()
     #    return '', {} # connstate
 
-    def _got_disconnected(self):
+    async def _got_disconnected(self):
         self.connectstate = 'closed'
         tasks.spawn(self._bgdisconnect())
 
@@ -77,7 +77,7 @@ class _ShellHandler(consoleserver.ConsoleHandler):
         await self._send_rcpts({'connectstate': self.connectstate})
         for session in list(self.livesessions):
             await session.destroy()
-        self.feedbuffer('\x1bc')
+        await self.feedbuffer('\x1bc')
 
 
 

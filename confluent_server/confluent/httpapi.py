@@ -585,21 +585,24 @@ async def wsock_handler(req):
             if asess:
                 await asess.destroy()
         return rsp
-    if '/console/session' in ws.path or '/shell/sessions/' in ws.path:
-        def datacallback(data):
-            ws.send(websockify_data(data))
-        geom = ws.wait()
-        geom = geom[1:]
+    path = req.rel_url.path
+    if '/console/session' in path or '/shell/sessions/' in path:
+        async def datacallback(data):
+            await rsp.send_str(websockify_data(data))
+        geom = await rsp.receive()
+        if geom.type != WSMsgType.TEXT:
+            return rsp
+        geom = geom.data[1:]
         geom = json.loads(geom)
         width = geom['width']
         height = geom['height']
         skipreplay = geom.get('skipreplay', False)
         #hard bake JSON into this path, do not support other incarnations
-        if '/console/session' in ws.path:
-            prefix, _, _ = ws.path.partition('/console/session')
+        if '/console/session' in path:
+            prefix, _, _ = path.partition('/console/session')
             shellsession = False
-        elif '/shell/sessions/' in ws.path:
-            prefix, _, _ = ws.path.partition('/shell/sessions')
+        elif '/shell/sessions/' in path:
+            prefix, _, _ = path.partition('/shell/sessions')
             shellsession = True
         _, _, nodename = prefix.rpartition('/')
 
@@ -618,11 +621,12 @@ async def wsock_handler(req):
                 )
         except exc.NotFoundException:
             return
-        clientmsg = ws.wait()
+        clientmsg = await rsp.receive()
         try:
-            while clientmsg is not None:
+            while clientmsg.type == WSMsgType.TEXT:
+                clientmsg = clientmsg.data
                 if clientmsg[0] == ' ':
-                    consession.write(clientmsg[1:])
+                    await consession.write(clientmsg[1:])
                 elif clientmsg[0] == '!':
                     cmd = json.loads(clientmsg[1:])
                     action = cmd.get('action', None)
@@ -632,10 +636,11 @@ async def wsock_handler(req):
                         consession.resize(
                             width=cmd['width'], height=cmd['height'])
                 elif clientmsg[0] == '?':
-                    ws.send(u'?')
-                clientmsg = ws.wait()
+                    await rsp.send_str(u'?')
+                clientmsg = await rsp.receive()
         finally:
-            consession.destroy()
+            await consession.destroy()
+        return rsp
 
 
 async def resourcehandler(request):
@@ -927,7 +932,7 @@ async def resourcehandler_backend(req, make_response):
             await rsp.write(json.dumps({'session': querydict['session']}))
             return rsp # client has requests to send or receive, not both...
         elif 'closesession' in querydict:
-            consolesessions[querydict['session']]['session'].destroy()
+            await consolesessions[querydict['session']]['session'].destroy()
             del consolesessions[querydict['session']]
             rsp = await make_response('application/json', 200)
             await rsp.write(b'{"sessionclosed": true}')

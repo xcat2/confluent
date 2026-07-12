@@ -451,8 +451,7 @@ class ConsoleHandler(object):
         await self._send_rcpts({'deleting': True})
         await self._disconnect()
         if self._console:
-
-            self._console.close()
+            await self._console.close()
             self._console = None
         if self.connectionthread:
             self.connectionthread.cancel()
@@ -871,7 +870,7 @@ class ConsoleSession(object):
             await self.conshdl.attachsession(self)
             self.write = self.conshdl.write
 
-    def got_data(self, data):
+    async def got_data(self, data):
         """Receive data from console and buffer
 
         If the caller does not provide a callback and instead will be polling
