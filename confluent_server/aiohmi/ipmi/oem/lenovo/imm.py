@@ -839,7 +839,7 @@ class IMMClient(object):
                     hwmap[aname] = bdata
             self.datacache['lenovo_cached_hwmap'] = (hwmap,
                                                      util._monotonic_time())
-        self.weblogout()
+        await self.weblogout()
         return hwmap
 
     async def get_firmware_inventory(self, bmcver, components, category):
@@ -1434,7 +1434,7 @@ class XCCClient(IMMClient):
                 if controller != disk.id[0]:
                     raise pygexc.UnsupportedFunctionality(
                         'Cannot span arrays across controllers')
-            raidmap = self._raid_number_map(controller)
+            raidmap = await self._raid_number_map(controller)
             if not raidmap:
                 raise pygexc.InvalidParameterValue(
                     'There are no available drives for a new array')
@@ -1487,21 +1487,21 @@ class XCCClient(IMMClient):
             # TODO(): adding new volume to existing array would be here
             pass
 
-    def _make_jbod(self, disk, realcfg):
+    async def _make_jbod(self, disk, realcfg):
         currstatus = self._get_status(disk, realcfg)
         if currstatus.lower() == 'jbod':
             return
-        self._make_available(disk, realcfg)
-        self._set_drive_state(disk, 16)
+        await self._make_available(disk, realcfg)
+        await self._set_drive_state(disk, 16)
 
-    def _make_global_hotspare(self, disk, realcfg):
+    async def _make_global_hotspare(self, disk, realcfg):
         currstatus = self._get_status(disk, realcfg)
         if currstatus.lower() == 'global hot spare':
             return
-        self._make_available(disk, realcfg)
-        self._set_drive_state(disk, 1)
+        await self._make_available(disk, realcfg)
+        await self._set_drive_state(disk, 1)
 
-    def _make_available(self, disk, realcfg):
+    async def _make_available(self, disk, realcfg):
         # 8 if jbod, 4 if hotspare.., leave alone if already...
         currstatus = self._get_status(disk, realcfg)
         newstate = None
@@ -1511,7 +1511,7 @@ class XCCClient(IMMClient):
             newstate = 4
         elif currstatus.lower() == 'jbod':
             newstate = 8
-        self._set_drive_state(disk, newstate)
+        await self._set_drive_state(disk, newstate)
 
     def _get_status(self, disk, realcfg):
         for cfgdisk in realcfg.disks:
@@ -1536,7 +1536,7 @@ class XCCClient(IMMClient):
         wc = await self.wc()
         rsp = await wc.grab_json_response(
             '/api/function', {'raidlink_ClearRaidConf': '1'})
-        self.weblogout()
+        await self.weblogout()
         if rsp['return'] != 0:
             raise Exception('Unexpected return to clear config: ' + repr(rsp))
 
@@ -1560,10 +1560,10 @@ class XCCClient(IMMClient):
                 if rsp.get('return', -1) != 0:
                     raise Exception(
                         'Unexpected return to volume deletion: ' + repr(rsp))
-                self._wait_storage_async()
+                await self._wait_storage_async()
         for disk in cfgspec.disks:
             await self._make_available(disk, realcfg)
-        self.weblogout()
+        await self.weblogout()
 
     async def apply_storage_configuration(self, cfgspec):
         realcfg = await self.get_storage_configuration(False)
@@ -2168,7 +2168,7 @@ class XCCClient(IMMClient):
             retry = 3
             while not complete and retry > 0:
                 try:
-                    pgress, status = self.grab_redfish_response_with_status(
+                    pgress, status = await self.grab_redfish_response_with_status(
                         monitorurl)
                 except socket.timeout:
                     pgress = None                
@@ -2205,10 +2205,10 @@ class XCCClient(IMMClient):
                 return 'complete'
             return 'pending'
         finally:
-            self.grab_redfish_response_with_status(
+            await self.grab_redfish_response_with_status(
                 '/redfish/v1/UpdateService',
                 {'HttpPushUriTargetsBusy': False}, method='PATCH')
-            self.grab_redfish_response_with_status(
+            await self.grab_redfish_response_with_status(
                 '/redfish/v1/UpdateService',
                 {'HttpPushUriTargets': []}, method='PATCH')
 
@@ -2410,7 +2410,7 @@ class XCCClient(IMMClient):
                 errmsg = repr(rsp) if rsp else wc.lastjsonerror
                 raise Exception(
                     'Unexpected result from PCI select: ' + errmsg)
-            self.set_property('/v2/ibmc/uefi/force-inventory', 1)
+            await self.set_property('/v2/ibmc/uefi/force-inventory', 1)
         else:
             await self._refresh_token()
             rsp = await wc.grab_json_response(

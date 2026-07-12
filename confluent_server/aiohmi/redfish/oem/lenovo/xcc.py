@@ -184,7 +184,7 @@ class OEMHandler(generic.OEMHandler):
         try:
             self.fwo = await self.fwc.get_fw_options(fetchimm=fetchimm)
         except config.Unsupported:
-            return super(OEMHandler, self).get_system_configuration(
+            return await super(OEMHandler, self).get_system_configuration(
                 hideadvanced, fishclient)
         except Exception:
             raise Exception('%s failed to retrieve UEFI configuration'
@@ -831,7 +831,7 @@ class OEMHandler(generic.OEMHandler):
                 wc.set_header('X-XSRF-TOKEN', cookie.value)
             wc.vintage = util._monotonic_time()
 
-    def _make_available(self, disk, realcfg):
+    async def _make_available(self, disk, realcfg):
         # 8 if jbod, 4 if hotspare.., leave alone if already...
         currstatus = self._get_status(disk, realcfg)
         newstate = None
@@ -841,21 +841,21 @@ class OEMHandler(generic.OEMHandler):
             newstate = 4
         elif currstatus.lower() == 'jbod':
             newstate = 8
-        self._set_drive_state(disk, newstate)
+        await self._set_drive_state(disk, newstate)
 
-    def _make_jbod(self, disk, realcfg):
+    async def _make_jbod(self, disk, realcfg):
         currstatus = self._get_status(disk, realcfg)
         if currstatus.lower() == 'jbod':
             return
-        self._make_available(disk, realcfg)
-        self._set_drive_state(disk, 16)
+        await self._make_available(disk, realcfg)
+        await self._set_drive_state(disk, 16)
 
-    def _make_global_hotspare(self, disk, realcfg):
+    async def _make_global_hotspare(self, disk, realcfg):
         currstatus = self._get_status(disk, realcfg)
         if currstatus.lower() == 'global hot spare':
             return
-        self._make_available(disk, realcfg)
-        self._set_drive_state(disk, 1)
+        await self._make_available(disk, realcfg)
+        await self._set_drive_state(disk, 1)
 
     def _get_status(self, disk, realcfg):
         for cfgdisk in realcfg.disks:
@@ -978,7 +978,7 @@ class OEMHandler(generic.OEMHandler):
             pass
 
     async def _create_array(self, pool):
-        params = self._parse_array_spec(pool)
+        params = await self._parse_array_spec(pool)
         cid = params['controller'].split(',')[0]
         cslotno = params['controller'].split(',')[1]
         url = '/api/function/raid_conf?params=raidlink_GetDefaultVolProp'
@@ -1443,7 +1443,7 @@ class OEMHandler(generic.OEMHandler):
 
     async def update_firmware_backend(self, filename, data=None, progress=None,
                                 bank=None):
-        self._refresh_token()
+        await self._refresh_token()
         wc = await self.wc()
         rsv = await wc.grab_json_response('/api/providers/fwupdate', json.dumps(
             {'UPD_WebReserve': 1}))
@@ -1470,7 +1470,7 @@ class OEMHandler(generic.OEMHandler):
                     raise Exception('File is larger than supported')
                 raise Exception('Unexpected result:' + repr(rsp))
             uploadstate = rsp['state']
-            self._refresh_token()
+            await self._refresh_token()
         while uploadstate != 'done':
             rsp = await wc.grab_json_response(
                 '/upload/progress?X-Progress-ID={0}'.format(xid))

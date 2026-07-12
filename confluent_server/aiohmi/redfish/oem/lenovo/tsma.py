@@ -186,7 +186,7 @@ class TsmHandler(generic.OEMHandler):
             if 'dns_domain'.startswith(key.lower()):
                 dnschgs['domain_name'] = currval
             if 'password_complexity'.startswith(key.lower()):
-                self._set_pass_complexity(currval, wc)
+                await self._set_pass_complexity(currval, wc)
             if 'password_login_failures'.startswith(key.lower()):
                 await self._set_pass_lockout(currval, wc)
         if dnschgs:

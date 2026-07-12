@@ -671,14 +671,14 @@ class SMMClient(object):
             for bayn in range(1, numbays + 1):
                 if fnmatch.fnmatch('bay{0}_user_cap'.format(bayn),
                                    key.lower()):
-                    self.set_bay_cap(bayn, changeset[key]['value'])
+                    await self.set_bay_cap(bayn, changeset[key]['value'])
                 if fnmatch.fnmatch(
                         'bay{0}_user_cap_active'.format(bayn), key.lower()):
-                    self.set_bay_cap_active(bayn, changeset[key]['value'])
+                    await self.set_bay_cap_active(bayn, changeset[key]['value'])
             if fnmatch.fnmatch('chassis_user_cap', key.lower()):
-                self.set_bay_cap(numbays + 1, changeset[key]['value'])
+                await self.set_bay_cap(numbays + 1, changeset[key]['value'])
             if fnmatch.fnmatch('chassis_user_cap_active', key.lower()):
-                self.set_bay_cap_active(numbays + 1, changeset[key]['value'])
+                await self.set_bay_cap_active(numbays + 1, changeset[key]['value'])
             if fnmatch.fnmatch('fanspeed', key.lower()):
                 for mode in self.fanmodes:
                     byteval = mode
@@ -816,10 +816,10 @@ class SMMClient(object):
     async def process_fru(self, fru):
         smmv1 = self.smm_variant & 0xf0 == 0
         # TODO(jjohnson2): can also get EIOM, SMM, and riser data if warranted
-        snum = bytes(await self.ipmicmd.raw_command(
-            netfn=0x32, command=0xb0, data=(5, 1))['data'][:])
-        mnum = bytes(await self.ipmicmd.raw_command(
-            netfn=0x32, command=0xb0, data=(5, 0))['data'][:])
+        snum = bytes((await self.ipmicmd.raw_command(
+            netfn=0x32, command=0xb0, data=(5, 1)))['data'][:])
+        mnum = bytes((await self.ipmicmd.raw_command(
+            netfn=0x32, command=0xb0, data=(5, 0)))['data'][:])
         if not smmv1:
             snum = snum[2:]
             mnum = mnum[2:]
@@ -1115,5 +1115,5 @@ class SMMClient(object):
     async def wc(self):
         if (not self._wc or self._wc.broken
                 or self._wc.vintage < util._monotonic_time() + 30):
-            self._wc = await self.get_webclient()
+            self._wc = self.get_webclient()
         return self._wc

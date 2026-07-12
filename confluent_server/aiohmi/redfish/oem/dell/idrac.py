@@ -17,8 +17,8 @@ import aiohmi.redfish.oem.generic as generic
 
 class OEMHandler(generic.OEMHandler):
 
-    def set_bootdev(self, bootdev, persist=False, uefiboot=None,
-                    fishclient=None):
+    async def set_bootdev(self, bootdev, persist=False, uefiboot=None,
+                          fishclient=None):
         # gleaned from web console, under configuration, system settings,
         # hardware, first boot device. iDrac presumes that the standard
         # explicitly refers only to physical devices. I think the intent
@@ -26,8 +26,8 @@ class OEMHandler(generic.OEMHandler):
         # the 'physical' standard to the vFDD/VCD-DVD seen in the idrac
         # web gui
         if bootdev not in ('floppy', 'cd'):
-            return super(OEMHandler, self).set_bootdev(bootdev, persist,
-                                                       uefiboot, fishclient)
+            return await super(OEMHandler, self).set_bootdev(bootdev, persist,
+                                                             uefiboot, fishclient)
         payload = {'Attributes': {}}
         if persist:
             payload['Attributes']['ServerBoot.1.BootOnce'] = 'Disabled'
@@ -37,7 +37,7 @@ class OEMHandler(generic.OEMHandler):
             payload['Attributes']['ServerBoot.1.FirstBootDevice'] = 'vFDD'
         elif bootdev == 'cd':
             payload['Attributes']['ServerBoot.1.FirstBootDevice'] = 'VCD-DVD'
-        fishclient._do_web_request(
+        await fishclient._do_web_request(
             '/redfish/v1/Managers/iDRAC.Embedded.1/Attributes',
             payload, method='PATCH')
         return {'bootdev': bootdev}

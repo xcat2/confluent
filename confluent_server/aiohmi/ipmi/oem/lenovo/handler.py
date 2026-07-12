@@ -493,8 +493,7 @@ class OEMHandler(generic.OEMHandler):
         if await self.has_tsm() or await self.has_ami() or await self.has_asrock():
             # Thinkserver with TSM
             if not self.oem_inventory_info:
-                async for desc in self._collect_tsm_inventory():
-                    yield desc
+                await self._collect_tsm_inventory()
             for compname in self.oem_inventory_info:
                 yield compname
         elif await self.has_imm():
@@ -767,7 +766,7 @@ class OEMHandler(generic.OEMHandler):
             except (AttributeError, KeyError, IndexError):
                 pass
             if await self.has_xcc() and name and name.startswith('PSU '):
-                self.immhandler.augment_psu_info(fru, name)
+                await self.immhandler.augment_psu_info(fru, name)
             if (await self.has_xcc() and 'memory_type' in fru
                     and fru['memory_type'] == 'Unknown'):
                 await self.immhandler.fetch_dimm(name, fru)
@@ -1028,14 +1027,14 @@ class OEMHandler(generic.OEMHandler):
 
     async def add_extra_net_configuration(self, netdata, channel=None):
         if await self.has_tsm():
-            ipv6_addr = await self.ipmicmd.raw_command(
+            ipv6_addr = (await self.ipmicmd.raw_command(
                 netfn=0x0c, command=0x02,
-                data=(0x01, 0xc5, 0x00, 0x00))["data"][1:]
+                data=(0x01, 0xc5, 0x00, 0x00)))['data'][1:]
             if not ipv6_addr:
                 return
-            rspdata = await self.ipmicmd.raw_command(
+            rspdata = (await self.ipmicmd.raw_command(
                 netfn=0xc, command=0x02,
-                data=(0x1, 0xc6, 0, 0))['data']
+                data=(0x1, 0xc6, 0, 0)))['data']
             ipv6_prefix_ba = bytearray(rspdata)
             ipv6_prefix = ipv6_prefix_ba[1]
 
