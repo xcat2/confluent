@@ -1668,7 +1668,7 @@ class IpmiHandler:
     async def handle_ikvm(self):
         methods = await self.ipmicmd.get_ikvm_methods()
         if 'openbmc' in methods:
-            url = vinzmanager.get_url(self.node, self.inputdata)
+            url = await vinzmanager.get_url(self.node, self.inputdata)
             await self.output.put(msg.ChildCollection(url))
             return
         launchdata = await self.ipmicmd.get_ikvm_launchdata()

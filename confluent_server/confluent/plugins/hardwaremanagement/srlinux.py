@@ -55,7 +55,7 @@ async def retrieve_node_backend(node, element, user, pwd, configmanager, inputda
             if element[-1] == 'all' or simplify_name(sensor['name']) == element[-1]:
                 await results.put(msg.SensorReadings([sensor], node))
     else:
-        results.put(msg.ConfluentNodeError(node, 'Not supported'))
+        await results.put(msg.ConfluentNodeError(node, 'Not supported'))
 
 
 async def retrieve(nodes, element, configmanager, inputdata):
