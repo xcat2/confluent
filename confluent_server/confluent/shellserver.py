@@ -37,7 +37,7 @@ async def reapsessions():
             for sesshdl in list(currcli):
                 currsess = currcli[sesshdl]
                 if currsess.numusers == 0 and currsess.expiry < time.time():
-                    currsess.close()
+                    await currsess.close()
                     del activesessions[clientid][sesshdl]
 
 class _ShellHandler(consoleserver.ConsoleHandler):

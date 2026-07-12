@@ -225,13 +225,13 @@ class ConsoleHandler(object):
             'value', None)
         if list(configmodule.list_collective()) and not myc:
             self._is_local = False
-            self._detach()
+            await self._detach()
             await self._disconnect()
         if myc and myc != collective.get_myname():
             # Do not do console connect for nodes managed by another
             # confluent collective member
             self._is_local = False
-            self._detach()
+            await self._detach()
             await self._disconnect()
         else:
             self._is_local = True
@@ -301,9 +301,9 @@ class ConsoleHandler(object):
             'or the console simply not having any output since last connection]')
         self.clearpending = True
 
-    def _detach(self):
+    async def _detach(self):
         for ses in list(self.livesessions):
-            ses.detach()
+            await ses.detach()
 
     async def _disconnect(self):
         if self.connectionthread:
@@ -669,7 +669,7 @@ class ProxyConsole(object):
 
     def _attribschanged(self, nodeattribs, configmanager, **kwargs):
         if self.clisession:
-            self.clisession.detach()
+            tasks.spawn(self.clisession.detach())
             self.clisession = None
 
     async def relay_data(self):
@@ -742,15 +742,15 @@ class ProxyConsole(object):
                 pass
         self.clisession = None
 
-    def send_break(self):
-        tlvdata.send(self.remote, {'operation': 'break'})
+    async def send_break(self):
+        await tlvdata.send(self.remote, {'operation': 'break'})
 
-    def reopen(self):
-        tlvdata.send(self.remote, {'operation': 'reopen'})
+    async def reopen(self):
+        await tlvdata.send(self.remote, {'operation': 'reopen'})
 
     def resize(self, width, height):
-        tlvdata.send(self.remote, {'operation': 'resize', 'width': width,
-                                   'height': height})
+        tasks.spawn(tlvdata.send(self.remote, {'operation': 'resize', 'width': width,
+                                              'height': height}))
 
 
 # this represents some api view of a console handler.  This handles things like
@@ -824,10 +824,10 @@ class ConsoleSession(object):
         self.conshdl = await connect_node(self.node, self.configmanager,
                                     self.username, self.direct, self.width,
                                     self.height)
-    def send_break(self):
+    async def send_break(self):
         """Send break to remote system
         """
-        self.conshdl.send_break()
+        await self.conshdl.send_break()
 
     def resize(self, width, height):
         self.conshdl.resize(width, height)

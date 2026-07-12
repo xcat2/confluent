@@ -571,7 +571,7 @@ async def wsock_handler(req):
                                     width=msg['width'], height=msg['height'])
                             if action == 'break':
                                 clientsessid = '{0}'.format(msg['sessid'])
-                                myconsoles[clientsessid].send_break()
+                                await myconsoles[clientsessid].send_break()
                             elif action == 'stop':
                                 sessid = '{0}'.format(msg.get('sessid', None))
                                 if sessid in myconsoles:
@@ -631,7 +631,7 @@ async def wsock_handler(req):
                     cmd = json.loads(clientmsg[1:])
                     action = cmd.get('action', None)
                     if action == 'break':
-                        consession.send_break()
+                        await consession.send_break()
                     elif action == 'resize':
                         consession.resize(
                             width=cmd['width'], height=cmd['height'])
@@ -939,7 +939,7 @@ async def resourcehandler_backend(req, make_response):
             return rsp
         elif 'action' in querydict:
             if querydict['action'] == 'break':
-                consolesessions[querydict['session']]['session'].send_break()
+                await consolesessions[querydict['session']]['session'].send_break()
             elif querydict['action'] == 'resize':
                 consolesessions[querydict['session']]['session'].resize(
                     width=querydict['width'], height=querydict['height'])
