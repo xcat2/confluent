@@ -329,8 +329,8 @@ class Command(object):
         await self.oem_init()
 
         if hasattr(self._oem, 'set_power'):
-            return self._oem.set_power(powerstate,
-                                       bridge_request=bridge_request)
+            return await self._oem.set_power(powerstate,
+                                             bridge_request=bridge_request)
 
         if hasattr(self._oem, 'process_power_state'):
             powerstate = self._oem.process_power_state(
@@ -675,7 +675,7 @@ class Command(object):
         await self.init_sdr()
         for fruid in self._sdr.fru:
             if self._sdr.fru[fruid].fru_name == component:
-                return self._oem.process_fru(fru.FRU(
+                return await self._oem.process_fru(fru.FRU(
                     ipmicmd=self, fruid=fruid,
                     sdr=self._sdr.fru[fruid]).info, component)
         return await self._oem.get_inventory_of_component(component)
@@ -854,9 +854,9 @@ class Command(object):
         else:
             raise Exception("Unrecognized data format " + repr(fetchdata))
 
-    def get_extended_bmc_configuration(self):
-        self.oem_init()
-        return self._oem.get_extended_bmc_configuration()
+    async def get_extended_bmc_configuration(self):
+        await self.oem_init()
+        return await self._oem.get_extended_bmc_configuration()
 
     async def get_bmc_configuration(self):
         await self.oem_init()
