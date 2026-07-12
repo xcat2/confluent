@@ -298,7 +298,7 @@ async def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
                                     if await netutil.ip_on_same_subnet(theip, 'fe80::', 64):
                                         if '%' in peer[0]:
                                             ifidx = peer[0].split('%', 1)[1]
-                                            iface = await cloop.getaddrinfo(peer[0], 0, socket.AF_INET6, socket.SOCK_DGRAM)[0][-1][-1]
+                                            iface = (await cloop.getaddrinfo(peer[0], 0, socket.AF_INET6, socket.SOCK_DGRAM))[0][-1][-1]
                                         else:
                                             ifidx = '{}'.format(peer[-1])
                                             iface = peer[-1]
@@ -502,7 +502,7 @@ async def check_fish(urldata, port=443, verifycallback=None):
     if url == '/DeviceDescription.json':
         if not peerinfo:
             if data.get('services', None) == ['urn::dmtf-org:service:redfish-rest:']:
-                peerinfo = wc.grab_json_response('/redfish/v1/')
+                peerinfo = await wc.grab_json_response('/redfish/v1/')
                 if peerinfo:
                     data['services'] = ['lenovo-smm3']
                     data['uuid'] = peerinfo['UUID'].lower()
@@ -609,5 +609,3 @@ if __name__ == '__main__':
     def printit(rsp):
         pass # print(repr(rsp))
     asyncio.run(active_scan(printit))
-
-

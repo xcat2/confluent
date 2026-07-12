@@ -580,14 +580,14 @@ async def handle_api_request(configmanager, inputdata, operation, pathcomponents
         return (msg.KeyValueData({'rescan': 'started'}),)
     elif operation in ('update', 'create') and pathcomponents[:2] == ['discovery', 'subscriptions']:
         target = pathcomponents[2]
-        affluent.subscribe_discovery(target, configmanager, collective.get_myname())
+        await affluent.subscribe_discovery(target, configmanager, collective.get_myname())
         currsubs = get_subscriptions()
         currsubs[target] = {}
         save_subscriptions(currsubs)
         return (msg.KeyValueData({'status': 'subscribed'}),)
     elif operation == 'delete' and pathcomponents[:2] == ['discovery', 'subscriptions']:
         target = pathcomponents[2]
-        affluent.unsubscribe_discovery(target, configmanager, collective.get_myname())
+        await affluent.unsubscribe_discovery(target, configmanager, collective.get_myname())
         currsubs = get_subscriptions()
         if target in currsubs:
             del currsubs[target]
@@ -597,7 +597,7 @@ async def handle_api_request(configmanager, inputdata, operation, pathcomponents
         if pathcomponents == ['discovery', 'register']:
             if 'addresses' not in inputdata:
                 raise exc.InvalidArgumentException('Missing address in input')
-            return await register_remote_addrs(inputdata['addresses'], configmanager)
+            return register_remote_addrs(inputdata['addresses'], configmanager)
         if 'node' not in inputdata:
             raise exc.InvalidArgumentException('Missing node name in input')
         mac = _get_mac_from_query(pathcomponents)
@@ -920,7 +920,7 @@ async def detected(info):
                     else:
                         policies = set([])
                     if policies & {'open', 'permissive'}:
-                        cfg.set_node_attributes({nodename: {'id.uuid': info['uuid']}})
+                        await cfg.set_node_attributes({nodename: {'id.uuid': info['uuid']}})
             return  # already known, no need for more
     #TODO(jjohnson2): We might have to get UUID for certain searches...
     #for now defer probe until inside eval_node.  We might not have
@@ -975,7 +975,7 @@ async def get_chained_smm_name(nodename, cfg, handler, nl=None, checkswitch=True
     mycert = await handler.get_https_cert()
     if checkswitch:
         fprints = macmap.get_node_fingerprints(nodename, cfg)
-        for fprint in fprints:
+        async for fprint in fprints:
             if util.cert_matches(fprint[0], mycert):
                 # ok we have a direct match, it is this node
                 return nodename, fprint[1]
@@ -1380,7 +1380,7 @@ async def eval_node(cfg, handler, info, nodename, manual=False):
                     # The candidate nodename is the head of a chain, we must
                     # validate the smm certificate by the switch
                     fprints = macmap.get_node_fingerprints(nodename, cfg)
-                    for fprint in fprints:
+                    async for fprint in fprints:
                         if util.cert_matches(fprint[0], await handler.get_https_cert()):
                             if not await discover_node(cfg, handler, info,
                                                  nodename, manual):
@@ -1434,7 +1434,7 @@ async def discover_node(cfg, handler, info, nodename, manual):
     # in some product or another.
     curruuid = info.get('uuid', False)
     if 'pxe' in policies and info['handler'] == pxeh:
-        return do_pxe_discovery(cfg, handler, info, manual, nodename, policies)
+        return await do_pxe_discovery(cfg, handler, info, manual, nodename, policies)
     elif ('permissive' in policies and handler.https_supported and lastfp and
             not util.cert_matches(lastfp, await handler.get_https_cert()) and not manual):
         info['discofailure'] = 'fingerprint'
@@ -1455,7 +1455,7 @@ async def discover_node(cfg, handler, info, nodename, manual):
                 return False
         info['nodename'] = nodename
         if info['handler'] == pxeh:
-            return do_pxe_discovery(cfg, handler, info, manual, nodename, policies)
+            return await do_pxe_discovery(cfg, handler, info, manual, nodename, policies)
         elif manual or not util.cert_matches(lastfp, await handler.get_https_cert()):
             # only 'discover' if it is not the same as last time
             try:
@@ -1554,7 +1554,7 @@ async def wait_for_connection(bmcaddr):
                 continue
         await asyncio.sleep(1)
 
-def do_pxe_discovery(cfg, handler, info, manual, nodename, policies):
+async def do_pxe_discovery(cfg, handler, info, manual, nodename, policies):
     # use uuid based scheme in lieu of tls cert, ideally only
     # for stateless 'discovery' targets like pxe, where data does not
     # change
@@ -1585,7 +1585,7 @@ def do_pxe_discovery(cfg, handler, info, manual, nodename, policies):
             for checkattr in attribs:
                 checkval = currattrs.get(nodename, {}).get(checkattr, {}).get('value', None)
                 if checkval != attribs[checkattr]:
-                    cfg.set_node_attributes({nodename: attribs})
+                    await cfg.set_node_attributes({nodename: attribs})
                     break
     if info['uuid'] in known_pxe_uuids:
         return True

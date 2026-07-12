@@ -48,8 +48,8 @@ class NodeHandler(generic.NodeHandler):
         return
         # TODO(jjohnson2): probe serial number and uuid
 
-    def config(self, nodename, reset=False):
-        self._bmcconfig(nodename, reset)
+    async def config(self, nodename, reset=False):
+        await self._bmcconfig(nodename, reset)
 
     async def _bmcconfig(self, nodename, reset=False, customconfig=None, vc=None):
         # TODO(jjohnson2): set ip parameters, user/pass, alert cfg maybe
@@ -174,7 +174,7 @@ class NodeHandler(generic.NodeHandler):
                                          ipv4_gateway=netconfig[
                                              'ipv4_gateway'])
         elif self.ipaddr.startswith('fe80::'):
-            cfg.set_node_attributes(
+            await cfg.set_node_attributes(
                 {nodename: {'hardwaremanagement.manager': self.ipaddr}})
         else:
             raise exc.TargetEndpointUnreachable(
