@@ -7,6 +7,7 @@ import confluent.collective.manager as collective
 import confluent.util as util
 import glob
 import os
+import signal
 import shutil
 import subprocess
 import tempfile
