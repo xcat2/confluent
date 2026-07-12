@@ -3232,7 +3232,7 @@ async def dump_db_to_directory(location, password, redact=None, skipkeys=False, 
     try:
         for tenant in os.listdir(
                 os.path.join(ConfigManager._cfgdir, '/tenants/')):
-            tenant_data = ConfigManager(tenant=tenant)._dump_to_json(redact=redact)
+            tenant_data = await ConfigManager(tenant=tenant)._dump_to_json(redact=redact)
             with open(os.path.join(location, 'tenants', tenant, f'main.{format}'), 'wb' if format == 'json' else 'w') as cfgfile:
                 if format == 'json':
                     cfgfile.write(tenant_data)

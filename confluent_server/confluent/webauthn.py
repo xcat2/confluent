@@ -248,7 +248,7 @@ async def handle_api_request(url, req, username, cfm, reqbody, authorized):
     if url == '/registration_options':
         userinfo = cfm.get_user(username)
         if not userinfo:
-            cfm.create_user(username, role='Stub')
+            await cfm.create_user(username, role='Stub')
             userinfo = cfm.get_user(username)
         authid = userinfo.get('webauthid', None)
         if not authid:  # TODO: index users by authid as well as name
@@ -292,5 +292,4 @@ async def handle_api_request(url, req, username, cfm, reqbody, authorized):
         rsp = await registration_response(req, username, APP_RELYING_PARTY, APP_ORIGIN)
         if rsp.get('verified', False):
             return json.dumps({'status': 'Success'})
-
 

@@ -187,7 +187,7 @@ async def connect_to_leader(cert=None, name=None, leader=None, remote=None, isre
                 await cfm.ConfigManager(tenant=None)._load_from_json(dbjson,
                                                                sync=False)
                 cfm.commit_clear()
-            except Exception:
+            except Exception as e:
                 print(repr(e))
                 await cfm.stop_following()
                 cfm.rollback_clear()
@@ -895,7 +895,7 @@ async def check_managers():
                 targets = sorted(expandednoderanges[targets], key=availmanagers.get)
                 if not targets:
                     continue
-                c.set_node_attributes({node: {'collective.manager': {'value': targets[0]}}})
+                await c.set_node_attributes({node: {'collective.manager': {'value': targets[0]}}})
                 availmanagers[targets[0]] += 1
         await _assimilate_missing()
     failovercheck = None
