@@ -1481,15 +1481,18 @@ def pack_image(args):
         pass
 
 def gather_bootloader(outdir, rootpath='/'):
+    shimdestfilename = 'BOOTX64.EFI'
+    grubdestfilename = 'grubx64.efi'
     shimlocation = os.path.join(rootpath, 'boot/efi/EFI/BOOT/BOOTX64.EFI')
     if not os.path.exists(shimlocation):
         shimlocation = os.path.join(rootpath, 'boot/efi/EFI/BOOT/BOOTAA64.EFI')
+        shimdestfilename = os.path.basename(shimlocation)
     if not os.path.exists(shimlocation):
         shimlocation = os.path.join(rootpath, 'usr/lib64/efi/shim.efi')
     if not os.path.exists(shimlocation):
         shimlocation = os.path.join(rootpath, 'usr/lib/shim/shimx64.efi.signed')
     mkdirp(os.path.join(outdir, 'boot/efi/boot'))
-    shutil.copyfile(shimlocation, os.path.join(outdir, 'boot/efi/boot/BOOTX64.EFI'))
+    shutil.copyfile(shimlocation, os.path.join(outdir, 'boot/efi/boot/{0}'.format(shimdestfilename)))
     grubbin = None
     for candidate in glob.glob(os.path.join(rootpath, 'boot/efi/EFI/*')):
         if 'BOOT' not in candidate:
@@ -1498,6 +1501,7 @@ def gather_bootloader(outdir, rootpath='/'):
                 break
             grubbin = os.path.join(candidate, 'grubaa64.efi')
             if os.path.exists(grubbin):
+                grubdestfilename = os.path.basename(grubbin)
                 break
     if not grubbin:
         grubbin = os.path.join(rootpath, 'usr/lib64/efi/grub.efi')
@@ -1512,7 +1516,7 @@ def gather_bootloader(outdir, rootpath='/'):
         mkdirp(os.path.join(outdir, 'boot/EFI/ubuntu/'))
         with open(os.path.join(outdir, 'boot/EFI/ubuntu/grub.cfg'), 'w') as wo:
             wo.write('')
-    shutil.copyfile(grubbin, os.path.join(outdir, 'boot/efi/boot/grubx64.efi'))
+    shutil.copyfile(grubbin, os.path.join(outdir, 'boot/efi/boot/{0}'.format(grubdestfilename)))
     shutil.copyfile(grubbin, os.path.join(outdir, 'boot/efi/boot/grub.efi'))
 
 
