@@ -42,7 +42,6 @@ import confluent.core as confluentcore
 import confluent.httpapi as httpapi
 import confluent.log as log
 import confluent.collective.manager as collective
-import confluent.discovery.protocols.pxe as pxe
 import linecache
 try:
     import confluent.sockapi as sockapi
@@ -58,7 +57,6 @@ except ImportError:
     havefcntl = False
 #import multiprocessing
 import asyncio
-import gc
 import sys
 import os
 import glob
@@ -102,7 +100,7 @@ def format_stack(task):
 
 
 def _daemonize():
-    if not 'fork' in os.__dict__:
+    if 'fork' not in os.__dict__:
         return
     thispid = os.fork()
     if thispid > 0:

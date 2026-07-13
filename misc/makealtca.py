@@ -74,7 +74,7 @@ def create_alt_ca(certout, permitdomains):
     if nameconstraints:
         nameconstraints = f'nameConstraints = critical,{nameconstraints}\n'
     certutil.mkdirp('/etc/confluent/tls/ca-alt/newcerts')
-    with open('/etc/confluent/tls/ca-alt/index.txt', 'w') as idx:
+    with open('/etc/confluent/tls/ca-alt/index.txt', 'w'):
         pass
 
     with open(sslcfg, 'r') as cfgin:
@@ -100,4 +100,3 @@ def create_alt_ca(certout, permitdomains):
     )
 if __name__ == '__main__':
     create_alt_ca(sys.argv[1], sys.argv[2].split(','))
-

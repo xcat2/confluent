@@ -15,7 +15,6 @@
 #TODO: ASYNC asyncio conversion
 import asyncio
 
-import confluent.util as util
 import confluent.messages as msg
 import confluent.exceptions as exc
 import lxml.etree as etree

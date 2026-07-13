@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import argparse
 import ctypes
 import fcntl
 import json
@@ -26,7 +25,6 @@ import subprocess
 import sys
 import time
 import ssl
-import socket
 
 class IpmiMsg(ctypes.Structure):
     _fields_ = [('netfn', ctypes.c_ubyte),
@@ -108,7 +106,6 @@ def scan_nicname(nicname):
 def scan_nic(nicidx):
     iplinkinfo = subprocess.check_output(['ip', '-j', 'link'], stderr=subprocess.DEVNULL)
     iplinkinfo = json.loads(iplinkinfo.decode())
-    lilkelylla = None
     for link in iplinkinfo:
         if link['ifindex'] == nicidx:
             mac = link['address']
@@ -124,7 +121,6 @@ def scan_nic(nicidx):
                     return likelylla
             except Exception:
                 pass
-    srvs = {}
     s6 = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
     s6.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
     s6.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
@@ -238,7 +234,7 @@ def dotwait():
 
 def disable_host_interface():
     s = Session('/dev/ipmi0')
-    rsp = s.raw_command(netfn=0xc, command=1, data=(1, 0xc1, 0))
+    s.raw_command(netfn=0xc, command=1, data=(1, 0xc1, 0))
 
 def get_redfish_creds():
     os.makedirs('/run/redfish', exist_ok=True, mode=0o700)

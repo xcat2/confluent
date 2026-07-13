@@ -301,7 +301,6 @@ class NetManager(object):
             del self.myattribs[netname]
             return
         if ipv4addr:
-            prefixlen = None
             if '/' in ipv4addr:
                 ipv4addr, _ = ipv4addr.split('/', 1)
             ipv4bytes = socket.inet_pton(socket.AF_INET, ipv4addr.split('/')[0])
@@ -678,7 +677,7 @@ async def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
             if not cfgdata.get('ipv6_method', None):
                 cfgdata['ipv6_method'] = 'dhcp'
             return noneify(cfgdata)
-        if ipbynodename == None and ip6bynodename == None:
+        if ipbynodename is None and ip6bynodename is None:
             return noneify(cfgdata)
         for myaddr in myaddrs:
             fam, svrip, prefix = myaddr[:3]

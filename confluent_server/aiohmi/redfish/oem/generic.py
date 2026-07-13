@@ -17,7 +17,6 @@ from fnmatch import fnmatch
 import json
 import os
 import re
-import time
 import uuid
 
 import base64
@@ -1431,7 +1430,6 @@ class OEMHandler(object):
             uploadthread = await webclient.make_uploader(
                 self.webclient, upurl, filename, data, formname='UpdateFile', formwrap=ismultipart,
                 otherfields=otherfields)
-            wc = self.webclient
             while not uploadthread.completed():
                 try:
                     await uploadthread.join(3)

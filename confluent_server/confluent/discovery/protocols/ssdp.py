@@ -155,7 +155,7 @@ async def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
     cloop = asyncio.get_running_loop()
     try:
         await active_scan(handler, protocol)
-    except Exception as e:
+    except Exception:
         tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
                     event=log.Events.stacktrace)
     known_peers = set([])
@@ -220,7 +220,7 @@ async def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
                         continue
                     recent_peers.add(peer)
                     mac = await neighutil.get_hwaddr(peer[0])
-                    if mac == False:
+                    if mac is False:
                         # neighutil determined peer ip is not local, skip attempt
                         # to probe and critically, skip growing deferrednotifiers
                         continue
@@ -346,7 +346,7 @@ def _relay_pkt(sock, pktq):
     sock.setblocking(0)
     try:
         rsp, peer = sock.recvfrom(9000)
-    except socket.error as se:
+    except socket.error:
         return
     pktq.put_nowait((sock, rsp, peer))
 
@@ -488,7 +488,8 @@ async def _find_service(service, target):
 
 async def check_fish(urldata, port=443, verifycallback=None):
     if not verifycallback:
-        verifycallback = lambda x: True
+        def verifycallback(x):
+            return True
     try:
         url, data, targtype = urldata
     except ValueError:
@@ -609,5 +610,4 @@ if __name__ == '__main__':
     def printit(rsp):
         pass # print(repr(rsp))
     asyncio.run(active_scan(printit))
-
 

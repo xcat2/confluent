@@ -66,7 +66,7 @@ class NodeHandler(generic.NodeHandler):
         try:
             ic = await self._get_ipmicmd()
             passwd = self.DEFAULT_PASS
-        except pygexc.IpmiException as pi:
+        except pygexc.IpmiException:
             havecustomcreds = False
             if user is not None and user != self.DEFAULT_USER:
                 havecustomcreds = True

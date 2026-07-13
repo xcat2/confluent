@@ -32,7 +32,6 @@
 
 if __name__ == '__main__':
     import sys
-    import confluent.config.configmanager as cfm
 import asyncio
 import base64
 import confluent.networking.nxapi as nxapi
@@ -296,7 +295,7 @@ async def _extract_neighbor_data_b(args):
     lldpdata = {'!!vintage': now}
     try:
         return await _extract_neighbor_data_https(switch, user, password, cfm, lldpdata)
-    except Exception as e:
+    except Exception:
         pass
     conn = snmp.Session(switch, password, user, privacy_protocol=privproto)
     sid = None

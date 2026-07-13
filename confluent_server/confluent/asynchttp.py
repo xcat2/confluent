@@ -29,13 +29,11 @@
 # far away.
 
 import asyncio
-import collections
 import confluent.exceptions as exc
 import confluent.messages as messages
 import confluent.util as util
 import confluent.core as core
 import confluent.log as log
-import time
 
 _asyncsessions = {}
 _consolesessions = None

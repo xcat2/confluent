@@ -20,7 +20,6 @@ import aiohmi.constants as pygconst
 import aiohmi.util.webclient as webclient
 import aiohmi.exceptions as exc
 import time
-import socket
 
 healthlookup = {
     'ok': pygconst.Health.Ok,
@@ -283,7 +282,7 @@ class OEMHandler(generic.OEMHandler):
     async def reseat_bay(self, bay):
         bayid = _baytolabel(bay)
         url = '/redfish/v1/Chassis/chassis1/Oem/Lenovo/Nodes/{}/Actions/Node.Reseat'.format(bayid)
-        rsp = await self._do_web_request(url, method='POST')
+        await self._do_web_request(url, method='POST')
 
     async def get_event_log(self, clear=False, fishclient=None):
         return await super().get_event_log(clear, fishclient, extraurls=[{'@odata.id':'/redfish/v1/Chassis/chassis1/LogServices/EventLog'}])

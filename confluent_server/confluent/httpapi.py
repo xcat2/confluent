@@ -29,7 +29,7 @@ try:
 except ImportError:
     webauthn = None
 import asyncio
-from aiohttp import web, web_urldispatcher, connector, ClientSession, WSMsgType
+from aiohttp import web, WSMsgType
 import confluent.auth as auth
 import confluent.config.attributes as attribs
 import confluent.config.configmanager as configmanager
@@ -185,7 +185,6 @@ async def _sessioncleaner():
 
 def _get_query_dict(req, reqbody, reqtype):
     qdict = {}
-    qstring = req.rel_url.query_string
     qdict.update(req.rel_url.query)
     if reqbody is not None:
         if "application/x-www-form-urlencoded" in reqtype:

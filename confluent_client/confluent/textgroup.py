@@ -138,8 +138,6 @@ class GroupedData(object):
     def print_all(self, output=sys.stdout, skipmodal=False, reverse=False,
                   count=False):
         self.generate_byoutput()
-        modaloutput = None
-        ismodal = True
 
         if reverse:
             outdatalist = sorted(

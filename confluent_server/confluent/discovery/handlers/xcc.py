@@ -20,7 +20,6 @@ import confluent.discovery.handlers.xcc3 as xcc3handler
 import confluent.exceptions as exc
 import confluent.netutil as netutil
 import confluent.util as util
-import errno
 import json
 import os
 import aiohmi.exceptions as pygexc
@@ -491,7 +490,6 @@ class NodeHandler(immhandler.NodeHandler):
         # First check if the specified user is sha256...
         userinfo = await wc.grab_json_response('/api/dataset/imm_users')
         curruser = None
-        uid = None
         user = util.stringify(user)
         passwd = util.stringify(passwd)
         for userent in userinfo['items'][0]['users']:
@@ -508,7 +506,7 @@ class NodeHandler(immhandler.NodeHandler):
             try:
                 tpass = base64.b64encode(os.urandom(9)) + 'Iw47$'
                 userparams = "{0},6pmu0ezczzcp,{1},1,4,0,0,0,0,,8,".format(tmpuid, tpass)
-                result = await wc.grab_json_response('/api/function', {'USER_UserCreate': userparams})
+                await wc.grab_json_response('/api/function', {'USER_UserCreate': userparams})
                 await wc.grab_json_response('/api/providers/logout')
                 adata = {
                     'username': '6pmu0ezczzcp',

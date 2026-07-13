@@ -18,10 +18,8 @@ import asyncio
 import base64
 import confluent.util as util
 import confluent.messages as msg
-import confluent.exceptions as exc
 import aiohmi.util.webclient as wc
 import confluent.tasks as tasks
-import json
 import time
 
 
@@ -92,7 +90,6 @@ class RaritanClient(object):
     async def get_wc_with_session(self):
         if self._authtoken and self._authvintage and time.time() - self._authvintage < 90:
             return self._wc
-        wc = self.wc
         if not self._username or not self._password:
             credcfg = self.configmanager.get_node_attributes(
                 self.node,

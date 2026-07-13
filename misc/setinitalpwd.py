@@ -29,7 +29,6 @@ if rsp.status == 200:
          'USER_GlobalPassExpWarningPeriod': '0', 
          'USER_GlobalPassExpPeriod': '0', 
          'USER_GlobalMinPassReuseCycle': '0', 
-         'USER_GlobalMinPassReuseCycle': '0', 
          'USER_GlobalMinPassChgInt': '0', 
      })))
      #print(repr(w.grab_json_response('/api/function', {'USER_UserPassChange': '1,' + os.environ['XCCPASS']})))

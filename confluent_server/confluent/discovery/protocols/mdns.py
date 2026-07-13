@@ -29,17 +29,12 @@
 
 
 import asyncio
-import confluent.config.configmanager as cfm
-import confluent.collective.manager as collective
 import confluent.neighutil as neighutil
-import confluent.noderange as noderange
 import confluent.util as util
 import confluent.log as log
-import confluent.netutil as netutil
 import confluent.tasks as tasks
 import socket
 import os
-import time
 import struct
 import traceback
 
@@ -51,7 +46,6 @@ mcastv6addr = 'ff02::fb'
 mdns6mcast = socket.inet_pton(socket.AF_INET6, mcastv6addr)
 
 def name_to_qname(name):
-    nameparts = name.split('.')
     qname = b''
     for namepart in name.split('.'):
         namepart = namepart.encode('utf8')
@@ -132,7 +126,7 @@ async def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
     net4.bind(('', 5353))
     try:
         await active_scan(handler, protocol)
-    except Exception as e:
+    except Exception:
         tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
                     event=log.Events.stacktrace)
     known_peers = set([])
@@ -180,7 +174,7 @@ async def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
                 if peer in recent_peers:
                     continue
                 mac = await neighutil.get_hwaddr(peer[0])
-                if mac == False:
+                if mac is False:
                     continue
                 if not mac:
                     probepeer = (peer[0], struct.unpack('H', os.urandom(2))[0] | 1025) + peer[2:]
@@ -316,7 +310,8 @@ async def active_scan(handler, protocol=None):
 
 async def check_fish(urldata, port=443, verifycallback=None):
     if not verifycallback:
-        verifycallback = lambda x: True
+        def verifycallback(x):
+            return True
     url, data = urldata
     try:
         wc = webclient.WebConnection(_get_svrip(data), port, verifycallback=verifycallback, timeout=1.5)

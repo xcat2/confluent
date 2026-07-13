@@ -28,7 +28,6 @@ import errno
 import os
 import pwd
 import shutil
-import stat
 import struct
 import sys
 import traceback
@@ -509,7 +508,6 @@ class SockApi(object):
         if self.should_run_remoteapi():
             self.start_remoteapi()
         else:
-            cloop = asyncio.get_running_loop()
             tasks.spawn(self.watch_for_cert())
         self.unixdomainserver = tasks.spawn_task(_unixdomainhandler(self.bind_group, self.bind_perms))
 

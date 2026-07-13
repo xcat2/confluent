@@ -39,7 +39,7 @@ class KvmConnection:
         #self.ws = WrappedWebSocket(host=bmc)
         #self.ws.set_verify_callback(kv)
         ticket = consdata['ticket']
-        user = consdata['user']
+        #user = consdata['user']
         port = consdata['port']
         urlticket = urlparse.quote(ticket)
         host = consdata['host']
@@ -173,7 +173,8 @@ class PmxApiClient:
                 configmanager, server, 'pubkeys.tls'
             ).verify_cert
         else:
-            cv = lambda x: True
+            def cv(x):
+                return True
 
         try:
             self.user = self.user.decode()
@@ -232,7 +233,6 @@ class PmxApiClient:
     async def get_vm_inventory(self, vm):
         host, guest = await self.get_vm(vm)
         cfg = await self.wc.grab_json_response(f'/api2/json/nodes/{host}/{guest}/pending')
-        myuuid = None
         sysinfo = {'name': 'System', 'present': True, 'information': {
             'Product name': 'Proxmox qemu virtual machine',
             'Manufacturer': 'qemu'
@@ -335,7 +335,7 @@ class PmxApiClient:
                     state = ''
                     newstate = 'reset'
         if state:
-            rsp = await self.wc.grab_json_response_with_status(f'/api2/json/nodes/{host}/{guest}/status/{state}', method='POST')
+            await self.wc.grab_json_response_with_status(f'/api2/json/nodes/{host}/{guest}/status/{state}', method='POST')
         if state and state != 'reset':
             newstate = await self.get_vm_power(vm)
             while newstate != targstate:
@@ -486,7 +486,6 @@ async def create(nodes, element, configmanager, inputdata):
 if __name__ == '__main__':
     import sys
     import os
-    from pprint import pprint
     myuser = os.environ['PMXUSER']
     mypass = os.environ['PMXPASS']
     vc = PmxApiClient(sys.argv[1], myuser, mypass, None)

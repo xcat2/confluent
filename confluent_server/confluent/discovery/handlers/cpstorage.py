@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import confluent.discovery.handlers.bmc as bmchandler
-import confluent.util as util
 try:
     from urllib import urlencode
 except ImportError:
@@ -45,9 +44,9 @@ class NodeHandler(bmchandler.NodeHandler):
                     'privilege': 4,
                 }
                 passchange = urlencode(passchange)
-                rsp = await wc.grab_json_response_with_status('/api/reset-pass',
+                await wc.grab_json_response_with_status('/api/reset-pass',
                                                         passchange)
-                rsp = await wc.grab_json_response_with_status('/api/session',
+                await wc.grab_json_response_with_status('/api/session',
                                                         method='DELETE')
 
     async def config(self, nodename, reset=False):

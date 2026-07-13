@@ -57,7 +57,6 @@ import confluent.tasks as tasks
 import confluent.networking.nxapi as nxapi
 import confluent.networking.srlinux as srlinux
 import confluent.util as util
-import fcntl
 import msgpack
 import random
 import re
@@ -135,7 +134,7 @@ async def _map_switch(args):
     except exc.TargetEndpointBadCredentials:
         log.log({'error': "Bad SNMPv3 credentials for \'{0}\'".format(
             args[0])})
-    except Exception as e:
+    except Exception:
         log.log({'error': 'Unexpected condition trying to reach switch "{0}"'
                           ' check trace log for more'.format(args[0])})
         log.logtrace()
@@ -302,7 +301,7 @@ async def _map_switch_backend(args):
                               'from {0}, the TLS certificate failed validation. '
                               'Clear pubkeys.tls_hardwaremanager if this was '
                               'expected due to reinstall or new certificate'.format(switch)})
-        except Exception as e:
+        except Exception:
             pass
     mactobridge, ifnamemap, bridgetoifmap = await _offload_map_switch(
         switch, password, user, privprotocol)
@@ -390,7 +389,6 @@ async def _snmp_map_switch_relay(rqid, switch, password, user, privprotocol=None
         except AttributeError:
             sys.stdout.write(payload)
     except Exception as e:
-        import traceback
         payload = msgpack.packb((rqid, 2, str(e)), use_bin_type=True)
         try:
             sys.stdout.buffer.write(payload)

@@ -3,7 +3,6 @@ from ctypes.util import find_library
 import confluent.util as util
 import grp
 import pwd
-import os
 libc = cdll.LoadLibrary(find_library('c'))
 _getgrouplist = libc.getgrouplist
 _getgrouplist.restype = c_int32

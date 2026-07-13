@@ -345,7 +345,7 @@ class Command(object):
             return {'powerstate': oldpowerstate}
         if newpowerstate == 'boot':
             newpowerstate = 'on' if oldpowerstate == 'off' else 'reset'
-        response = await self.raw_command(
+        await self.raw_command(
             netfn=0, command=2, data=[power_states[newpowerstate]],
             bridge_request=bridge_request)
         lastresponse = {'pendingpowerstate': newpowerstate}
@@ -564,7 +564,7 @@ class Command(object):
                 duration = 255
             if duration < 0:
                 duration = 0
-            response = await self.raw_command(netfn=0, command=4, data=[duration])
+            await self.raw_command(netfn=0, command=4, data=[duration])
             return
         forceon = 0
         if on:
@@ -575,7 +575,7 @@ class Command(object):
             identifydata = [255 * forceon]
         else:
             identifydata = [0, forceon]
-        response = await self.raw_command(netfn=0, command=4, data=identifydata)
+        await self.raw_command(netfn=0, command=4, data=identifydata)
 
     async def init_sdr(self):
         """Initialize SDR
@@ -891,7 +891,6 @@ class Command(object):
         if channel is None:
             channel = await self.get_network_channel()
         if static_addresses is not None:
-            i = 0
             for va in static_addresses:
                 if '/' in va:
                     va, plen = va.split('/', 1)
@@ -2238,7 +2237,8 @@ class Command(object):
 
         await self.oem_init()
         if progress is None:
-            progress = lambda x: True
+            def progress(x):
+                return True
         return await self._oem.update_firmware(filename, data, progress, bank)
 
     async def attach_remote_media(self, url, username=None, password=None):

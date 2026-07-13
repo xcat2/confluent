@@ -1,10 +1,8 @@
 import confluent.tlvdata as tlvdata
-import confluent.util as util
 import json
 import copy
 import base64
-import secrets, time
-from typing import Any, Optional
+import secrets
 from webauthn import (
     generate_registration_options, 
     options_to_json, 
@@ -34,7 +32,7 @@ def _load_credentials(creds):
 def _load_authenticators(authenticators):
     ret = authenticators
     if 'challenges' in ret:
-        if not ret['challenges'] is None:       
+        if ret['challenges'] is not None:       
             ret['challenges']['request'] = base64.b64decode(ret['challenges']['request'])
     if 'credentials' in ret:
         ret['credentials'] = _load_credentials(ret['credentials'])
@@ -179,7 +177,7 @@ async def registration_response(request, username, APP_RELYING_PARTY, APP_ORIGIN
         expected_rp_id=APP_RELYING_PARTY.id,
         expected_origin=APP_ORIGIN,
         )
-    except Exception as err:
+    except Exception:
         raise Exception("Could not handle credential attestation")
     
     credential = Credential(id=registration_verification.credential_id, public_key=registration_verification.credential_public_key)
@@ -292,5 +290,4 @@ async def handle_api_request(url, req, username, cfm, reqbody, authorized):
         rsp = await registration_response(req, username, APP_RELYING_PARTY, APP_ORIGIN)
         if rsp.get('verified', False):
             return json.dumps({'status': 'Success'})
-
 

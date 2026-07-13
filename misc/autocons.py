@@ -1,6 +1,5 @@
 import fcntl
 import os
-import signal
 import struct
 import subprocess
 import termios

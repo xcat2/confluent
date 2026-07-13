@@ -23,7 +23,6 @@ import base64
 import random
 import struct
 
-import time
 
 import aiohmi.exceptions as pygexc
 

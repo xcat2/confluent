@@ -67,7 +67,6 @@ class OEMHandler(object):
         # in practice, some implementations use 0x27 ('External environment')
         if not hasattr(self, '_processor_names'):
             self._processor_names = []
-        readings = []
         if not self._processor_names:
             sdr = await ipmicmd.init_sdr()
             for sensename in sdr.sensors:

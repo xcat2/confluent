@@ -15,7 +15,6 @@
 from lxml import etree
 import confluent.util as util
 import confluent.messages as msg
-import confluent.exceptions as exc
 import confluent.tasks as tasks
 import aiohmi.util.webclient as wc
 import time

@@ -401,7 +401,7 @@ class ConsoleHandler(object):
             if not self.reconnect:
                 self.reconnect = tasks.spawn_task_after(retrytime, self._connect)
             return
-        except (exc.TargetEndpointUnreachable, socket.gaierror) as se:
+        except (exc.TargetEndpointUnreachable, socket.gaierror):
             await self.clearbuffer()
             self.error = 'unreachable'
             self.connectstate = 'unconnected'
@@ -720,7 +720,7 @@ class ProxyConsole(object):
         }
         try:
             remote = await collective.connect_to_collective(None, self.managerinfo['address'])
-        except Exception as e:
+        except Exception:
             if _tracelog:
                 _tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event, event=log.Events.stacktrace)
             await asyncio.sleep(3)

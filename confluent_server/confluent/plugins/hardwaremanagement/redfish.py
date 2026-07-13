@@ -208,7 +208,7 @@ class IpmiCommandWrapper(ipmicommand.Command):
         self._inhealth = True
         try:
             self._lasthealth = await super(IpmiCommandWrapper, self).get_health()
-        except Exception as e:
+        except Exception:
             self._inhealth = False
             raise
         self._inhealth = False
@@ -1620,7 +1620,7 @@ class IpmiHandler:
             if mybmc.startswith('fe80::'):  # link local, need to adjust
                 lancfg = await self.ipmicmd.get_net_configuration()
                 mybmc = lancfg['ipv4_address'].split('/')[0]
-            if ':' in mybmc and not '[' in mybmc:
+            if ':' in mybmc and '[' not in mybmc:
                 mybmc = '[{}]'.format(mybmc)
             launchdata['url'] = 'https://{}{}'.format(mybmc, launchdata['url'])
         await self.output.put(msg.KeyValueData(launchdata, self.node))
