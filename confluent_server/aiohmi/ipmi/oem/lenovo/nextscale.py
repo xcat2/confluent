@@ -887,90 +887,84 @@ class SMMClient(object):
         wc.set_header('ST2', wc.st2)
         return wc
 
-    def set_hostname(self, hostname):
-        wc = self.wc
-        wc.request('POST', '/data', 'set=hostname:' + hostname)
-        rsp = wc.getresponse()
-        if rsp.status != 200:
-            raise Exception(rsp.read())
-        rsp.read()
-        self.logout()
+    async def set_hostname(self, hostname):
+        wc = await self.wc()
+        rsp, status, _ = await wc.grab_response_with_status('/data', 'set=hostname:' + hostname)
+        if status != 200:
+            raise Exception(rsp)
+        await self.logout()
 
-    def get_hostname(self):
-        currinfo = self.get_netinfo()
-        self.logout()
+    async def get_hostname(self):
+        currinfo = await self.get_netinfo()
+        await self.logout()
         for data in currinfo.find('netConfig').findall('hostname'):
             return data.text
 
-    def get_netinfo(self):
-        wc = self.wc
-        wc.request('POST', '/data', 'get=hostname')
-        rsp = wc.getresponse()
-        data = rsp.read()
-        if rsp.status == 400:
-            wc.request('POST', '/data?get=hostname', '')
-            rsp = wc.getresponse()
-            data = rsp.read()
-        if rsp.status != 200:
+    async def get_netinfo(self):
+        wc = await self.wc()
+        data, status, _ = await wc.grab_response_with_status('/data', 'get=hostname')
+        if status == 400:
+            data, status, _ = await wc.grab_response_with_status('/data?get=hostname', '')
+        if status != 200:
             raise Exception(data)
         currinfo = fromstring(data)
         return currinfo
 
-    def set_domain(self, domain):
-        wc = self.wc
-        wc.request('POST', '/data', 'set=dnsDomain:' + domain)
-        rsp = wc.getresponse()
-        if rsp.status != 200:
-            raise Exception(rsp.read())
-        rsp.read()
-        self.logout()
+    async def set_domain(self, domain):
+        wc = await self.wc()
+        rsp, status, _ = await wc.grab_response_with_status('/data', 'set=dnsDomain:' + domain)
+        if status != 200:
+            raise Exception(rsp)
+        await self.logout()
 
-    def get_domain(self):
-        currinfo = self.get_netinfo()
-        self.logout()
+    async def get_domain(self):
+        currinfo = await self.get_netinfo()
+        await self.logout()
         for data in currinfo.find('netConfig').findall('dnsDomain'):
             return data.text
 
-    def get_ntp_enabled(self, variant):
-        wc = self.wc
-        wc.request('POST', '/data', 'get=ntpOpMode')
-        rsp = wc.getresponse()
-        info = fromstring(rsp.read())
-        self.logout()
+    async def get_ntp_enabled(self, variant):
+        wc = await self.wc()
+        rsp, status, _ = await wc.grab_response_with_status('/data', 'get=ntpOpMode')
+        if status != 200:
+            raise Exception(rsp)
+        info = fromstring(rsp)
+        await self.logout()
         for data in info.findall('ntpOpMode'):
             return data.text == '1'
 
-    def set_ntp_enabled(self, enabled):
-        wc = self.wc
-        wc.request('POST', '/data', 'set=ntpOpMode:{0}'.format(
+    async def set_ntp_enabled(self, enabled):
+        wc = await self.wc()
+        result, status, _ = await wc.grab_response_with_status('/data', 'set=ntpOpMode:{0}'.format(
             1 if enabled else 0))
-        rsp = wc.getresponse()
-        result = rsp.read()
+        if status != 200:
+            raise Exception(result)
         if not isinstance(result, str):
             result = result.decode('utf8')
-        self.logout()
+        await self.logout()
         if '<status>ok</status>' not in result:
             raise Exception("Unrecognized result: " + result)
 
-    def set_ntp_server(self, server, index):
-        wc = self.wc
-        wc.request('POST', '/data', 'set=ntpServer{0}:{1}'.format(
+    async def set_ntp_server(self, server, index):
+        wc = await self.wc()
+        result, status, _ = await wc.grab_response_with_status('/data', 'set=ntpServer{0}:{1}'.format(
             index + 1, server))
-        rsp = wc.getresponse()
-        result = rsp.read()
+        if status != 200:
+            raise Exception(result)
         if not isinstance(result, str):
             result = result.decode('utf8')
         if '<status>ok</status>' not in result:
             raise Exception("Unrecognized result: " + result)
-        self.logout()
+        await self.logout()
         return True
 
-    def get_ntp_servers(self):
-        wc = self.wc
-        wc.request(
-            'POST', '/data', 'get=ntpServer1,ntpServer2,ntpServer3')
-        rsp = wc.getresponse()
-        result = fromstring(rsp.read())
+    async def get_ntp_servers(self):
+        wc = await self.wc()
+        rsp, status, _ = await wc.grab_response_with_status(
+            '/data', 'get=ntpServer1,ntpServer2,ntpServer3')
+        if status != 200:
+            raise Exception(rsp)
+        result = fromstring(rsp)
         srvs = []
         for data in result.findall('ntpServer1'):
             srvs.append(data.text)
@@ -978,7 +972,7 @@ class SMMClient(object):
             srvs.append(data.text)
         for data in result.findall('ntpServer3'):
             srvs.append(data.text)
-        self.logout()
+        await self.logout()
         return srvs
 
     async def update_firmware(self, filename, data=None, progress=None, bank=None):
@@ -1095,12 +1089,14 @@ class SMMClient(object):
             b' \x00\xff').decode('utf8'))
         return psui
 
-    def logout(self):
-        wc = self.wc
-        wc.request('POST', '/data/logout', None)
-        rsp = wc.getresponse()
-        rsp.read()
+    async def logout(self):
+        wc = self._wc
         self._wc = None
+        if wc is None:
+            return
+        rsp, status, _ = await wc.grab_response_with_status('/data/logout', None, method='POST')
+        if status != 200:
+            raise Exception(rsp)
 
     async def wc(self):
         if (not self._wc or (self._wc.vintage
