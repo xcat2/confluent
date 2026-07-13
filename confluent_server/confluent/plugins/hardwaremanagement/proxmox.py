@@ -115,10 +115,8 @@ class PmxConsole(conapi.Console):
         self.datacallback = callback
         kv = util.TLSCertVerifier(
             self.nodeconfig, self.node, 'pubkeys.tls_hardwaremanager').verify_cert
-        bmc = self.bmc
-        if '%' in self.bmc:
-            prefix = self.bmc.split('%')[0]
-            bmc = prefix + ']'
+        if ':' in self.bmc and not self.bmc.startswith('['):
+            self.bmc = '[{0}]'.format(self.bmc)
         self.ssl = CustomVerifier(kv)
         ticket = self.consdata['ticket']
         user = self.consdata['user']
@@ -486,7 +484,6 @@ async def create(nodes, element, configmanager, inputdata):
 if __name__ == '__main__':
     import sys
     import os
-    from pprint import pprint
     myuser = os.environ['PMXUSER']
     mypass = os.environ['PMXPASS']
     vc = PmxApiClient(sys.argv[1], myuser, mypass, None)
