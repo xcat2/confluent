@@ -33,6 +33,8 @@ class HostMerger(object):
         self.byip = {}
         self.byname = {}
         self.byname6 = {}
+        self.ipbyname = {}
+        self.ipbyname6 = {}
         self.sourcelines = []
         self.targlines = []
 
@@ -54,14 +56,21 @@ class HostMerger(object):
 
     def add_entry(self, ip, names):
         targ = self.byname
+        ipbyname = self.ipbyname
         if ':' in ip:
             targ = self.byname6
+            ipbyname = self.ipbyname6
         line = '{:<39} {}'.format(ip, names)
         x = len(self.sourcelines)
         self.sourcelines.append(line)
         for name in names.split():
             if not name:
                 continue
+            if ipbyname.setdefault(name, ip) != ip:
+                sys.stderr.write(
+                    'WARNING: {0} is mapped to both {1} and {2}; all entries '
+                    'will be written to /etc/hosts\n'.format(
+                        name, ipbyname[name], ip))
             targ[name] = x
         self.byip[ip] = x
 
