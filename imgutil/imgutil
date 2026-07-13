@@ -1488,6 +1488,7 @@ def gather_bootloader(outdir, rootpath='/'):
         shimlocation = os.path.join(rootpath, 'boot/efi/EFI/BOOT/BOOTAA64.EFI')
         shimdestfilename = os.path.basename(shimlocation)
     if not os.path.exists(shimlocation):
+        shimdestfilename = 'BOOTX64.EFI'
         shimlocation = os.path.join(rootpath, 'usr/lib64/efi/shim.efi')
     if not os.path.exists(shimlocation):
         shimlocation = os.path.join(rootpath, 'usr/lib/shim/shimx64.efi.signed')
