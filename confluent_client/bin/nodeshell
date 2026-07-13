@@ -53,6 +53,8 @@ def run():
                          help='Specify a custom port for ssh')
     argparser.add_option('-s', '--substitutename',
                          help='Use a different name other than the nodename for ssh')
+    argparser.add_option('-t', '--timeout', type='int', default=0,
+                         help='Timeout in seconds for each node ssh connection')
     argparser.add_option('-x', '--noexpression', action='store_true',
                          help='Suppress expression expansion of command')
     argparser.add_option('-m', '--maxnodes', type='int',
@@ -119,6 +121,8 @@ def run():
             cmdv += ['-p', '{0}'.format(options.port)]
         if options.loginname:
             cmdv += ['-l', options.loginname]
+        if options.timeout:
+            cmdv += ['-o', 'ConnectTimeout={0}'.format(options.timeout)]
         cmdv += [sshnode, cmd]
         if currprocs < concurrentprocs:
             currprocs += 1
