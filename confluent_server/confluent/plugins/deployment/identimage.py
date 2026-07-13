@@ -46,7 +46,7 @@ async def create_ident_image(node, configmanager):
     tmpd = tempfile.mkdtemp()
     ident = { 'nodename': node }
     apikey = create_apikey()
-    configmanager.set_node_attributes({node: {'secret.selfapiarmtoken': apikey}})
+    await configmanager.set_node_attributes({node: {'secret.selfapiarmtoken': apikey}})
     ident['apitoken'] = apikey
     # This particular mechanism does not (yet) do anything smart with collective
     # It would be a reasonable enhancement to list all collective server addresses
@@ -78,5 +78,4 @@ async def update(nodes, element, configmanager, inputdata):
         await create_ident_image(node, configmanager)
         yield msg.CreatedResource(
                 'nodes/{0}/deployment/ident_image'.format(node))
-
 

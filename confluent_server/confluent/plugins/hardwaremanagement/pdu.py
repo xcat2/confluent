@@ -71,9 +71,10 @@ async def readpdu(pdu, outletmap, configmanager, rspq):
         for outlet in outletmap:
             node, pgroup = outletmap[outlet]
             try:
-                for rsp in core.handle_path(
+                responses = await core.handle_path(
                         '/nodes/{0}/power/outlets/{1}'.format(pdu, outlet),
-                        'retrieve', configmanager):
+                        'retrieve', configmanager)
+                async for rsp in core.iterate_responses(responses):
                     await rspq.put(msg.KeyValueData({pgroup: rsp.kvpairs['state']['value']}, node))
             except exc.TargetEndpointBadCredentials:
                     await rspq.put(msg.ConfluentTargetInvalidCredentials(pdu))
@@ -137,8 +138,9 @@ async def updatepdu(pdu, outletmap, configmanager, inputdata, rspq):
     try:
         for outlet in outletmap:
             node, pgroup = outletmap[outlet]
-            for rsp in core.handle_path('/nodes/{0}/power/outlets/{1}'.format(pdu, outlet),
-                                        'update', configmanager, inputdata={'state': inputdata.powerstate(node)}):
+            responses = await core.handle_path('/nodes/{0}/power/outlets/{1}'.format(pdu, outlet),
+                                               'update', configmanager, inputdata={'state': inputdata.powerstate(node)})
+            async for rsp in core.iterate_responses(responses):
                 await rspq.put(msg.KeyValueData({pgroup: rsp.kvpairs['state']['value']}, node))
     finally:
         await rspq.put(TaskDone())

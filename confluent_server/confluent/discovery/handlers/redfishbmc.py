@@ -266,8 +266,9 @@ class NodeHandler(generic.NodeHandler):
             newip = newipinfo[-1][0]
             if ':' in newip:
                 raise exc.NotImplementedException('IPv6 remote config TODO')
-            hifurls = await get_host_interface_urls(wc, self.mgrinfo(wc))
-            mgtnicinfo = self.mgrinfo(wc)['EthernetInterfaces']['@odata.id']
+            mgrinfo = await self.mgrinfo(wc)
+            hifurls = await get_host_interface_urls(wc, mgrinfo)
+            mgtnicinfo = mgrinfo['EthernetInterfaces']['@odata.id']
             mgtnicinfo = await wc.grab_json_response(mgtnicinfo)
             mgtnics = [x['@odata.id'] for x in mgtnicinfo.get('Members', [])]
             actualnics = []

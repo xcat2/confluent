@@ -319,7 +319,7 @@ async def term_interact(authdata, authname, ccons, cfm, connection, consession,
                 await consession.destroy()
                 break
             elif data['operation'] == 'break':
-                consession.send_break()
+                await consession.send_break()
                 continue
             elif data['operation'] == 'reopen':
                 await consession.reopen()

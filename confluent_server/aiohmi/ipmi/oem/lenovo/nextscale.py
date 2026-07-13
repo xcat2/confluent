@@ -671,14 +671,14 @@ class SMMClient(object):
             for bayn in range(1, numbays + 1):
                 if fnmatch.fnmatch('bay{0}_user_cap'.format(bayn),
                                    key.lower()):
-                    self.set_bay_cap(bayn, changeset[key]['value'])
+                    await self.set_bay_cap(bayn, changeset[key]['value'])
                 if fnmatch.fnmatch(
                         'bay{0}_user_cap_active'.format(bayn), key.lower()):
-                    self.set_bay_cap_active(bayn, changeset[key]['value'])
+                    await self.set_bay_cap_active(bayn, changeset[key]['value'])
             if fnmatch.fnmatch('chassis_user_cap', key.lower()):
-                self.set_bay_cap(numbays + 1, changeset[key]['value'])
+                await self.set_bay_cap(numbays + 1, changeset[key]['value'])
             if fnmatch.fnmatch('chassis_user_cap_active', key.lower()):
-                self.set_bay_cap_active(numbays + 1, changeset[key]['value'])
+                await self.set_bay_cap_active(numbays + 1, changeset[key]['value'])
             if fnmatch.fnmatch('fanspeed', key.lower()):
                 for mode in self.fanmodes:
                     byteval = mode
@@ -784,7 +784,7 @@ class SMMClient(object):
         if progress:
             progress({'phase': 'initializing', 'progress': initpct})
         while bytearray(rsp['data'])[0] != 0:
-            ipmisession.Session.pause(3)
+            await ipmisession.Session.pause(3)
             initpct += 3.0
             if initpct > 99.0:
                 initpct = 99.0
@@ -816,10 +816,10 @@ class SMMClient(object):
     async def process_fru(self, fru):
         smmv1 = self.smm_variant & 0xf0 == 0
         # TODO(jjohnson2): can also get EIOM, SMM, and riser data if warranted
-        snum = bytes(await self.ipmicmd.raw_command(
-            netfn=0x32, command=0xb0, data=(5, 1))['data'][:])
-        mnum = bytes(await self.ipmicmd.raw_command(
-            netfn=0x32, command=0xb0, data=(5, 0))['data'][:])
+        snum = bytes((await self.ipmicmd.raw_command(
+            netfn=0x32, command=0xb0, data=(5, 1)))['data'][:])
+        mnum = bytes((await self.ipmicmd.raw_command(
+            netfn=0x32, command=0xb0, data=(5, 0)))['data'][:])
         if not smmv1:
             snum = snum[2:]
             mnum = mnum[2:]
@@ -1039,7 +1039,7 @@ class SMMClient(object):
         complete = False
         tries = 0
         while not complete:
-            ipmisession.Session.pause(3)
+            await ipmisession.Session.pause(3)
             wc.request('POST', '/data', 'get=fwProgress,fwUpdate')
             try:
                 rsp = wc.getresponse()
@@ -1061,16 +1061,16 @@ class SMMClient(object):
             complete = percent >= 100.0
         return 'complete'
 
-    def get_inventory_descriptions(self, ipmicmd, variant):
+    async def get_inventory_descriptions(self, ipmicmd, variant):
         if variant >> 5 == 0:
             return
-        psucount = get_psu_count(ipmicmd, variant)
+        psucount = await get_psu_count(ipmicmd, variant)
         for idx in range(psucount):
             yield 'PSU {}'.format(idx + 1)
 
-    def get_inventory_of_component(self, ipmicmd, component):
+    async def get_inventory_of_component(self, ipmicmd, component):
         psuidx = int(component.replace('PSU ', ''))
-        return self.get_psu_info(ipmicmd, psuidx)
+        return await self.get_psu_info(ipmicmd, psuidx)
 
     async def get_psu_info(self, ipmicmd, psunum):
         psuinfo = await ipmicmd.raw_command(0x34, 0x6, data=(psunum,))

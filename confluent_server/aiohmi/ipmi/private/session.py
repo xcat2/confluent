@@ -1023,11 +1023,11 @@ class Session(object):
             # tried ipmi 2.0 against a 1.5 which should work, but some bmcs
             # thought 'reserved' meant 'must be zero'
             self.ipmi15only = 1
-            return self._get_channel_auth_cap()
+            return await self._get_channel_auth_cap()
         mysuffix = " while trying to get channel authentication capabalities"
         errstr = get_ipmi_error(response, suffix=mysuffix)
         if errstr:
-            self.onlogon({'error': errstr})
+            await self.onlogon({'error': errstr})
             return
         data = response['data']
         self.currentchannel = data[0]
@@ -1035,7 +1035,7 @@ class Session(object):
             self.ipmiversion = 2.0
         if self.ipmiversion == 1.5:
             if not (data[1] & 0b100):
-                self.onlogon(
+                await self.onlogon(
                     {'error':
                      "MD5 required but not enabled/available on target BMC"})
                 return
@@ -1043,16 +1043,16 @@ class Session(object):
         elif self.ipmiversion == 2.0:
             await self._open_rmcpplus_request()
 
-    def _got_session_challenge(self, response):
+    async def _got_session_challenge(self, response):
         errstr = get_ipmi_error(response,
                                 suffix=" while getting session challenge")
         if errstr:
-            self.onlogon({'error': errstr})
+            await self.onlogon({'error': errstr})
             return
         data = response['data']
         self.sessionid = struct.unpack("<I", bytes(data[0:4]))[0]
         self.authtype = 2
-        self._activate_session(data[4:])
+        await self._activate_session(data[4:])
 
     # NOTE(jbjohnso):
     # This sends the activate session payload.  We pick '1' as the requested
@@ -1067,7 +1067,7 @@ class Session(object):
     async def _activated_session(self, response):
         errstr = get_ipmi_error(response)
         if errstr:
-            self.onlogon({'error': errstr})
+            await self.onlogon({'error': errstr})
             return
         data = response['data']
         self.sessionid = struct.unpack("<I", bytes(data[1:5]))[0]
@@ -1085,8 +1085,8 @@ class Session(object):
                 # some implementations will let us get this far,
                 # but suddenly get skiddish.  Try again in such a case
                 self.privlevel = 3
-                response = self.raw_command(netfn=0x6, command=0x3b,
-                                            data=[self.privlevel])
+                response = await self.raw_command(netfn=0x6, command=0x3b,
+                                                  data=[self.privlevel])
             if response['code']:
                 self.logged = 0
                 self.onlogpayload = None
@@ -1097,7 +1097,7 @@ class Session(object):
                     self.privlevel, self.userid)
                 errstr = get_ipmi_error(response, suffix=mysuffix)
                 if errstr:
-                    self.onlogon({'error': errstr})
+                    await self.onlogon({'error': errstr})
                     return
         self.logging = False
         self.logoutexpiry = None
@@ -1548,7 +1548,7 @@ class Session(object):
                 errstr = constants.rmcp_codes[data[1]]
             else:
                 errstr = "Unrecognized RMCP code %d" % data[1]
-            self.onlogon({'error': errstr})
+            await self.onlogon({'error': errstr})
             return -9
         self.allowedpriv = data[2]
         # NOTE(jbjohnso): At this point, the BMC has no idea about what user
@@ -1692,7 +1692,7 @@ class Session(object):
         aclen = len(expectedauthcode)
         authcode = struct.pack("%dB" % aclen, *data[8:aclen + 8])
         if authcode != expectedauthcode:
-            self.onlogon({'error': "Invalid RAKP4 integrity code (wrong Kg?)"})
+            await self.onlogon({'error': "Invalid RAKP4 integrity code (wrong Kg?)"})
             return
         self.sessionid = self.pendingsessionid
         self.integrityalgo = self.attemptedhash

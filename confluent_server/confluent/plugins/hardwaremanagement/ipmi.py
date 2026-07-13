@@ -554,16 +554,16 @@ class IpmiHandler:
             if (self.error == 'timeout' or
                     'Insufficient resources' in self.error):
                 self.error = self.error.replace(' reported in RAKP4', '')
-                self.output.put(msg.ConfluentTargetTimeout(
+                await self.output.put(msg.ConfluentTargetTimeout(
                     self.node, self.error))
                 return
             elif 'Invalid Session ID' in self.error:
-                self.output.put(msg.ConfluentTargetTimeout(
+                await self.output.put(msg.ConfluentTargetTimeout(
                     self.node, 'Temporary Login Error'))
                 return
             elif ('Unauthorized' in self.error or
                     'Incorrect password' in self.error):
-                self.output.put(
+                await self.output.put(
                     msg.ConfluentTargetInvalidCredentials(self.node))
                 return
             else:
@@ -708,7 +708,7 @@ class IpmiHandler:
             if tmpvarbind.endswith('3183.1.1'):
                 varbinddata = inputdata[tmpvarbind]
         varbinddata = hex2bin(varbinddata)
-        event = self.ipmicmd.decode_pet(specifictrap, varbinddata)
+        event = await self.ipmicmd.decode_pet(specifictrap, varbinddata)
         self.pyghmi_event_to_confluent(event)
         await self.output.put(msg.EventCollection((event,), name=self.node))
 
@@ -1007,7 +1007,7 @@ class IpmiHandler:
         if activeupdates:
             await self.output.put(msg.KeyValueData({'status': 'active'}, self.node))
         else:
-            status = self.ipmicmd.get_update_status()
+            status = await self.ipmicmd.get_update_status()
             await self.output.put(msg.KeyValueData({'status': status}, self.node))
 
     async def handle_inventory(self):
@@ -1025,12 +1025,12 @@ class IpmiHandler:
 
     async def list_leds(self):
         await self.output.put(msg.ChildCollection('all'))
-        for category, info in self.ipmicmd.get_leds():
+        async for category, info in self.ipmicmd.get_leds():
             await self.output.put(msg.ChildCollection(simplify_name(category)))
 
     async def read_leds(self, component):
         led_categories = []
-        for category, info in self.ipmicmd.get_leds():
+        async for category, info in self.ipmicmd.get_leds():
             if component == 'all' or component == simplify_name(category):
                 led_categories.append({category: info})
         await self.output.put(msg.LEDStatus(led_categories, self.node))
@@ -1054,7 +1054,7 @@ class IpmiHandler:
                 await self.make_inventory_map()
                 compname = self.invmap.get(component, None)
                 if compname is None:
-                    self.output.put(msg.ConfluentTargetNotFound())
+                    await self.output.put(msg.ConfluentTargetNotFound())
                     return
                 invdata = await self.ipmicmd.get_inventory_of_component(compname)
                 if invdata is None:
@@ -1118,7 +1118,7 @@ class IpmiHandler:
         if len(storelem) < 2 or storelem[0] != 'volumes':
             raise exc.InvalidArgumentException('Must target a specific volume')
         volname = storelem[-1]
-        curr = self.ipmicmd.get_storage_configuration()
+        curr = await self.ipmicmd.get_storage_configuration()
         volumes = []
         volsfound = False
         toremove = storage.ConfigSpec(arrays=[storage.Array(volumes=volumes)])
@@ -1131,7 +1131,7 @@ class IpmiHandler:
             await self.output.put(msg.ConfluentTargetNotFound(
                 self.node, "No volume named '{0}' found".format(volname)))
             return
-        self.ipmicmd.remove_storage_configuration(toremove)
+        await self.ipmicmd.remove_storage_configuration(toremove)
         await self.output.put(msg.DeletedResource(volname))
 
     async def _create_storage(self, storelem):
@@ -1139,7 +1139,7 @@ class IpmiHandler:
             raise exc.InvalidArgumentException('Can only create volumes')
         vols = []
         thedisks = None
-        currcfg = self.ipmicmd.get_storage_configuration()
+        currcfg = await self.ipmicmd.get_storage_configuration()
         currnames = []
         for arr in currcfg.arrays:
             arrname = '{0}-{1}'.format(*arr.id)
@@ -1345,7 +1345,7 @@ class IpmiHandler:
 
     async def list_sensors(self):
         try:
-            sensors = await self.ipmicmd.get_sensor_descriptions()
+            sensors = [sensor async for sensor in self.ipmicmd.get_sensor_descriptions()]
         except pygexc.IpmiException:
             await self.output.put(msg.ConfluentTargetTimeout(self.node))
             return
@@ -1668,7 +1668,7 @@ class IpmiHandler:
     async def handle_ikvm(self):
         methods = await self.ipmicmd.get_ikvm_methods()
         if 'openbmc' in methods:
-            url = vinzmanager.get_url(self.node, self.inputdata)
+            url = await vinzmanager.get_url(self.node, self.inputdata)
             await self.output.put(msg.ChildCollection(url))
             return
         launchdata = await self.ipmicmd.get_ikvm_launchdata()
@@ -1760,4 +1760,3 @@ def delete(nodes, element, configmanager, inputdata):
                                               element, type='ffdc')
     return perform_requests(
         'delete', nodes, element, configmanager, inputdata, 'delete')
-

@@ -99,7 +99,7 @@ class NodeHandler(bmchandler.NodeHandler):
         if smmip:
             smmip = smmip.split('/', 1)[0]
         if smmip and ':' not in smmip:
-            smmip = await asyncio.get_running_loop().getaddrinfo(smmip, 0)[0]
+            smmip = (await asyncio.get_running_loop().getaddrinfo(smmip, 0))[0]
             smmip = smmip[-1][0]
             if smmip and ':' in smmip:
                 raise exc.NotImplementedException('IPv6 not supported')
@@ -125,7 +125,7 @@ class NodeHandler(bmchandler.NodeHandler):
         if smmip and ':' in smmip and not smmip.startswith('fe80::'):
             raise exc.NotImplementedException('IPv6 configuration TODO')
         if self.ipaddr.startswith('fe80::'):
-            cfg.set_node_attributes(
+            await cfg.set_node_attributes(
                     {nodename: {'hardwaremanagement.manager': self.ipaddr}})
 
     def _webconfigcreds(self, username, password):

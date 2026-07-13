@@ -254,10 +254,10 @@ def yield_rename_resources(namemap, isnode):
         else:
             yield msg.RenamedResource(node, namemap[node])
 
-def update_locks(nodes, configmanager, inputdata):
+async def update_locks(nodes, configmanager, inputdata):
     for node in nodes:
         updatestate = inputdata.inputbynode[node]
-        configmanager.set_node_attributes({node: {'deployment.lock': updatestate}})
+        await configmanager.set_node_attributes({node: {'deployment.lock': updatestate}})
         yield msg.DeploymentLock(node, updatestate)
 
 async def update_nodes(nodes, element, configmanager, inputdata):

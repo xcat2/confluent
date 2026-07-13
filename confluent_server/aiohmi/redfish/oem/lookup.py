@@ -27,23 +27,23 @@ OEMMAP = {
 }
 
 
-def get_oem_handler(sysinfo, sysurl, webclient, cache, cmd, rootinfo={}):
+async def get_oem_handler(sysinfo, sysurl, webclient, cache, cmd, rootinfo={}):
     if rootinfo.get('Vendor', None) in OEMMAP:
-        return OEMMAP[rootinfo['Vendor']].get_handler(sysinfo, sysurl,
-                                                     webclient, cache, cmd, rootinfo)
+        return await OEMMAP[rootinfo['Vendor']].get_handler(sysinfo, sysurl,
+                                                            webclient, cache, cmd, rootinfo)
     for oem in sysinfo.get('Oem', {}):
         if oem in OEMMAP:
-            return OEMMAP[oem].get_handler(sysinfo, sysurl, webclient, cache,
-                                           cmd, rootinfo)
+            return await OEMMAP[oem].get_handler(sysinfo, sysurl, webclient, cache,
+                                                 cmd, rootinfo)
     for oem in sysinfo.get('Links', {}).get('OEM', []):
         if oem in OEMMAP:
-            return OEMMAP[oem].get_handler(sysinfo, sysurl, webclient, cache,
-                                           cmd, rootinfo)
+            return await OEMMAP[oem].get_handler(sysinfo, sysurl, webclient, cache,
+                                                 cmd, rootinfo)
     if rootinfo:  # rootinfo indicates early invocation, bmcinfo not ready yet
-        return generic.OEMHandler(sysinfo, sysurl, webclient, cache, cmd._gpool, rootinfo)    
-    bmcinfo = cmd.bmcinfo
+        return await generic.OEMHandler.create(sysinfo, sysurl, webclient, cache, cmd._gpool, rootinfo)
+    bmcinfo = await cmd.bmcinfo()
     for oem in bmcinfo.get('Oem', {}):
         if oem in OEMMAP:
-            return OEMMAP[oem].get_handler(sysinfo, sysurl, webclient, cache,
-                                           cmd, rootinfo)
-    return generic.OEMHandler(sysinfo, sysurl, webclient, cache, cmd._gpool, rootinfo)
+            return await OEMMAP[oem].get_handler(sysinfo, sysurl, webclient, cache,
+                                                 cmd, rootinfo)
+    return await generic.OEMHandler.create(sysinfo, sysurl, webclient, cache, cmd._gpool, rootinfo)

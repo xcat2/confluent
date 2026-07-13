@@ -89,13 +89,13 @@ class NodeHandler(bmchandler.NodeHandler):
             guiddata = await ipmicmd.xraw_command(netfn=6, command=8)
             self.info['uuid'] = pygutil.decode_wireformat_uuid(
                 guiddata['data']).lower()
-            ipmicmd.oem_init()
-            bayid = ipmicmd._oem.immhandler.get_property(
+            await ipmicmd.oem_init()
+            bayid = await ipmicmd._oem.immhandler.get_property(
                 '/v2/cmm/sp/7')
             if not bayid:
                 return
             self.info['enclosure.bay'] = int(bayid)
-            smmid = ipmicmd._oem.immhandler.get_property(
+            smmid = await ipmicmd._oem.immhandler.get_property(
                 '/v2/ibmc/smm/chassis/uuid')
             if not smmid:
                 return
@@ -108,4 +108,3 @@ class NodeHandler(bmchandler.NodeHandler):
         except pygexc.IpmiException as ie:
             print(repr(ie))
             raise
-

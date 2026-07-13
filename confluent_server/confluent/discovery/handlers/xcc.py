@@ -171,8 +171,8 @@ class NodeHandler(immhandler.NodeHandler):
                     {'IPMI': {'ProtocolEnabled': True}}, method='PATCH')
         ipmicmd = None
         try:
-            ipmicmd = self._get_ipmicmd(self._currcreds[0], self._currcreds[1])
-            ipmicmd.xraw_command(netfn=0x3a, command=0xf1, data=(1,))
+            ipmicmd = await self._get_ipmicmd(self._currcreds[0], self._currcreds[1])
+            await ipmicmd.xraw_command(netfn=0x3a, command=0xf1, data=(1,))
         except pygexc.IpmiException as e:
             if (e.ipmicode != 193 and 'Unauthorized name' not in str(e) and
                     'Incorrect password' not in str(e) and
@@ -711,4 +711,3 @@ async def remote_nodecfg(nodename, cfm):
     else:
         nh = xcc3handler.NodeHandler(info, cfm)
     await nh.config(nodename)
-

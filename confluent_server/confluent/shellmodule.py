@@ -30,6 +30,7 @@ import fcntl
 import os
 import pty
 import random
+import select
 import subprocess
 
 
@@ -54,12 +55,12 @@ class ExecConsole(conapi.Console):
                 try:
                     somedata = os.read(self._master, 128)
                     while somedata:
-                        self._datacallback(somedata)
+                        await self._datacallback(somedata)
                         await asyncio.sleep(0)
                         somedata = os.read(self._master, 128)
                 except OSError as e:
                     if e.errno == 5:
-                        self._datacallback(conapi.ConsoleEvent.Disconnect)
+                        await self._datacallback(conapi.ConsoleEvent.Disconnect)
                         self.subproc = None
                         return
                     if e.errno != 11:
@@ -68,7 +69,7 @@ class ExecConsole(conapi.Console):
                 try:
                     somedata = self.subproc.stderr.read()
                     while somedata:
-                        self._datacallback(somedata)
+                        await self._datacallback(somedata)
                         await asyncio.sleep(0)
                         somedata = self.subproc.stderr.read()
                 except IOError as e:
@@ -76,10 +77,10 @@ class ExecConsole(conapi.Console):
                         raise
             childstate = self.subproc.poll()
             if childstate is not None:
-                self._datacallback(conapi.ConsoleEvent.Disconnect)
+                await self._datacallback(conapi.ConsoleEvent.Disconnect)
                 self.subproc = None
 
-    def connect(self, callback):
+    async def connect(self, callback):
         self._datacallback = callback
         master, slave = pty.openpty()
         self._master = master
@@ -90,14 +91,16 @@ class ExecConsole(conapi.Console):
                 stderr=subprocess.PIPE, close_fds=True)
         except OSError:
             print("Unable to execute " + self.executable + " (permissions?)")
-            self.close()
+            os.close(master)
+            os.close(slave)
+            self._master = None
             return
         os.close(slave)
         fcntl.fcntl(master, fcntl.F_SETFL, os.O_NONBLOCK)
         fcntl.fcntl(self.subproc.stderr.fileno(), fcntl.F_SETFL, os.O_NONBLOCK)
         self.readerthread = tasks.spawn(self.relaydata())
 
-    def write(self, data):
+    async def write(self, data):
         os.write(self._master, data)
 
     async def close(self):

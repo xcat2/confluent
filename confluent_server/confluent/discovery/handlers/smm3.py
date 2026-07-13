@@ -46,7 +46,7 @@ async def remote_nodecfg(nodename, cfm):
     ipaddr = cfg.get(nodename, {}).get('hardwaremanagement.manager', {}).get(
         'value', None)
     ipaddr = ipaddr.split('/', 1)[0]
-    ipaddr = await asyncio.get_running_loop().getaddrinfo(ipaddr, 0)[0][-1]
+    ipaddr = (await asyncio.get_running_loop().getaddrinfo(ipaddr, 0))[0][-1]
     if not ipaddr:
         raise Exception('Cannot remote configure a system without known '
                         'address')
@@ -63,4 +63,3 @@ if __name__ == '__main__':
     print(repr(info))
     testr = NodeHandler(info, c)
     asyncio.run(testr.config(sys.argv[2]))
-

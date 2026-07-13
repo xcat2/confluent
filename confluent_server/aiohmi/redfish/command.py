@@ -1035,7 +1035,7 @@ class Command(object):
                 'Address': static_gateway,
             }]
         if patch:
-            nicurl = self._get_bmc_nic_url(name)
+            nicurl = await self._get_bmc_nic_url(name)
             await self._do_web_request(nicurl, patch, 'PATCH')
 
     async def set_net_configuration(self, ipv4_address=None, ipv4_configuration=None,
@@ -1458,22 +1458,22 @@ class Command(object):
                     del self.wc.stdheaders['Authorization']            
             return
         for vmurl in vmurls:
-            vminfo = self._do_web_request(vmurl, cache=False)
+            vminfo = await self._do_web_request(vmurl, cache=False)
             if vminfo.get('ConnectedVia', None) != 'NotConnected':
                 continue
             inserturl = vminfo.get(
                 'Actions', {}).get(
                     '#VirtualMedia.InsertMedia', {}).get('target', None)
             if inserturl:
-                self._do_web_request(inserturl, {'Image': url})
+                await self._do_web_request(inserturl, {'Image': url})
             else:
                 try:
-                    self._do_web_request(vmurl,
-                                         {'Image': url, 'Inserted': True},
-                                         'PATCH')
+                    await self._do_web_request(vmurl,
+                                               {'Image': url, 'Inserted': True},
+                                               'PATCH')
                 except exc.RedfishError as re:
                     if re.msgid.endswith(u'PropertyUnknown'):
-                        self._do_web_request(vmurl, {'Image': url}, 'PATCH')
+                        await self._do_web_request(vmurl, {'Image': url}, 'PATCH')
                     else:
                         raise
             break
@@ -1586,6 +1586,10 @@ class Command(object):
         return await oem.apply_license(filename, self, progress, data)
 
 if __name__ == '__main__':
-    print(repr(
-        Command(sys.argv[1], os.environ['BMCUSER'], os.environ['BMCPASS'],
-                verifycallback=lambda x: True).get_power()))
+    async def main():
+        cmd = await Command.create(
+            sys.argv[1], os.environ['BMCUSER'], os.environ['BMCPASS'],
+            verifycallback=lambda x: True)
+        print(repr(await cmd.get_power()))
+
+    asyncio.run(main())

@@ -146,7 +146,7 @@ class SshShell(conapi.Console):
             if b'\r' in self.keyaction:
                 action = self.keyaction.split(b'\r')[0]
                 if action.lower() == b'accept':
-                    self.nodeconfig.set_node_attributes(
+                    await self.nodeconfig.set_node_attributes(
                         {self.node:
                              {self.keyattrname: self.candidatefprint}})
                     await self.datacallback('\r\n')
@@ -157,10 +157,10 @@ class SshShell(conapi.Console):
                     self.keyaction = b''
                     await self.datacallback('\r\nEnter "disconnect" or "accept": ')
             elif len(data) > 0:
-                self.datacallback(data)
+                await self.datacallback(data)
         elif self.inputmode == 0:
             while len(data) and data[0:1] == b'\x7f' and len(self.username):
-                self.datacallback('\b \b')  # erase previously echoed value
+                await self.datacallback('\b \b')  # erase previously echoed value
                 self.username = self.username[:-1]
                 data = data[1:]
             while len(data) and data[0:1] == b'\x7f':

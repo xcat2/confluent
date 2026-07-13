@@ -329,8 +329,8 @@ class Command(object):
         await self.oem_init()
 
         if hasattr(self._oem, 'set_power'):
-            return self._oem.set_power(powerstate,
-                                       bridge_request=bridge_request)
+            return await self._oem.set_power(powerstate,
+                                             bridge_request=bridge_request)
 
         if hasattr(self._oem, 'process_power_state'):
             powerstate = self._oem.process_power_state(
@@ -675,7 +675,7 @@ class Command(object):
         await self.init_sdr()
         for fruid in self._sdr.fru:
             if self._sdr.fru[fruid].fru_name == component:
-                return self._oem.process_fru(fru.FRU(
+                return await self._oem.process_fru(fru.FRU(
                     ipmicmd=self, fruid=fruid,
                     sdr=self._sdr.fru[fruid]).info, component)
         return await self._oem.get_inventory_of_component(component)
@@ -738,7 +738,8 @@ class Command(object):
         This provides a detailed view of the LEDs of the managed system.
         """
         await self.oem_init()
-        return await self._oem.get_leds()
+        async for led in self._oem.get_leds():
+            yield led
 
     async def get_ntp_enabled(self):
         await self.oem_init()
@@ -806,7 +807,7 @@ class Command(object):
                 rsp = await self.raw_command(command=0x2d, netfn=4,
                                        rslun=currsensor.sensor_lun,
                                        data=(currsensor.sensor_number,))
-                return self._sdr.sensors[sensor].decode_sensor_reading(
+                return await self._sdr.sensors[sensor].decode_sensor_reading(
                     self, rsp['data'])
         await self.oem_init()
         return await self._oem.get_sensor_reading(sensorname)
@@ -853,9 +854,9 @@ class Command(object):
         else:
             raise Exception("Unrecognized data format " + repr(fetchdata))
 
-    def get_extended_bmc_configuration(self):
-        self.oem_init()
-        return self._oem.get_extended_bmc_configuration()
+    async def get_extended_bmc_configuration(self):
+        await self.oem_init()
+        return await self._oem.get_extended_bmc_configuration()
 
     async def get_bmc_configuration(self):
         await self.oem_init()
@@ -1091,7 +1092,7 @@ class Command(object):
                 if rsp['code'] == 203:  # Sensor does not exist, optional dev
                     continue
                 raise exc.IpmiException(rsp['error'], code=rsp['code'])
-            yield self._sdr.sensors[sensor].\
+            yield await self._sdr.sensors[sensor].\
                 decode_sensor_reading(self, rsp['data'])
         await self.oem_init()
         async for reading in self._oem.get_sensor_data():
@@ -1581,7 +1582,7 @@ class Command(object):
         }
         b |= privilege_levels[privilege_level] & 0b00000111
         data.append(b)
-        response = self.raw_command(netfn=0x06, command=0x40, data=data)
+        response = await self.raw_command(netfn=0x06, command=0x40, data=data)
         if 'error' in response:
             raise Exception(response['error'])
         return True
