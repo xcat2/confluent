@@ -1043,15 +1043,16 @@ class Session(object):
         elif self.ipmiversion == 2.0:
             await self._open_rmcpplus_request()
 
-    def _got_session_challenge(self, response):
+    async def _got_session_challenge(self, response):
         errstr = get_ipmi_error(response,
                                 suffix=" while getting session challenge")
         if errstr:
-            return self.onlogon({'error': errstr})
+            await self.onlogon({'error': errstr})
+            return
         data = response['data']
         self.sessionid = struct.unpack("<I", bytes(data[0:4]))[0]
         self.authtype = 2
-        return self._activate_session(data[4:])
+        await self._activate_session(data[4:])
 
     # NOTE(jbjohnso):
     # This sends the activate session payload.  We pick '1' as the requested
