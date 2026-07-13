@@ -270,6 +270,7 @@ async def _extract_neighbor_data_affluent(switch, user, password, cfm, lldpdata,
             'peerportid': record['peerportid'],
             'port': record['localport'],
             'peerid': peerid,
+            'peeraddresses': record.get('peeraddresses', []),
         }
         _extract_extended_desc(portdata, portdata['peerdescription'], True)
         _neighbypeerid[peerid] = portdata
