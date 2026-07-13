@@ -209,28 +209,30 @@ async def follow_leader(remote, leader):
         exitcause = await cfm.follow_channel(remote)
         newleader = exitcause.get('newleader', None)
     finally:
+        handled = False
         if cleanexit:
             log.log({'info': 'Previous following cleanly closed',
                      'subsystem': 'collective'})
-            return
-        if newleader:
+            handled = True
+        if not handled and newleader:
             log.log(
                 {'info': 'Previous leader directed us to join new leader {}'.format(newleader)})
             try:
                 if await connect_to_leader(None, get_myname(), newleader):
-                    return
+                    handled = True
             except Exception:
                 log.log({'error': 'Unknown error attempting to connect to {}, check trace log'.format(newleader), 'subsystem': 'collective'})
                 cfm.logException()
-        log.log({'info': 'Current leader ({0}) has disappeared, restarting '
-                         'collective membership'.format(leader), 'subsystem': 'collective'})
-        # The leader has folded, time to startup again...
-        follower = None
-        await cfm.stop_following()
-        currentleader = None
-        if retrythread is None:  # start a recovery
-            retrythread = tasks.spawn_task_after(
-                random.random(), start_collective)
+        if not handled:
+            log.log({'info': 'Current leader ({0}) has disappeared, restarting '
+                             'collective membership'.format(leader), 'subsystem': 'collective'})
+            # The leader has folded, time to startup again...
+            follower = None
+            await cfm.stop_following()
+            currentleader = None
+            if retrythread is None:  # start a recovery
+                retrythread = tasks.spawn_task_after(
+                    random.random(), start_collective)
 
 async def _create_tls_connection(host, port):
     cloop = asyncio.get_running_loop()
