@@ -34,8 +34,8 @@ done
 if [ -e /tmp/installdisk ]; then
     instdisk=$(cat /tmp/installdisk)
 else
-    for blockdev in $(ls /sys/class/block/); do
-        shortname=$(basename $blockdev)
+    for blockdev in /sys/class/block/*; do
+        shortname=$(basename "$blockdev")
         if [ "$shortname" != "${shortname%loop*}" ]; then
             continue
         fi
@@ -62,7 +62,7 @@ else
     done
 fi
 if [ -z "$instdisk" ]; then
-    if [ ! -z "$sraid"]; then
+    if [ ! -z "$sraid" ]; then
         instdisk=$sraid
     elif [ ! -z "$onbdisk" ]; then
         instdisk=$onbdisk
