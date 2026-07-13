@@ -1,0 +1,157 @@
+#!/usr/bin/python
+
+import asyncio
+import re
+import sys
+try:
+    import confluent.asynclient as asynclient
+except ImportError:
+    sys.path.append('/opt/confluent/lib/python')
+    import confluent.asynclient as asynclient
+
+_whitelistnames = (
+    # 3com
+    re.compile(r'^RMON Port (\d+) on unit \d+'),
+    # Dell
+    re.compile(r'^Unit \d+ Port (\d+)\Z'),
+)
+
+_blacklistnames = (
+    re.compile(r'vl'),
+    re.compile(r'Nu'),
+    re.compile(r'RMON'),
+    re.compile(r'onsole'),
+    re.compile(r'Stack'),
+    re.compile(r'Trunk'),
+    re.compile(r'po\d'),
+    re.compile(r'XGE'),
+    re.compile(r'LAG'),
+    re.compile(r'CPU'),
+    re.compile(r'Management'),
+)
+
+def mac2lla(mac):
+    """Convert MAC address to IPv6 link-local address."""
+    # Remove colons from MAC address
+    mac_clean = mac.replace(':', '')
+    # Insert fe80:: prefix and convert to lowercase
+    # Split MAC into first 3 octets and last 3 octets
+    first_half = mac_clean[:6]
+    second_half = mac_clean[6:]
+    # Flip the universal/local bit in the first octet
+    first_octet = int(first_half[:2], 16)
+    first_octet ^= 0x02
+    first_half = f'{first_octet:02x}' + first_half[2:]
+    # Format as IPv6 link-local address
+    lla = f'fe80::{first_half[0:4]}:{first_half[4:]}ff:fe{second_half[0:2]}:{second_half[2:6]}'
+    return lla
+
+async def is_reachable(address):
+    try:
+        await asyncio.wait_for(asyncio.open_connection(address, 22), timeout=0.5)
+        return True
+    except (asyncio.TimeoutError, OSError):
+        return False
+
+async def add_zone(lla):
+    if '%' in lla:
+        return lla
+    proc = await asyncio.create_subprocess_exec(
+        'ip', '-json', 'link',
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE
+    )
+    stdout, _ = await proc.communicate()
+    import json
+    links = json.loads(stdout)
+    tocheck = []
+    for link in links:
+        if 'LOOPBACK' in link.get('flags', []):
+            continue
+        if 'LOWER_UP' not in link.get('flags', []):
+            continue
+        tocheck.append(link)
+    
+    tasks = []
+    for link in tocheck:
+        zone_addr = lla + '%' + link['ifname']
+        tasks.append(is_reachable(zone_addr))
+    
+    results = await asyncio.gather(*tasks)
+    for link, reachable in zip(tocheck, results):
+        if reachable:
+            return lla + '%' + link['ifname']
+    
+    return lla
+
+def _namesmatch(switchdesc, userdesc):
+    if switchdesc is None:
+        return False
+    if switchdesc == userdesc:
+        return True
+    try:
+        portnum = int(userdesc)
+    except ValueError:
+        portnum = None
+    if portnum is not None:
+        for exp in _whitelistnames:
+            match = exp.match(switchdesc)
+            if match:
+                snum = int(match.groups()[0])
+                if snum == portnum:
+                    return True
+    anymatch = re.search(r'[^0123456789]' + userdesc + r'(\.0)?\Z', switchdesc)
+    if anymatch:
+        for blexp in _blacklistnames:
+            if blexp.match(switchdesc):
+                return False
+        return True
+    return False
+
+async def main(switch, port):
+    portname = None
+    client = asynclient.Command()
+    async for rsp in client.read(f'/networking/neighbors/by-switch/{switch}/by-port/'):
+        portcandidate = rsp.get('item', {}).get('href')[:-1]
+        if _namesmatch(portcandidate, port):
+            if portname:
+                sys.stderr.write(f"Multiple matches found for port {port} on switch {switch}\n")
+                portname = None
+            else:
+                portname = portcandidate
+    peerid = None
+    if portname:
+        async for rsp in client.read(f'/networking/neighbors/by-switch/{switch}/by-port/{portname}/by-peerid/'):
+            peerid = rsp.get('item', {}).get('href')
+    if peerid:
+        fe80found = False
+        maybemac = None
+        async for rsp in client.read(f'/networking/neighbors/by-switch/{switch}/by-port/{portname}/by-peerid/{peerid}'):
+            if 'peeraddresses' in rsp:
+                for addr in rsp['peeraddresses']:
+                    if addr.startswith('fe80::'):
+                        fe80found = True
+                        addr = await add_zone(addr)
+                    print(addr)
+            if 'peerchassisid' in rsp:
+                maybemac = rsp['peerchassisid']
+        if not fe80found and maybemac:
+            try:
+                maybella = mac2lla(maybemac)
+                maybella = await add_zone(maybella)
+                print(maybella)
+            except Exception as e:
+                pass
+
+            
+    
+
+
+if __name__ == '__main__':
+    if len(sys.argv) < 3:
+        sys.stderr.write(f"Usage: {sys.argv[0]} <switch> <port>\n")
+        sys.exit(1)
+    switch = sys.argv[1]
+    port = sys.argv[2]
+    asyncio.run(main(switch, port))
+
