@@ -130,6 +130,21 @@ to a blank value will allow masking a group defined attribute with an empty valu
     `node12: net.compute.ipv4_address: 172.17.0.12/16`  
     `node12: net.compute.team_mode: lacp`  
 
+* Passing additional settings to the network backend of the deployed OS with `net.extra_settings`
+  (semicolon-delimited key=value pairs, keys in the native syntax of the respective backend).
+  On a NetworkManager based OS (e.g. Enterprise Linux), keys are nmcli properties:
+    `# nodeattrib node12 net.mgmt.extra_settings='connection.zone=internal;ipv4.routes=10.0.0.0/8 192.168.1.254, 172.16.0.0/12 192.168.1.254;ipv4.route-metric=200'`  
+    `node12: net.mgmt.extra_settings: connection.zone=internal;ipv4.routes=10.0.0.0/8 192.168.1.254, 172.16.0.0/12 192.168.1.254;ipv4.route-metric=200`  
+
+* On a netplan based OS (e.g. Ubuntu), keys are netplan YAML paths (nested keys dotted, values in YAML flow syntax).
+  Since Confluent uses braces for attribute expressions, literal braces must be escaped as `{{` and `}}` when setting the attribute:
+    `# nodeattrib node13 net.mgmt.extra_settings='routes=[{{to: 10.0.0.0/8, via: 192.168.1.254}}];nameservers.search=[lab.example.com]'`
+    `node13: net.mgmt.extra_settings: routes=[{to: 10.0.0.0/8, via: 192.168.1.254}];nameservers.search=[lab.example.com]`  
+
+* On a wicked based OS (e.g. SUSE), keys are ifcfg variables (routes are not supported through this mechanism on wicked):
+    `# nodeattrib node14 net.mgmt.extra_settings='ZONE=internal;ETHTOOL_OPTIONS=-K iface tso off'`  
+    `node14: net.mgmt.extra_settings: ZONE=internal;ETHTOOL_OPTIONS=-K iface tso off`  
+
 * Clear attribute on nodes of a simple noderange, if you want to retain the variable set the attribute to "":
     `# nodeattrib n1-n2 -c console.method`  
     `# nodeattrib n1-n2 console.method`  
