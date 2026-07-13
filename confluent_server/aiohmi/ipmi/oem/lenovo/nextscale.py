@@ -1115,5 +1115,5 @@ class SMMClient(object):
     async def wc(self):
         if (not self._wc or self._wc.broken
                 or self._wc.vintage < util._monotonic_time() + 30):
-            self._wc = self.get_webclient()
+            self._wc = await self.get_webclient()
         return self._wc

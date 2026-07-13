@@ -347,7 +347,7 @@ class OEMHandler(generic.OEMHandler):
             ntpres = await self.ipmicmd.raw_command(netfn=0x32, command=0xa7)
             return ntpres['data'][0] == '\x01'
         elif await self.is_fpc():
-            return self.smmhandler.get_ntp_enabled(self._fpc_variant)
+            return await self.smmhandler.get_ntp_enabled(self._fpc_variant)
         elif self.has_tsma:
             return await self.tsmahandler.get_ntp_enabled()
         return None
