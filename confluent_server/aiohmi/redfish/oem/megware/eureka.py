@@ -124,14 +124,24 @@ class OEMHandler(generic.OEMHandler):
 
     async def get_health(self, fishclient, verbose=True):
         """Gather health status for the EUREKA chassis and all nodes."""
-        issues = []
+        summary = {'badreadings': [], 'health': const.Health.Ok}
+
+        def note_issue(name, health, state):
+            summary['health'] |= health
+            if verbose:
+                reading = generic.SensorReading(None, {'name': name})
+                reading.health = health
+                reading.states = [state]
+                summary['badreadings'].append(reading)
+
         try:
             chassis = await self._do_web_request('/redfish/v1/Chassis/1')
             health = chassis.get('Status', {}).get('Health', 'OK')
             if health != 'OK':
-                issues.append('Chassis health: {}'.format(health))
+                note_issue('Chassis', generic._healthmap.get(
+                    health, const.Health.Warning), health)
         except Exception:
-            issues.append('Cannot reach chassis health endpoint')
+            note_issue('Chassis', const.Health.Warning, 'Unreachable')
 
         for sysurl in self._allsysurls:
             try:
@@ -140,12 +150,6 @@ class OEMHandler(generic.OEMHandler):
                 continue
             state = sysinfo.get('Status', {}).get('State', 'Absent')
             name = sysurl.rstrip('/').rsplit('/', 1)[-1]
-            if state == 'Absent':
-                issues.append('{}: Absent'.format(name))
-            elif state != 'Enabled':
-                issues.append('{}: {}'.format(name, state))
-
-        health = 0
-        if issues:
-            health = 1
-        return {'badreadings': [], 'health': health}
+            if state != 'Enabled':
+                note_issue(name, const.Health.Warning, state)
+        return summary
