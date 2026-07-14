@@ -743,7 +743,10 @@ node = {
                        'its validity is governed by pubkeys.tls_lifetime '
                        '(default 47 days) - consider raising it (e.g. 3650) '
                        'so forwarding does not stop when the certificate '
-                       'expires. To set up the receiving side, see the '
+                       'expires, but note that the log transports offer no '
+                       'certificate revocation, so choose the lifetime with '
+                       'node decommissioning in mind. To set up the '
+                       'receiving side, see the '
                        'confluent-logging-receiver-setup helper under '
                        '/opt/confluent/share/examples/logging.',
         'type': bool,
