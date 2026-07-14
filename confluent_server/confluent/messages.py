@@ -571,6 +571,8 @@ def get_input_message(path, operation, inputdata, nodes=None, multinode=False,
         return InputPowerMessage(path, nodes, inputdata)
     elif '/'.join(path).startswith('media/detach'):
         return DetachMedia(path, nodes, inputdata)
+    elif '/'.join(path).startswith('media/attach') and inputdata:
+        return InputMediaUrl(path, nodes, inputdata, configmanager)
     elif '/'.join(path).startswith('media/') and inputdata:
         return InputMedia(path, nodes, inputdata, configmanager)
     elif '/'.join(path).startswith('support/servicedata') and inputdata:
@@ -613,9 +615,14 @@ def checkaccess(user, filename, pwent):
             return True
         return False
 
+def isurl(value):
+    prefix, value = value.split('://', 1) if '://' in value else (None, value)
+    if '/' in prefix:
+        return False
+    return True if prefix else False
 
 class InputFirmwareUpdate(ConfluentMessage):
-
+    urlsupported = False
     def __init__(self, path, nodes, inputdata, configmanager):
         self._filename = inputdata.get('filename', inputdata.get('url', inputdata.get('dirname', None)))
         self.bank = inputdata.get('bank', None)
@@ -632,6 +639,9 @@ class InputFirmwareUpdate(ConfluentMessage):
             node, value = expanded
             if value != self._filename:
                 self._complexname = True
+            if self.urlsupported and isurl(value):
+                self.filebynode[node] = value
+                continue
             value = os.path.normpath(value)
             if value not in checkedfiles:
                 if value.startswith('../'):
@@ -680,6 +690,11 @@ class InputFirmwareUpdate(ConfluentMessage):
 
 class InputMedia(InputFirmwareUpdate):
     # Use InputFirmwareUpdate
+    pass
+
+class InputMediaUrl(InputFirmwareUpdate):
+    # Use InputFirmwareUpdate for URL-based media attachment
+    urlsupported = True
     pass
 
 class InputLicense(InputFirmwareUpdate):
