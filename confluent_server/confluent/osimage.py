@@ -1262,11 +1262,10 @@ class MediaImporter(object):
     async def importmedia(self):
         if self.medfile:
             os.environ['CONFLUENT_MEDIAFD'] = '{0}'.format(self.medfile.fileno())
-        with open(os.devnull, 'w'):
-            self.worker = await asyncio.create_subprocess_exec(
-                sys.executable, __file__, self.filename, '-b',
-                self.targpath, self.distpath, self.customname,
-                stdout=asyncio.subprocess.PIPE, close_fds=False)
+        self.worker = await asyncio.create_subprocess_exec(
+            sys.executable, __file__, self.filename, '-b',
+            self.targpath, self.distpath, self.customname,
+            stdout=asyncio.subprocess.PIPE, close_fds=False)
         wkr = self.worker
         currline = b''
         while wkr.returncode is None:
