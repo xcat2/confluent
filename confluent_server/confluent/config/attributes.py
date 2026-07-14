@@ -709,8 +709,13 @@ node = {
         'description': 'Remote logging server or servers (comma separated) '
                        'for the OS deployment to configure the node to '
                        'forward logs to, using the method indicated by '
-                       'logging.method. May be set to the address of the '
-                       'deployment server or any other logging server. See '
+                       'logging.method. May be set to the deployment server '
+                       'or any other logging server. With logging.tls and '
+                       'the rsyslog method, prefer DNS names resolvable by '
+                       'the nodes over IP addresses: a name lets the node '
+                       'verify the specific server identity, while an IP '
+                       'only validates that the certificate came from the '
+                       'confluent CA. See '
                        '/opt/confluent/share/examples/logging for cfg '
                        'examples. If unset, no forwarding is configured.',
     },
