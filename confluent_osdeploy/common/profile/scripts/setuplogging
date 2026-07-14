@@ -166,8 +166,22 @@ else
         echo '       DefaultNetstreamDriverCAFile="'$tlsdir'/ca.pem"' >> $syslogconf
         echo '       DefaultNetstreamDriverCertFile="'$tlsdir'/rsyslog.crt"' >> $syslogconf
         echo '       DefaultNetstreamDriverKeyFile="'$tlsdir'/rsyslog.key")' >> $syslogconf
+        # For name-valued targets, pin the server identity (x509/name): the
+        # confluent CA also issues certificates to every node and BMC, and
+        # with chain validation alone any of them could pose as the server.
+        # rsyslog matches pinned peers only against DNS-type SANs, so IP
+        # targets can only validate the chain (x509/certvalid).
         for loggingsrv in $loggingservers; do
-            echo '*.* action(type="omfwd" target="'$loggingsrv'" port="6514" protocol="tcp" StreamDriverMode="1" StreamDriverAuthMode="x509/certvalid")' >> $syslogconf
+            case $loggingsrv in
+                *:*) isname=0 ;;        # IPv6 literal
+                *[!0-9.]*) isname=1 ;;  # anything besides digits and dots
+                *) isname=0 ;;          # IPv4 literal
+            esac
+            if [ $isname = 1 ]; then
+                echo '*.* action(type="omfwd" target="'$loggingsrv'" port="6514" protocol="tcp" StreamDriverMode="1" StreamDriverAuthMode="x509/name" StreamDriverPermittedPeers="'$loggingsrv'")' >> $syslogconf
+            else
+                echo '*.* action(type="omfwd" target="'$loggingsrv'" port="6514" protocol="tcp" StreamDriverMode="1" StreamDriverAuthMode="x509/certvalid")' >> $syslogconf
+            fi
         done
     else
         echo '# Syslog forwarding configured by confluent during deployment' > $syslogconf
