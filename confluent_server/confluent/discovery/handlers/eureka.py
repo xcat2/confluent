@@ -21,6 +21,8 @@ sensor readings. It does NOT support IPMI, NIC configuration,
 firmware update, or other BMC-specific operations.
 """
 
+import asyncio
+import json
 import confluent.discovery.handlers.generic as generic
 import confluent.util as util
 import aiohmi.util.webclient as webclient
@@ -105,7 +107,7 @@ class NodeHandler(generic.NodeHandler):
             elif status == 401:
                 self.trieddefault = True
                 try:
-                    errinfo = util.json_loads(body)
+                    errinfo = json.loads(body)
                     for msg in errinfo.get('@Message.ExtendedInfo', []):
                         if 'PasswordChangeRequired' in msg.get('MessageId', ''):
                             chgurl = msg.get('MessageArgs', [None])[0]
