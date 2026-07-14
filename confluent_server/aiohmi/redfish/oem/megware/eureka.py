@@ -86,13 +86,22 @@ class OEMHandler(generic.OEMHandler):
         """Read CPU temperatures from EUREKA BMC sensor endpoints.
 
         Reads BMC{N}CPU0Temp and BMC{N}CPU1Temp sensors from
-        /redfish/v1/Chassis/1/Sensors/.
+        /redfish/v1/Chassis/1/Sensors/. Nodes whose BMC is not
+        currently reporting (HasBMCMetrics false) are skipped, as
+        their sensors read a meaningless 0.
         """
         cputemps = []
         for sysurl in self._allsysurls:
             nodeid = sysurl.rstrip('/').rsplit('/', 1)[-1]
             nodeid = nodeid.replace('Node', '')
             if not nodeid.isdigit():
+                continue
+            try:
+                sysinfo = await fishclient._do_web_request(sysurl)
+            except Exception:
+                continue
+            if not sysinfo.get('Oem', {}).get('Megware', {}).get(
+                    'HasBMCMetrics', True):
                 continue
             for cpu in ('CPU0', 'CPU1'):
                 try:
