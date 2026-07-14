@@ -20,4 +20,5 @@ import aiohmi.redfish.oem.megware.eureka as eureka
 
 
 async def get_handler(sysinfo, sysurl, webclient, cache, cmd, rootinfo={}):
-    return await eureka.OEMHandler.create(sysinfo, sysurl, webclient, cache, gpool=cmd._gpool)
+    return await eureka.OEMHandler.create(sysinfo, sysurl, webclient, cache,
+                                          gpool=cmd._gpool, rootinfo=rootinfo)
