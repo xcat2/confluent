@@ -246,7 +246,7 @@ async def handle_api_request(url, req, username, cfm, reqbody, authorized):
     if url == '/registration_options':
         userinfo = cfm.get_user(username)
         if not userinfo:
-            cfm.create_user(username, role='Stub')
+            await cfm.create_user(username, role='Stub')
             userinfo = cfm.get_user(username)
         authid = userinfo.get('webauthid', None)
         if not authid:  # TODO: index users by authid as well as name

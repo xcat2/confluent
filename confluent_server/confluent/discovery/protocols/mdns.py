@@ -331,7 +331,7 @@ async def check_fish(urldata, port=443, verifycallback=None):
         except (IndexError, KeyError):
             return None
             url = '/redfish/v1/'
-            peerinfo = wc.grab_json_response('/redfish/v1/')
+            peerinfo = await wc.grab_json_response('/redfish/v1/')
     if url == '/redfish/v1/':
         if 'UUID' in peerinfo:
             if 'services' not in data:

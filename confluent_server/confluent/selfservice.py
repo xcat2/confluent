@@ -252,7 +252,7 @@ async def handle_request(req, make_response, mimetype):
         if not bmcaddr:
             return await make_response(mimetype, 500, 'Internal Server Error', body='Missing value in hardwaremanagement.manager')
         bmcaddr = bmcaddr.split('/', 1)[0]
-        bmcaddr = await asyncio.get_running_loop().getaddrinfo(bmcaddr, 0)[0]
+        bmcaddr = (await asyncio.get_running_loop().getaddrinfo(bmcaddr, 0))[0]
         bmcaddr = bmcaddr[-1][0]
         if '.' in bmcaddr:  # ipv4 is allowed
             netconfig = await netutil.get_nic_config(cfg, nodename, ip=bmcaddr)
@@ -456,9 +456,9 @@ async def handle_request(req, make_response, mimetype):
             reqbody = None
         cfgmod = reqbody.get('configmod', 'unspecified')
         if cfgmod == 'xcc':
-            xcc.remote_nodecfg(nodename, cfg)
+            await xcc.remote_nodecfg(nodename, cfg)
         elif cfgmod == 'tsm':
-            tsm.remote_nodecfg(nodename, cfg)
+            await tsm.remote_nodecfg(nodename, cfg)
         else:
             return await make_response(mimetype, 500, 'unsupported configmod', body='Unsupported configmod "{}"'.format(cfgmod))
         return await make_response(mimetype, 200, 'Ok', body='complete')

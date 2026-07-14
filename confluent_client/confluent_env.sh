@@ -53,6 +53,8 @@ _confluent_get_args()
         CMPARGS+=("")
     fi
     GENNED=""
+    # Whitespace separates candidate groups, while commas group synonyms.
+    # shellcheck disable=SC2068
     for CAND in ${COMP_CANDIDATES[@]}; do
         candarray=(${CAND//,/ })
         matched=0

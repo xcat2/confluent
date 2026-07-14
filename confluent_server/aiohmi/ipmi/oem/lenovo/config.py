@@ -73,7 +73,7 @@ async def run_command_with_retry(connection, data):
         except pygexc.IpmiException as e:
             if e.ipmicode != 0xa or not tries:
                 raise
-            connection.ipmi_session.pause(1)
+            await connection.ipmi_session.pause(1)
 
 
 def _convert_syntax(raw):
@@ -197,7 +197,7 @@ class LenovoFirmwareConfig(object):
                     break
             except KeyError:
                 pass
-            self.connection.ipmi_session.pause(5)
+            await self.connection.ipmi_session.pause(5)
         filehandle = response['data'][3:7]
         filehandle = struct.unpack("<I", filehandle)[0]
         return filehandle

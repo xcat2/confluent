@@ -38,7 +38,7 @@ class EnergyManager(object):
                                         'Node Power', 'Total Power')
                 self._mypowermeters = ('node power', 'total power', 'gpu power', 'riser 1 power', 'riser 2 power')
                 self._usefapm = True
-                return
+                return self
         except pygexc.IpmiException:
             pass
 
@@ -80,7 +80,7 @@ class EnergyManager(object):
                 break
             except pygexc.IpmiException as ie:
                 if tries and ie.ipmicode == 0xc3:
-                    ipmicmd.ipmi_session.pause(0.1)
+                    await ipmicmd.ipmi_session.pause(0.1)
                     continue
                 raise
         if rsp is None:
@@ -159,8 +159,14 @@ class Energy(object):
 
 
 if __name__ == '__main__':
+    import asyncio
     import os
     import aiohmi.ipmi.command as cmd
     import sys
-    c = cmd.Command(sys.argv[1], os.environ['BMCUSER'], os.environ['BMCPASS'])
-    EnergyManager(c).get_dc_energy(c)
+
+    async def main():
+        c = await cmd.Command.create(sys.argv[1], os.environ['BMCUSER'], os.environ['BMCPASS'])
+        manager = await EnergyManager.create(c)
+        print(await manager.get_dc_energy(c))
+
+    asyncio.run(main())

@@ -102,7 +102,7 @@ class CredServer(object):
                     now = datetime.datetime.utcnow()
                     expiry = datetime.datetime.strptime(apiarmed, "%Y-%m-%dT%H:%M:%SZ")
                     if now > expiry:
-                        self.cfm.set_node_attributes({nodename: {'deployment.apiarmed': ''}})
+                        await self.cfm.set_node_attributes({nodename: {'deployment.apiarmed': ''}})
                         client.close()
                         return
             await cloop.sock_sendall(client, b'\x02\x20')
@@ -132,7 +132,7 @@ class CredServer(object):
             await cloop.sock_recv(client, 2)  # drain end of message
             await cloop.sock_sendall(client, b'\x05\x00') # report success
             if hmackey and apiarmed != 'continuous':
-                self.cfm.clear_node_attributes([nodename], ['secret.selfapiarmtoken'])
+                await self.cfm.clear_node_attributes([nodename], ['secret.selfapiarmtoken'])
             if apiarmed != 'continuous':
                 disarm = {nodename: {'deployment.sealedapikey': '', 'deployment.apiarmed': ''}}
         finally:

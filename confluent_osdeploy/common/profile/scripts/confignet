@@ -114,6 +114,14 @@ def get_interface_name(iname, settings):
         return iname
     return None
 
+def parse_extra_settings(stgs):
+    extras = {}
+    for kv in stgs.get('extra_settings', '').split(';'):
+        k, _, v = kv.partition('=')
+        if k.strip():
+            extras[k.strip()] = v.strip()
+    return extras
+
 class NetplanManager(object):
     def __init__(self, deploycfg):
         self.cfgbydev = {}
@@ -229,6 +237,24 @@ class NetplanManager(object):
                 if dnsdomain not in currdnsdomain:
                     needcfgwrite = True
                     currdnsdomain.append(dnsdomain)
+            extras = parse_extra_settings(stgs)
+            if extras:
+                currcfg = self.cfgbybond if devname in self.cfgbybond else self.cfgbydev
+                devdict = currcfg.setdefault(devname, {})
+                for key in extras:
+                    try:
+                        val = yaml.safe_load(extras[key])
+                    except yaml.YAMLError:
+                        val = extras[key]
+                    keyptr = devdict
+                    keypath = key.split('.')
+                    for k in keypath[:-1]:
+                        if not isinstance(keyptr.get(k, None), dict):
+                            keyptr[k] = {}
+                        keyptr = keyptr[k]
+                    if keyptr.get(keypath[-1], None) != val:
+                        needcfgwrite = True
+                        keyptr[keypath[-1]] = val
             prune_from_cloudinit = []
             if needcfgwrite:
                 needcfgapply = True
@@ -336,6 +362,9 @@ class WickedManager(object):
         if stgs.get('ipv6_address', None):
             ipcfg += 'IPADDR_V6=' + stgs['ipv6_address'] + '\n'
         v6gw = stgs.get('ipv6_gateway', None)
+        extras = parse_extra_settings(stgs)
+        for key in extras:
+            ipcfg += '{0}={1}\n'.format(key, shlex.quote(extras[key]))
         cname = None
         if len(cfg['interfaces']) > 1:  # creating new team
             if not stgs.get('team_mode', None):
@@ -475,6 +504,7 @@ class NetworkManager(object):
             cmdargs['ipv4.dns'] = ','.join(dns4)
         if dns6:
             cmdargs['ipv6.dns'] = ','.join(dns6)
+        cmdargs.update(parse_extra_settings(stgs))
         if len(cfg['interfaces']) > 1:  # team time.. should be..
             if not cfg['settings'].get('team_mode', None):
                 sys.stderr.write("Warning, multiple interfaces ({0}) without a team_mode, skipping setup\n".format(','.join(cfg['interfaces'])))

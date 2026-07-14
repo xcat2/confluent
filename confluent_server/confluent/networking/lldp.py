@@ -131,8 +131,8 @@ def b64tohex(b64str):
     bd = bytearray(bd)
     return ''.join(['{0:02x}'.format(x) for x in bd])
 
-def get_fingerprint(switch, port, configmanager, portmatch):
-    update_switch_data(switch, configmanager)
+async def get_fingerprint(switch, port, configmanager, portmatch):
+    await update_switch_data(switch, configmanager)
     for neigh in _neighbypeerid:
         info = _neighbypeerid[neigh]
         if neigh == '!!vintage' or info.get('switch', None) != switch:
@@ -269,6 +269,7 @@ async def _extract_neighbor_data_affluent(switch, user, password, cfm, lldpdata,
             'peerportid': record['peerportid'],
             'port': record['localport'],
             'peerid': peerid,
+            'peeraddresses': record.get('peeraddresses', []),
         }
         _extract_extended_desc(portdata, portdata['peerdescription'], True)
         _neighbypeerid[peerid] = portdata
@@ -490,4 +491,3 @@ async def _handle_neighbor_query(pathcomponents, configmanager):
             if isinstance(x, Exception):
                 raise x
     return list_info(parms, listrequested)
-

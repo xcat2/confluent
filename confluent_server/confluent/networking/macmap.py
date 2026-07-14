@@ -254,6 +254,7 @@ async def _start_offloader():
 
 
 async def _recv_offload():
+    global _offloader
     try:
         upacker = msgpack.Unpacker(encoding='utf8')
     except TypeError:
@@ -261,6 +262,15 @@ async def _recv_offload():
     #instream = _offloader.stdout.fileno()
     while True:
         datum = await _offloader.stdout.read(512)
+        if not datum:
+            _offloader = None
+            pending = list(_offloadevts.values())
+            _offloadevts.clear()
+            for future in pending:
+                if not future.done():
+                    future.set_exception(
+                        RuntimeError('MAC map offload process exited'))
+            return
         upacker.feed(datum)
         for result in upacker:
             if result[0] not in _offloadevts:
@@ -626,15 +636,15 @@ async def handle_api_request(configmanager, inputdata, operation, pathcomponents
             operation, '/'.join(pathcomponents)))
 
 
-def get_node_fingerprints(nodename, configmanager):
+async def get_node_fingerprints(nodename, configmanager):
     cfg = configmanager.get_node_attributes(nodename, ['net*.switch',
                                                        'net*.switchport'])
     for attrkey in cfg[nodename]:
         if attrkey.endswith('switch'):
             switch = cfg[nodename][attrkey]['value']
             port = cfg[nodename][attrkey + 'port']['value']
-            yield get_fingerprint(switch, port, configmanager,
-                                       _namesmatch)
+            yield await get_fingerprint(switch, port, configmanager,
+                                        _namesmatch)
 
 
 async def handle_read_api_request(pathcomponents, configmanager):

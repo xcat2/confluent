@@ -431,7 +431,7 @@ class OEMHandler(generic.OEMHandler):
             await self._make_available(disk, realcfg)
         self._urlcache.clear()
 
-    def _parse_array_spec(self, arrayspec):
+    async def _parse_array_spec(self, arrayspec):
         controller = None
         if arrayspec.disks:
             for disk in list(arrayspec.disks) + list(arrayspec.hotspares):
@@ -440,7 +440,7 @@ class OEMHandler(generic.OEMHandler):
                 if controller != disk.id[0]:
                     raise pygexc.UnsupportedFunctionality(
                         'Cannot span arrays across controllers')
-            raidmap = self._raid_number_map(controller)
+            raidmap = await self._raid_number_map(controller)
             if not raidmap:
                 raise pygexc.InvalidParameterValue(
                     'No RAID Type supported on this controller')
@@ -510,7 +510,7 @@ class OEMHandler(generic.OEMHandler):
         return themap
 
     async def _create_array(self, pool):
-        params = self._parse_array_spec(pool)
+        params = await self._parse_array_spec(pool)
         cid = params['controller'].split(',')[0]
         c_capabilities, code = await self.webclient.grab_json_response_with_status(
             f'/redfish/v1/Systems/1/Storage/{cid}/Volumes/Capabilities')
@@ -695,14 +695,14 @@ class OEMHandler(generic.OEMHandler):
             if write_policy:
                 request_data["WriteCachePolicy"] = write_policy
             
-            msg, code=self.webclient.grab_json_response_with_status(
+            msg, code = await self.webclient.grab_json_response_with_status(
                 f'/redfish/v1/Systems/1/Storage/{cid}/Volumes',
                 method='POST',
                 data=request_data)
             if code == 500 and not stripsize:
                     # Mystery error can be a mandatory strip size, default to 64k to match WebUI behavior
                     request_data["StripSizeBytes"] = 65536
-                    msg, code=self.webclient.grab_json_response_with_status(
+                    msg, code = await self.webclient.grab_json_response_with_status(
                         f'/redfish/v1/Systems/1/Storage/{cid}/Volumes',
                         method='POST',
                         data=request_data)
@@ -903,7 +903,7 @@ class OEMHandler(generic.OEMHandler):
                                                  cache=False)
         rawsettings = rawsettings.get('Attributes', {})
         pendingsettings = {}
-        ret = self._set_redfish_settings(
+        ret = await self._set_redfish_settings(
             changeset, fishclient, currsettings, rawsettings,
             pendingsettings, self.lenovobmcattrdeps, reginfo,
             '/redfish/v1/Managers/1/Oem/Lenovo/BMCSettings')
@@ -1036,7 +1036,7 @@ class OEMHandler(generic.OEMHandler):
         if usbsettings:
             await self.apply_usb_configuration(usbsettings)
         if bmchangeset:
-            self._set_xcc3_settings(bmchangeset, self)        
+            await self._set_xcc3_settings(bmchangeset, self)
 
     async def apply_usb_configuration(self, usbsettings):
         bmcattribs = {}
@@ -1216,5 +1216,3 @@ class OEMHandler(generic.OEMHandler):
                     'Name': 'HPM-FPGA Pending',
                     'build': pendinghpm}
         raise pygexc.BypassGenericBehavior()
-
-

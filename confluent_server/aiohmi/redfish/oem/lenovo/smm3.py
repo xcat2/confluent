@@ -285,7 +285,8 @@ class OEMHandler(generic.OEMHandler):
         await self._do_web_request(url, method='POST')
 
     async def get_event_log(self, clear=False, fishclient=None):
-        return await super().get_event_log(clear, fishclient, extraurls=[{'@odata.id':'/redfish/v1/Chassis/chassis1/LogServices/EventLog'}])
+        async for event in super().get_event_log(clear, fishclient, extraurls=[{'@odata.id':'/redfish/v1/Chassis/chassis1/LogServices/EventLog'}]):
+            yield event
 
     async def get_description(self, fishclient):
         return {'height': 13, 'slot': 0, 'slots': [8, 2]}

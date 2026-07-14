@@ -72,10 +72,10 @@ async def renotify_me(node, configmanager, myname):
     creds = configmanager.get_node_attributes(
         node, ['secret.hardwaremanagementuser', 'secret.hardwaremanagementpassword'], decrypt=True)
     wc = WebClient(node, configmanager, creds)
-    res, status = wc.wc.grab_json_response_with_status('/affluent/systems/renotify', {'subscriber': myname})
+    await wc.wc.grab_json_response_with_status('/affluent/systems/renotify', {'subscriber': myname})
 
 
-def subscribe_discovery(node, configmanager, myname):
+async def subscribe_discovery(node, configmanager, myname):
     creds = configmanager.get_node_attributes(
         node, ['secret.hardwaremanagementuser', 'secret.hardwaremanagementpassword'], decrypt=True)
     tsock = socket.create_connection((node, 443))
@@ -87,19 +87,19 @@ def subscribe_discovery(node, configmanager, myname):
     wc = WebClient(node, configmanager, creds)
     with open('/etc/confluent/tls/cacert.pem') as cain:
         cacert = cain.read()
-    wc.wc.grab_json_response('/affluent/cert_authorities/{0}'.format(myname), cacert)
-    res, status = wc.wc.grab_json_response_with_status('/affluent/discovery_subscribers/{0}'.format(myname), {'url': myurl, 'authname': node})
+    await wc.wc.grab_json_response('/affluent/cert_authorities/{0}'.format(myname), cacert)
+    res, status = await wc.wc.grab_json_response_with_status('/affluent/discovery_subscribers/{0}'.format(myname), {'url': myurl, 'authname': node})
     if status == 200:
         agentkey = res['cryptkey']
-        configmanager.set_node_attributes({node: {'crypted.selfapikey': {'hashvalue': agentkey}}})
-    res, status = wc.wc.grab_json_response_with_status('/affluent/systems/renotify', {'subscriber': myname})
+        await configmanager.set_node_attributes({node: {'crypted.selfapikey': {'hashvalue': agentkey}}})
+    await wc.wc.grab_json_response_with_status('/affluent/systems/renotify', {'subscriber': myname})
 
-def unsubscribe_discovery(node, configmanager, myname):
+async def unsubscribe_discovery(node, configmanager, myname):
     creds = configmanager.get_node_attributes(
         node, ['secret.hardwaremanagementuser', 'secret.hardwaremanagementpassword'], decrypt=True)
     wc = WebClient(node, configmanager, creds)
-    res, status = wc.wc.grab_json_response_with_status('/affluent/cert_authorities/{0}'.format(myname), method='DELETE')
-    res, status = wc.wc.grab_json_response_with_status('/affluent/discovery_subscribers/{0}'.format(myname), method='DELETE')
+    await wc.wc.grab_json_response_with_status('/affluent/cert_authorities/{0}'.format(myname), method='DELETE')
+    await wc.wc.grab_json_response_with_status('/affluent/discovery_subscribers/{0}'.format(myname), method='DELETE')
 
 
 def update(nodes, element, configmanager, inputdata):
