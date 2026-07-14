@@ -783,7 +783,8 @@ async def relay_slaved_requests(name, listener):
                 except Exception:
                     msg = None
         except Exception:
-            pass  # unexpected loss or misbehavior of the follower ends the relay
+            # unexpected loss or misbehavior of the follower ends the relay
+            logException()
         finally:
             try:
                 listener.close()
