@@ -18,7 +18,6 @@
 
 import asyncio
 import confluent.netutil as netutil
-import confluent.util as util
 import os
 import socket
 import struct
@@ -31,7 +30,6 @@ def msg_align(len):
 neightable = {}
 neightime = 0
 
-import re
 
 neighlock = asyncio.Lock()
 
@@ -103,7 +101,7 @@ async def get_hwaddr(ipaddr):
         hwaddr = neightable.get(ipaddr, None)
         if not hwaddr and not await netutil.ipn_is_local(ipaddr):
             hwaddr = False
-        if hwaddr == None and not updated:
+        if hwaddr is None and not updated:
             await _update_neigh()
             hwaddr = neightable.get(ipaddr, None)
     if hwaddr:

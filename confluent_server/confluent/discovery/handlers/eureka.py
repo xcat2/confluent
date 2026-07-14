@@ -21,7 +21,6 @@ sensor readings. It does NOT support IPMI, NIC configuration,
 firmware update, or other BMC-specific operations.
 """
 
-import asyncio
 import confluent.discovery.handlers.generic as generic
 import confluent.util as util
 import aiohmi.util.webclient as webclient
@@ -195,7 +194,6 @@ class NodeHandler(generic.NodeHandler):
             ['secret.hardwaremanagementuser',
              'secret.hardwaremanagementpassword'],
             True)
-        cd = creds.get(nodename, {})
         defuser, defpass = self.get_firmware_default_account_info()
         user, passwd, _ = self.get_node_credentials(
             nodename, creds, defuser, defpass)

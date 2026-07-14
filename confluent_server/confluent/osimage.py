@@ -50,7 +50,7 @@ HASHPRINTS = {
 from ctypes import byref, c_longlong, c_size_t, c_void_p
 
 from libarchive.ffi import (
-    write_disk_new, write_disk_set_options, write_free, write_header,
+    write_header,
     read_data_block, write_data_block, write_finish_entry, ARCHIVE_EOF
 )
 
@@ -1262,7 +1262,7 @@ class MediaImporter(object):
     async def importmedia(self):
         if self.medfile:
             os.environ['CONFLUENT_MEDIAFD'] = '{0}'.format(self.medfile.fileno())
-        with open(os.devnull, 'w') as devnull:
+        with open(os.devnull, 'w'):
             self.worker = await asyncio.create_subprocess_exec(
                 sys.executable, __file__, self.filename, '-b',
                 self.targpath, self.distpath, self.customname,
@@ -1340,4 +1340,3 @@ if __name__ == '__main__':
         asyncio.run(import_image(sys.argv[1], callback=printit, backend=True, mfd=mfd, custtargpath=sys.argv[3], custdistpath=sys.argv[4], custname=sys.argv[5]))
     else:
         asyncio.run(import_image(sys.argv[1], callback=printit))
-

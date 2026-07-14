@@ -215,7 +215,7 @@ class VNCClient:
         self._request_screen_update(incremental=True)
 
     async def _handle_rectangle(self):
-        if self.framebuffer == None:
+        if self.framebuffer is None:
             self.framebuffer = Image.new('RGBA', (self.width, self.height))
         x = await self._read_number(2)
         y = await self._read_number(2)

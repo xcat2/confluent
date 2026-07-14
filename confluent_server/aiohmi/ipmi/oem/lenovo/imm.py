@@ -17,7 +17,6 @@ import asyncio
 import base64
 import binascii
 from datetime import datetime
-import errno
 import fnmatch
 import json
 import math
@@ -28,7 +27,6 @@ import socket
 import struct
 import weakref
 
-import six
 import zipfile
 
 import aiohmi.constants as pygconst
@@ -848,7 +846,7 @@ class IMMClient(object):
         # https, using the caller TLS verification scheme
         components = set(components)
         if 'core' in components:
-            category = 'core'        
+            category = 'core'
         if not components or set(('imm', 'xcc', 'bmc', 'core')) & components:
             rsp = await self.ipmicmd.raw_command(netfn=0x3a, command=0x50)
             immverdata = self.parse_imm_buildinfo(rsp['data'])

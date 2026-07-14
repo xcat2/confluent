@@ -45,7 +45,6 @@ import socket
 import struct
 import time
 import uuid
-import confluent.tasks as tasks
 
 libc = ctypes.CDLL(ctypes.util.find_library('c'))
 
@@ -199,7 +198,6 @@ def v6opts_to_dict(rq):
         if struct.unpack('!H', duid[:2])[0] == 4:
             disco['uuid'] = decode_uuid(duid[2:])
     if 61 in reqdict:
-        arch = bytes(rq[optidx+4:optidx+4+optlen])
         disco['arch'] = pxearchs.get(bytes(reqdict[61]), None)
     return reqdict, disco
 
@@ -362,7 +360,7 @@ async def proxydhcp(handler, nodeguess):
             rpv[249:268] = b'\x61\x11' + opts[97]
             rpv[268:280] = b'\x3c\x09PXEClient\xff'
             net4011.sendto(rpv[:281], client)
-        except Exception as e:
+        except Exception:
             log.logtrace()
             # tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
             #                event=log.Events.stacktrace)
@@ -731,7 +729,7 @@ async def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, 
         log.log({'error': nicerr})
     if niccfg.get('ipv4_broken', False):
         # Received a request over a nic with no ipv4 configured, ignore it
-        log.log({'error': 'Skipping boot reply to {0} due to no viable IPv4 configuration on deployment system on interface index "{}"'.format(node, info['netinfo']['ifidx'])})
+        log.log({'error': 'Skipping boot reply to {0} due to no viable IPv4 configuration on deployment system on interface index "{1}"'.format(node, info['netinfo']['ifidx'])})
         return
     clipn = None
     if niccfg['ipv4_method'] == 'firmwarenone':
@@ -924,7 +922,7 @@ def ack_request(pkt, rq, info, sock=None, requestor=None):
     if not myipn or pkt.get(54, None) != myipn:
         return
     assigninfo = staticassigns.get(hwaddr, None)
-    if assigninfo == None:
+    if assigninfo is None:
         return
     if pkt.get(50, None) != assigninfo[0]:
         return

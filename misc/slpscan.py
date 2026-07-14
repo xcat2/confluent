@@ -363,7 +363,7 @@ def _add_attributes(parsed):
         rsp = net.recv(8192)
         net.close()
         _parse_attrs(rsp, parsed, xid)
-    except Exception as e:
+    except Exception:
         # this can be a messy area, just degrade the quality of rsp
         # in a bad situation
         return
@@ -434,7 +434,7 @@ def snoop(handler, protocol=None):
     """
     try:
         active_scan(handler, protocol)
-    except Exception as e:
+    except Exception:
         raise
     net = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
     net.setsockopt(IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
@@ -529,7 +529,7 @@ def snoop(handler, protocol=None):
                     else:
                         continue
                 handler(peerbymacaddress[mac])
-        except Exception as e:
+        except Exception:
             raise
 
 
@@ -645,7 +645,6 @@ def scan(srvtypes=_slp_services, addresses=None, localonly=False):
 # use ip neigh for the moment
 
 import subprocess
-import os
 
 neightable = {}
 neightime = 0
@@ -710,11 +709,9 @@ def refresh_neigh():
 import base64
 import hashlib
 import netifaces
-import os
 import re
 import socket
 import ssl
-import struct
 
 def stringify(instr):
     # Normalize unicode and bytes to 'str', correcting for

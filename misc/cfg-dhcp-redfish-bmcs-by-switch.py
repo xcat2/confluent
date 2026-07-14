@@ -35,8 +35,6 @@ import sys
 sys.path.append('/opt/confluent/lib/python')
 import aiohmi.util.webclient as webclient
 import confluent.client as cli
-import json
-import os
 import struct
 import subprocess
 import time

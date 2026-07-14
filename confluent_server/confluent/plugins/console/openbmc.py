@@ -22,11 +22,9 @@
 import asyncio
 import confluent.exceptions as cexc
 import confluent.interface.console as conapi
-import confluent.log as log
 import confluent.tasks as tasks
 import confluent.util as util
 import aiohmi.exceptions as pygexc
-import aiohmi.redfish.command as rcmd
 import aiohmi.util.webclient as webclient
 import aiohttp
 

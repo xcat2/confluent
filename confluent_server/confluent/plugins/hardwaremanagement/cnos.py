@@ -109,7 +109,6 @@ async def retrieve_health(configmanager, creds, node, results):
     if summary == 'noncritical':
         summary = 'warning'
     await results.put(msg.HealthSummary(summary, name=node))
-    state = None
     badreadings = []
     if summary != 'ok':  # temperature or dump or fans or psu
         await wc.grab_json_response('/nos/api/sysinfo/panic_dump')
@@ -172,7 +171,6 @@ async def retrieve(nodes, element, configmanager, inputdata):
         for node in nodes:
             yield msg.ConfluentNodeError(node, 'Not Implemented')
         return
-    currtimeout = 10
     while workers:
         try:
             datum = await asyncio.wait_for(results.get(), timeout=10)

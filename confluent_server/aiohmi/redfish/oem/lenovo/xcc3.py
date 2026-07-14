@@ -127,7 +127,6 @@ class OEMHandler(generic.OEMHandler):
         if adapterdata:
             anames = {}
             for adata, _ in adapterdata:
-                skipadapter = False
                 clabel = adata['Slot']['Location']['PartLocation'].get('LocationType','')
                 if not clabel:
                     clabel = adata['Slot']['Location']['PartLocation'].get('ServiceLabel', '').split("=")[0]                
@@ -831,7 +830,6 @@ class OEMHandler(generic.OEMHandler):
             3: pygconst.Health.Critical,
             2: pygconst.Health.Warning,
         }
-        infoevents = False
         existingevts = set([])
         for item in rsp.get('items', ()):
             # while usually the ipmi interrogation shall explain things,
@@ -840,7 +838,6 @@ class OEMHandler(generic.OEMHandler):
             itemseverity = hmap.get(item.get('Severity', 2),
                                     pygconst.Health.Critical)
             if itemseverity == pygconst.Health.Ok:
-                infoevents = True
                 continue
             if (summary['health'] < itemseverity):
                 summary['health'] = itemseverity
@@ -1113,7 +1110,6 @@ class OEMHandler(generic.OEMHandler):
                 extrainfo, valtodisplay, _, _ = reginfo
         for setting in bmcstgs.get('Attributes', {}):
             val = bmcstgs['Attributes'][setting]
-            currval = val
             val = valtodisplay.get(setting, {}).get(val, val)
             val = {'value': val}
             val.update(**extrainfo.get(setting, {}))

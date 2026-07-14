@@ -22,7 +22,6 @@
 import asyncio
 import confluent.exceptions as cexc
 import confluent.interface.console as conapi
-import confluent.log as log
 import confluent.tasks as tasks
 import confluent.util as util
 import aiohmi.exceptions as pygexc
@@ -109,7 +108,6 @@ class TsmConsole(conapi.Console):
         self.datacallback = callback
         kv = util.TLSCertVerifier(
             self.nodeconfig, self.node, 'pubkeys.tls_hardwaremanager').verify_cert
-        wc = webclient.WebConnection(self.origbmc, 443, verifycallback=kv)
         try:
             rc = rcmd.Command(self.origbmc, self.username,
                               self.password,

@@ -233,7 +233,8 @@ def authenticate(*vargs, **dargs):
 
 
 if __name__ == "__main__":
-    import readline, getpass
+    import readline
+    import getpass
 
     def input_with_prefill(prompt, text):
         def hook():

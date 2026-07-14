@@ -15,7 +15,6 @@
 import asyncio
 import os
 import struct
-import time
 try:
     from urllib import urlencode
 except ImportError:

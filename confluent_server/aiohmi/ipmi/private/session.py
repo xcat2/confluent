@@ -21,7 +21,6 @@ import hmac
 import operator
 import os
 import random
-import select
 import socket
 import struct
 #import threading
@@ -34,7 +33,6 @@ from cryptography.hazmat.primitives.ciphers import modes
 
 import aiohmi.exceptions as exc
 from aiohmi.ipmi.private import constants
-from aiohmi.ipmi.private import util
 from aiohmi.ipmi.private.util import _monotonic_time
 from aiohmi.ipmi.private.util import get_ipmi_error
 
@@ -1578,7 +1576,7 @@ class Session(object):
             payload=payload, payload_type=constants.payload_types['rakp1'])
 
     async def _got_rakp2(self, data):
-        if not (self.sessioncontext in ('EXPECTINGRAKP2', 'EXPECTINGRAKP4')):
+        if self.sessioncontext not in ('EXPECTINGRAKP2', 'EXPECTINGRAKP4'):
             # if we are not expecting rakp2, ignore. In a retry
             # scenario, replying from stale RAKP2 after sending
             # RAKP3 seems to be best

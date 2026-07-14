@@ -63,7 +63,6 @@ def get_entries(filename):
 
 class SyncList(object):
     def __init__(self, filename, nodename, cfg):
-        slist = None
         self.replacemap = {}
         self.appendmap = {}
         self.appendoncemap = {}
@@ -206,7 +205,7 @@ async def sync_list_to_node(sl, node, suffixes, peerip=None):
                 try:
                     with open(filename, 'r') as _:
                         pass
-                except OSError as e:
+                except OSError:
                     unreadablefiles.append(filename.replace(targdir, ''))
         if unreadablefiles:
             raise Exception("Syncing failed due to unreadable files: " + ','.join(unreadablefiles))

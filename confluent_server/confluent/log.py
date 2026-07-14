@@ -63,13 +63,11 @@
 #    (a future extended version might include suport for Forward Secure Sealing
 #    or other fields)
 
-import asyncio
 import collections
 import confluent.config.configmanager
 import confluent.config.conf as conf
 import confluent.exceptions as exc
 import confluent.tasks as tasks
-import inspect
 import glob
 import json
 import os
@@ -78,7 +76,6 @@ import stat
 import struct
 import time
 import traceback
-import random
 try:
     unicode
 except NameError:
@@ -171,7 +168,7 @@ class BaseRotatingHandler(object):
                 flock(self.textfile, LOCK_UN)
                 return self.doRollover(rolling_type)
             return None
-        except (IOError, OSError) as e:
+        except (IOError, OSError):
             if not daemonized:
                 raise
             logfull = True
@@ -190,7 +187,7 @@ class BaseRotatingHandler(object):
             self.binfile.write(binrecord)
             self.textfile.flush()
             self.binfile.flush()
-        except (IOError, OSError) as e:
+        except (IOError, OSError):
             if not daemonized:
                 raise
             logfull = True
@@ -727,7 +724,7 @@ class Logger(object):
                     textfile.close()
                     textfile = open(textpath, mode='r')
                     flock(textfile, LOCK_SH)
-                except (ValueError, IOError) as e:
+                except (ValueError, IOError):
                     break
             try:
                 textfile.seek(offset, 0)

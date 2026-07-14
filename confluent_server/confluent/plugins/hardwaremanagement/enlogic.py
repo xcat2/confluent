@@ -16,7 +16,6 @@ import asyncio
 
 import confluent.util as util
 import confluent.messages as msg
-import confluent.exceptions as exc
 import aiohmi.util.webclient as wc
 import confluent.tasks as tasks
 import time
@@ -135,7 +134,7 @@ class EnlogicClient(object):
             'pduid': 1,
             'powstat': state
             }
-        rsp = await self.grab_json_response('/xhroutpowstatset.jsp', request)
+        await self.grab_json_response('/xhroutpowstatset.jsp', request)
 
 
 _sensors_by_node = {}

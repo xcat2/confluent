@@ -27,9 +27,7 @@ import confluent.config.configmanager as configmanager
 from concurrent.futures import ProcessPoolExecutor
 from fnmatch import fnmatch
 import hashlib
-import hmac
 import msgpack
-import multiprocessing
 import os
 import pwd
 import confluent.tasks as tasks
@@ -40,7 +38,6 @@ try:
     import confluent.pam as pam
 except ImportError:
     pass
-import time
 import yaml
 
 _pamservice = 'confluent'

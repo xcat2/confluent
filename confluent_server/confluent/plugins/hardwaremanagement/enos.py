@@ -26,7 +26,6 @@ import asyncio
 import confluent.tasks as tasks
 import confluent.exceptions as exc
 import confluent.messages as msg
-import confluent.util as util
 import confluent.plugins.shell.ssh as ssh
 
 
@@ -109,7 +108,6 @@ async def retrieve(nodes, element, configmanager, inputdata):
         for node in nodes:
             yield msg.ConfluentNodeError(node, f"Not Implemented: {element}")
         return
-    currtimeout = 10
     while workers:
         try:
             datum = await results.get()
@@ -252,7 +250,7 @@ def gather_psus(data):
         # others are:
         # Internal  Power Supply: On
         if "Power Supply" in line:
-            match = re.match(re.compile(f"Power Supply (\d)+.*"), line)
+            match = re.match(re.compile("Power Supply (\d)+.*"), line)
             if match:
                 psu = match.group(1)
                 if psu not in psus:
@@ -282,7 +280,7 @@ def gather_fans(data):
     for line in data:
         # look for presence of fans
         if "Fan" in line:
-            match = re.match(re.compile(f"Fan (\d)+.*"), line)
+            match = re.match(re.compile("Fan (\d)+.*"), line)
             if match:
                 fan = match.group(1)
                 if match:

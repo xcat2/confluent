@@ -762,7 +762,7 @@ async def updateattrib(session, updateargs, nodetype, noderange, options, dictas
         if "=" in updateargs[1]:
             update_ready = True
             for arg in updateargs[1:]:
-                if not '=' in arg:
+                if '=' not in arg:
                     update_ready = False
                     exitcode = 1
             if not update_ready:

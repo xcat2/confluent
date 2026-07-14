@@ -154,7 +154,7 @@ def get_certificate_paths():
     return tlsmateriallocation
 
 async def assure_tls_ca():
-    keyout, certout = ('/etc/confluent/tls/cakey.pem', '/etc/confluent/tls/cacert.pem')
+    _keyout, certout = ('/etc/confluent/tls/cakey.pem', '/etc/confluent/tls/cacert.pem')
     if not os.path.exists(certout):
         #create_simple_ca(keyout, certout)
         await create_full_ca(certout)

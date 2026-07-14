@@ -88,7 +88,6 @@ class Bracketer(object):
     def extend(self, nodeorseq):
         # can only differentiate a single number
         endname = None
-        endnums = None
         if ':' in nodeorseq:
             nodename, endname = nodeorseq.split(':', 1)
         else:
@@ -280,7 +279,7 @@ class NodeRange(object):
         self.purenumeric = purenumeric
         try:
             elements = _parser.parseString("(" + noderange + ")", parseAll=True).asList()[0]
-        except pp.ParseException as pe:
+        except pp.ParseException:
             raise Exception("Invalid syntax")
         if noderange[0] in ('<', '>'):
             # pagination across all nodes

@@ -2,7 +2,6 @@
 from select import select
 import socket
 import sys
-import socket
 
 def scan_nicname(nicname):
     idx = int(open('/sys/class/net/{}/ifindex'.format(nicname)).read())
@@ -10,7 +9,6 @@ def scan_nicname(nicname):
 
 def scan_nic(nicidx):
     known_peers = {}
-    srvs = {}
     s6 = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
     s6.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
     s6.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)

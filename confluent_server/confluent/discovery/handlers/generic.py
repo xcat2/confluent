@@ -196,7 +196,7 @@ class NodeHandler(object):
             w.set_basic_credentials(relayuser, relaypass)
             await w.request('GET', self.relay_url)
             r = w.getresponse()
-            rb = r.read()
+            r.read()
             if r.code != 302:
                 raise Exception('Unexpected return from forwarder')
             newurl = r.getheader('Location')

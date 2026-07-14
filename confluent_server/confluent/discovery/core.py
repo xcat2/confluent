@@ -791,7 +791,7 @@ def safe_detected(info):
 async def eval_detected(info):
     try:
         await detected(info)
-    except Exception as e:
+    except Exception:
         traceback.print_exc()
     del runningevals[info['hwaddr']]
 
@@ -1255,7 +1255,7 @@ async def eval_node(cfg, handler, info, nodename, manual=False):
         # switch concurrently
         # do some preconfig, for example, to bring a SMM online if applicable
         await handler.preconfig(nodename)
-    except Exception as e:
+    except Exception:
         unknown_info[info['hwaddr']] = info
         info['discostatus'] = 'unidentified'
         errorstr = 'An error occurred during discovery, check the ' \
@@ -1677,7 +1677,7 @@ async def remotescan():
     for remagent in get_subscriptions():
         try:
             await affluent.renotify_me(remagent, mycfm, myname)
-        except Exception as e:
+        except Exception:
             log.log({'error': 'Unexpected problem asking {} for discovery notifications'.format(remagent)})
 
 

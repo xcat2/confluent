@@ -247,15 +247,14 @@ async def _find_srvtype(net, net4, srvtype, addresses, xid):
                            socket.inet_aton(addr))
             try:
                 net4.sendto(data, ('239.255.255.253', 427))
-            except socket.error as se:
+            except socket.error:
                 pass
             try:
                 net4.sendto(data, (bcast, 427))
-            except socket.error as se:
+            except socket.error:
                 pass
 
 
-import time
 
 def sock_read(fut, sock, cloop, allsocks):
     if fut.done():
@@ -363,14 +362,14 @@ async def _add_attributes(parsed):
         net.settimeout(0)
         net.setblocking(0)
         await asyncio.wait_for(cloop.sock_connect(net, target), 2.0)
-    except (socket.error, asyncio.exceptions.TimeoutError) as te:
+    except (socket.error, asyncio.exceptions.TimeoutError):
         return
     try:
         await cloop.sock_sendall(net, attrq)
         rsp = await cloop.sock_recv(net, 8192)
         net.close()
         _parse_attrs(rsp, parsed, xid)
-    except Exception as e:
+    except Exception:
         # this can be a messy area, just degrade the quality of rsp
         # in a bad situation
         return
@@ -402,7 +401,7 @@ async def query_srvtypes(target):
             net.settimeout(0)
             await asyncio.wait_for(cloop.sock_connect(net, target), 2.0)
             connected = True
-        except (socket.error, asyncio.exceptions.TimeoutError) as te:
+        except (socket.error, asyncio.exceptions.TimeoutError):
             return [u'']
     await cloop.sock_sendall(net, packet)
     rs = await cloop.sock_recv(net, 8192)
@@ -434,7 +433,7 @@ def relay_packet(sock, pktq):
     sock.setblocking(0)
     try:
         rsp, peer = sock.recvfrom(9000)
-    except socket.error as se:
+    except socket.error:
         return
     pktq.put_nowait((sock, rsp, peer))
 
@@ -449,7 +448,7 @@ async def snoop(handler, protocol=None):
     tracelog = log.Logger('trace')
     try:
         await active_scan(handler, protocol)
-    except Exception as e:
+    except Exception:
         tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
                         event=log.Events.stacktrace)
     net = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
@@ -498,8 +497,6 @@ async def snoop(handler, protocol=None):
             known_peers.clear()
             peerbymacaddress.clear()
             deferpeers.clear()
-            timeo = 60
-            rdy = True
             srp = await pktq.get()
             while srp and len(deferpeers) < 256:
                 s, rsp, peer = srp
@@ -517,7 +514,7 @@ async def snoop(handler, protocol=None):
                     try:
                         s.setblocking(1)
                         s.sendto(b'\x00', probepeer)
-                    except Exception as e:
+                    except Exception:
                         continue
                     deferpeers.append(peer)
                     continue
@@ -546,7 +543,7 @@ async def snoop(handler, protocol=None):
                     else:
                         continue
                 handler(peerbymacaddress[mac])
-        except Exception as e:
+        except Exception:
             tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
                          event=log.Events.stacktrace)
 
@@ -560,7 +557,7 @@ async def process_peer(newmacs, known_peers, peerbymacaddress, peer):
     else:
         try:
             q = await query_srvtypes(peer)
-        except Exception as e:
+        except Exception:
             q = None
         if not q or not q[0]:
             # SLP might have started and not ready yet
@@ -637,7 +634,6 @@ async def scan(srvtypes=_slp_services, addresses=None, localonly=False):
     # processed, mitigating volume of response traffic
     rsps = {}
     deferrals = []
-    rcvq = asyncio.Queue()
     for srvtype in srvtypes:
         xididx += 1
         await _find_srvtype(net, net4, srvtype, addresses, initxid + xididx)
