@@ -1,18 +1,78 @@
-#!/bin/sh
+#!/bin/bash
 # Configure the deployed node to forward logs to the servers from the
 # logging.servers attribute (surfaced as loggingservers in
 # confluent.deploycfg), using the method from the logging.method attribute
 # (surfaced as loggingmethod): rsyslog (the default) or journal-remote.
+# When logging.tls (surfaced as loggingtls) is true, the forwarding is
+# encrypted and mutually authenticated using certificates from the confluent
+# certificate authority (see the confluent-logging-receiver-setup helper
+# under /opt/confluent/share/examples/logging for the receiving side).
 # Does nothing when logging.servers is unset.
+
+[ -f /lib/confluent/functions ] && . /lib/confluent/functions
+[ -f /etc/confluent/functions ] && . /etc/confluent/functions
 
 if ! grep '^loggingservers:' /etc/confluent/confluent.deploycfg > /dev/null 2>&1; then
     exit 0
 fi
 loggingservers=$(sed -n '/^loggingservers:/,/^[^-]/p' /etc/confluent/confluent.deploycfg|sed 1d|sed '$d' | sed -e 's/^- //')
 loggingmethod=$(sed -n 's/^loggingmethod: //p' /etc/confluent/confluent.deploycfg)
+loggingtls=$(sed -n 's/^loggingtls: //p' /etc/confluent/confluent.deploycfg)
 if [ -z "$loggingmethod" ]; then
     loggingmethod=rsyslog
 fi
+
+# request_tls_cert <keyout> <certout>: generate a key and have the confluent
+# CA sign a certificate for this node via the deployment API
+request_tls_cert() {
+    if ! type confluentpython > /dev/null 2>&1; then
+        confluentpython() { python3 "$@"; }
+    fi
+    confapiclient=""
+    [ -f /opt/confluent/bin/apiclient ] && confapiclient=/opt/confluent/bin/apiclient
+    [ -f /etc/confluent/apiclient ] && confapiclient=/etc/confluent/apiclient
+    if [ -z "$confapiclient" ]; then
+        echo "logging.tls: unable to locate the confluent apiclient, skipping log forwarding setup"
+        return 1
+    fi
+    if ! command -v openssl > /dev/null 2>&1; then
+        echo "logging.tls: openssl is required but not available, skipping log forwarding setup"
+        return 1
+    fi
+    if [ ! -s /etc/confluent/ca.pem ]; then
+        echo "logging.tls: /etc/confluent/ca.pem is missing, skipping log forwarding setup"
+        return 1
+    fi
+    # $3 is the destination for the CA trust anchor. A dedicated directory is
+    # used per consumer: /etc/ssl/private is not traversable by service users
+    # on Debian-style systems, and Ubuntu's rsyslogd AppArmor profile only
+    # permits reads under /etc/rsyslog.d
+    # stage beside the live files (same filesystem), then replace atomically;
+    # a failure never disturbs material a previous run may have left in use
+    mkdir -p $(dirname $1)
+    cat /etc/confluent/ca.pem > $3.new
+    CRTDIR=$(mktemp -d)
+    openssl req -new -newkey ec -pkeyopt ec_paramgen_curve:secp384r1 -nodes \
+        -keyout $1.new -out $CRTDIR/csr.pem -subj /CN=$(hostname) > /dev/null 2>&1
+    echo -n > $2.new
+    confluentpython $confapiclient /confluent-api/self/tlscert $CRTDIR/csr.pem -o $2.new
+    rm -rf $CRTDIR
+    if [ ! -s "$2.new" ]; then
+        echo "logging.tls: failed to obtain a certificate from the confluent CA, skipping log forwarding setup"
+        rm -f $1.new $2.new $3.new
+        return 1
+    fi
+    chmod 600 $1.new
+    chmod 644 $2.new $3.new
+    if [ -x /usr/sbin/restorecon ]; then
+        /usr/sbin/restorecon $1.new $2.new $3.new 2>/dev/null
+    fi
+    mv $1.new $1
+    mv $2.new $2
+    mv $3.new $3
+    return 0
+}
+
 if [ "$loggingmethod" = journal-remote ]; then
     # drop forwarding state left by a previous rsyslog-method configuration
     if [ -f /etc/rsyslog.d/60-confluent.conf ]; then
@@ -43,7 +103,21 @@ if [ "$loggingmethod" = journal-remote ]; then
     journalconf=/etc/systemd/journal-upload.conf.d/confluent.conf
     echo '# Log forwarding configured by confluent during deployment' > $journalconf
     echo '[Upload]' >> $journalconf
-    echo 'URL=http://'$loggingsrv':19532' >> $journalconf
+    if [ "$loggingtls" = true ]; then
+        tlsdir=/etc/ssl/confluent-logging
+        if ! request_tls_cert $tlsdir/journal-upload.key $tlsdir/journal-upload.crt $tlsdir/ca.pem; then
+            rm -f $journalconf
+            exit 0
+        fi
+        chgrp systemd-journal $tlsdir/journal-upload.key 2>/dev/null
+        chmod g+r $tlsdir/journal-upload.key
+        echo 'URL=https://'$loggingsrv':19532' >> $journalconf
+        echo 'ServerKeyFile='$tlsdir'/journal-upload.key' >> $journalconf
+        echo 'ServerCertificateFile='$tlsdir'/journal-upload.crt' >> $journalconf
+        echo 'TrustedCertificateFile='$tlsdir'/ca.pem' >> $journalconf
+    else
+        echo 'URL=http://'$loggingsrv':19532' >> $journalconf
+    fi
     if [ -x /usr/sbin/restorecon ]; then
         /usr/sbin/restorecon $journalconf 2>/dev/null
     fi
@@ -66,10 +140,41 @@ else
         exit 0
     fi
     syslogconf=/etc/rsyslog.d/60-confluent.conf
-    echo '# Syslog forwarding configured by confluent during deployment' > $syslogconf
-    for loggingsrv in $loggingservers; do
-        echo '*.* action(type="omfwd" target="'$loggingsrv'" port="514" protocol="udp")' >> $syslogconf
-    done
+    if [ "$loggingtls" = true ]; then
+        # forwarding with TLS needs a network stream driver module
+        # (rsyslog-openssl or rsyslog-gnutls)
+        tlsdriver=""
+        for moddir in /usr/lib64/rsyslog /usr/lib/rsyslog /usr/lib/*-linux-gnu/rsyslog; do
+            [ -f $moddir/lmnsd_ossl.so ] && tlsdriver=ossl && break
+            [ -f $moddir/lmnsd_gtls.so ] && tlsdriver=gtls && break
+        done
+        if [ -z "$tlsdriver" ]; then
+            echo "logging.tls requires the rsyslog-openssl or rsyslog-gnutls module on the node, skipping log forwarding setup"
+            exit 0
+        fi
+        tlsdir=/etc/rsyslog.d/confluent-tls
+        if ! request_tls_cert $tlsdir/rsyslog.key $tlsdir/rsyslog.crt $tlsdir/ca.pem; then
+            exit 0
+        fi
+        if getent passwd syslog > /dev/null 2>&1; then
+            # e.g. Ubuntu runs rsyslogd as the syslog user
+            chgrp syslog $tlsdir/rsyslog.key 2>/dev/null
+            chmod g+r $tlsdir/rsyslog.key
+        fi
+        echo '# Syslog forwarding configured by confluent during deployment' > $syslogconf
+        echo 'global(DefaultNetstreamDriver="'$tlsdriver'"' >> $syslogconf
+        echo '       DefaultNetstreamDriverCAFile="'$tlsdir'/ca.pem"' >> $syslogconf
+        echo '       DefaultNetstreamDriverCertFile="'$tlsdir'/rsyslog.crt"' >> $syslogconf
+        echo '       DefaultNetstreamDriverKeyFile="'$tlsdir'/rsyslog.key")' >> $syslogconf
+        for loggingsrv in $loggingservers; do
+            echo '*.* action(type="omfwd" target="'$loggingsrv'" port="6514" protocol="tcp" StreamDriverMode="1" StreamDriverAuthMode="x509/certvalid")' >> $syslogconf
+        done
+    else
+        echo '# Syslog forwarding configured by confluent during deployment' > $syslogconf
+        for loggingsrv in $loggingservers; do
+            echo '*.* action(type="omfwd" target="'$loggingsrv'" port="514" protocol="udp")' >> $syslogconf
+        done
+    fi
     if [ -x /usr/sbin/restorecon ]; then
         /usr/sbin/restorecon $syslogconf 2>/dev/null
     fi
