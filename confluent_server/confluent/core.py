@@ -50,7 +50,6 @@ import confluent.networking.macmap as macmap
 import confluent.noderange as noderange
 import confluent.osimage as osimage
 import confluent.plugin as plugin
-import types
 try:
     import confluent.shellmodule as shellmodule
 except ImportError:
@@ -58,7 +57,6 @@ except ImportError:
 import confluent.tasks as tasks
 import confluent.util as util
 import inspect
-import itertools
 import msgpack
 import os
 import struct
@@ -1393,7 +1391,6 @@ class Staging:
             os.remove(stage_file)
             return self.storage_folder + '/{}'.format(filename)
         except FileNotFoundError:
-            file = None
             return False
         
     @staticmethod

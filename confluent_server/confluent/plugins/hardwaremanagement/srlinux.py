@@ -8,7 +8,7 @@ import confluent.tasks as tasks
 async def retrieve_node(node, element, user, pwd, configmanager, inputdata, results):
     try:
         await retrieve_node_backend(node, element, user, pwd, configmanager, inputdata, results)
-    except exc.PubkeyInvalid as e:
+    except exc.PubkeyInvalid:
         await results.put(msg.ConfluentNodeError(node, 'Mismatch detected between target certificate fingerprint '
                 'and pubkeys.tls_hardwaremanager attribute'))
     except Exception as e:

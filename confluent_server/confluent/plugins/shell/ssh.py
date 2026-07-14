@@ -21,14 +21,10 @@
 
 import confluent.exceptions as cexc
 import confluent.interface.console as conapi
-import confluent.log as log
 import confluent.tasks as tasks
-import confluent.util as util
 
-import hashlib
 import sys
 sys.modules['gssapi'] = None
-import asyncio
 import asyncssh
 
 

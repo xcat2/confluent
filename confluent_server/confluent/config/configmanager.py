@@ -621,7 +621,7 @@ def _load_dict_from_dbm(dpath, tdb):
                 currdict[tks] = cPickle.loads(dbe[tk]) # nosec
         except AttributeError:
             tk = dbe.firstkey()
-            while tk != None:
+            while tk is not None:
                 tks = confluent.util.stringify(tk)
                 currdict[tks] = cPickle.loads(dbe[tk]) # nosec
                 tk = dbe.nextkey(tk)
@@ -934,7 +934,7 @@ def commit_clear():
         for cfg in todelete:
             try:
                 os.remove(os.path.join(ConfigManager._cfgdir, cfg))
-            except OSError as oe:
+            except OSError:
                 pass
     ConfigManager.wait_for_sync(True)
     ConfigManager._bg_sync_to_file()
@@ -1953,7 +1953,7 @@ class ConfigManager(object):
         # if the attribute is not set, this will search for a candidate
         # if it is set, but inheritedfrom, search for a replacement, just
         # in case
-        if not 'groups' in nodecfg:
+        if 'groups' not in nodecfg:
             return
         for group in nodecfg['groups']:
             if attrib in self._cfgstore['nodegroups'][group]:
@@ -2044,7 +2044,7 @@ class ConfigManager(object):
                 try:
                     noderange._parser.parseString(
                         '({0})'.format(group)).asList()
-                except noderange.pp.ParseException as pe:
+                except noderange.pp.ParseException:
                     raise ValueError('"{0}" is not a valid group name'.format(
                         group))
             if not autocreate and group not in self._cfgstore['nodegroups']:
@@ -2534,7 +2534,7 @@ class ConfigManager(object):
                 try:
                     noderange._parser.parseString(
                         '({0})'.format(node)).asList()
-                except noderange.pp.ParseException as pe:
+                except noderange.pp.ParseException:
                     raise ValueError(
                         '"{0}" is not a valid node name'.format(node))
             if autocreate is False and node not in self._cfgstore['nodes']:
@@ -2703,7 +2703,7 @@ class ConfigManager(object):
                 try:
                     noderange._parser.parseString(
                         '({0})'.format(element)).asList()
-                except noderange.pp.ParseException as pe:
+                except noderange.pp.ParseException:
                     raise ValueError(
                         '"{0}" is not a supported name, it must be renamed or '
                         'removed from backup to restore'.format(element))

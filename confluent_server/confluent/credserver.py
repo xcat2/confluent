@@ -73,7 +73,6 @@ class CredServer(object):
                 return
             nodename = util.stringify(await cloop.sock_recv(client, tlv[1]))
             tlv = bytearray(await cloop.sock_recv(client, 2))  # should always be null
-            onlylocal = True
             if tlv[0] == 6:
                 hmacval = await cloop.sock_recv(client, tlv[1])
                 hmackey = self.cfm.get_node_attributes(nodename, ['secret.selfapiarmtoken'], decrypt=True)
@@ -146,7 +145,7 @@ class CredServer(object):
 
 
 async def main():
-    a = CredServer()
+    CredServer()
     while True:
         await asyncio.sleep(86400)
 if __name__ == '__main__':

@@ -18,15 +18,9 @@
 
 import asyncio
 import base64
-import copy
-import gzip
 import io
 import json
 import os
-import socket
-import ssl
-import threading
-import traceback
 
 from yarl import URL
 import aiohmi.exceptions as pygexc
@@ -35,8 +29,6 @@ import aiohmi.exceptions as pygexc
 import aiohttp
 from aiohttp.cookiejar import CookieJar
 
-import http.client as httplib
-import http.cookies as Cookie
 
 # Used as the separator for form data
 
@@ -334,7 +326,7 @@ class WebConnection:
                 kwargs['json'] = body
             elif body:
                 kwargs['data'] = body
-            async with thefunc(url, headers=headers, ssl=self.ssl, **kwargs) as rsp:
+            async with thefunc(url, headers=headers, ssl=self.ssl, **kwargs):
                 pass
 
     def set_basic_credentials(self, username, password):

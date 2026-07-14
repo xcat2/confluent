@@ -17,9 +17,7 @@ import asyncio
 import base64
 import confluent.util as util
 import confluent.messages as msg
-import confluent.exceptions as exc
 import aiohmi.util.webclient as wc
-import confluent.util as util
 import re
 import hashlib
 import json
@@ -201,7 +199,7 @@ class PDUClient(object):
         try:
             self._wc = WebConnection(target, secure=True, verifycallback=verifier.verify_cert)
             self.login(self.configmanager)
-        except socket.error as e:
+        except socket.error:
             pkey = self.configmanager.get_node_attributes(self.node, 'pubkeys.tls_hardwaremanager')
             pkey = pkey.get(self.node, {}).get('pubkeys.tls_hardwaremanager', {}).get('value', None)
             if pkey:
@@ -250,7 +248,7 @@ class PDUClient(object):
             )
         rsp = self.wc.grab_response(url)
         rsp = json.loads(sanitize_json(rsp[0]))
-        if rsp['success'] != True:
+        if not rsp['success']:
             raise Exception('Failed to login to device')
         rsp = self.wc.grab_response('/config/gateway?page=cgi_checkUserSession&sessionId={}&_dc={}'.format(self.sessid, int(time.time())))
 

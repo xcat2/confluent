@@ -26,7 +26,6 @@ import asyncio
 import confluent.tasks as tasks
 import confluent.exceptions as exc
 import confluent.messages as msg
-import confluent.util as util
 import confluent.plugins.shell.ssh as ssh
 
 
@@ -109,7 +108,6 @@ async def retrieve(nodes, element, configmanager, inputdata):
         for node in nodes:
             yield msg.ConfluentNodeError(node, f"Not Implemented: {element}")
         return
-    currtimeout = 10
     while workers:
         try:
             datum = await results.get()
@@ -328,7 +326,7 @@ def retrieve_health(configmanager, creds, node, results, element):
     switch = gather_data(configmanager, creds, node)
     badreadings = []
     summary = "ok"
-    sensors = gather_data(configmanager, creds, node)["sensors"]
+    sensors = switch["sensors"]
 
     for sensor in sensors:
         if sensor.health not in ["ok"]:

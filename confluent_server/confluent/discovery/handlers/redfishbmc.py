@@ -113,7 +113,7 @@ class NodeHandler(generic.NodeHandler):
                 'AccountTypes': actypes,
                 'Password': self.currpass,
                 }
-            rsp = await wc.grab_json_response_with_status(
+            await wc.grab_json_response_with_status(
                 await self.target_account_url(wc), acctupd, method='PATCH')
 
     async def _get_wc(self):
@@ -124,7 +124,6 @@ class NodeHandler(generic.NodeHandler):
         wc.set_header('Content-Type', 'application/json')
         wc.set_header('Accept', 'application/json')
         wc.set_header('Host', 'credible-bmc')
-        authmode = 0
         if not self.trieddefault:
             rsp, status = await wc.grab_json_response_with_status('/redfish/v1/Managers')
             if status == 403:
@@ -213,7 +212,6 @@ class NodeHandler(generic.NodeHandler):
         return targaccturl
 
     async def config(self, nodename):
-        mgrs = None
         self.nodename = nodename
         creds = self.configmanager.get_node_attributes(
             nodename, ['secret.hardwaremanagementuser',
@@ -231,7 +229,6 @@ class NodeHandler(generic.NodeHandler):
         self.targuser = user
         self.targpass = passwd
         wc = await self._get_wc()
-        curruserinfo = {}
         authupdate = {}
         wc.set_header('Content-Type', 'application/json')
         if user != self.curruser:

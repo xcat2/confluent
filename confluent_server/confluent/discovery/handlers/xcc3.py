@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import confluent.discovery.handlers.redfishbmc as redfishbmc
-import confluent.util as util
 import socket
 import aiohmi.util.webclient as webclient
 

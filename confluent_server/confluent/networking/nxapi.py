@@ -80,7 +80,8 @@ class NxApiClient:
                 configmanager, switch, 'pubkeys.tls_hardwaremanager'
             ).verify_cert
         else:
-            cv = lambda x: True
+            def cv(x):
+                return True
         self.user = user
         self.password = password
         try:

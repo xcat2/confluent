@@ -14,7 +14,6 @@
 
 
 import asyncio
-import errno
 import fnmatch
 import json
 import math
@@ -22,7 +21,6 @@ import os
 import random
 import re
 import socket
-import time
 
 import zipfile
 
@@ -564,7 +562,6 @@ class OEMHandler(generic.OEMHandler):
             'E': pygconst.Health.Critical,
             'W': pygconst.Health.Warning,
         }
-        infoevents = False
         existingevts = set([])
         for item in rsp.get('items', ()):
             # while usually the ipmi interrogation shall explain things,
@@ -573,7 +570,6 @@ class OEMHandler(generic.OEMHandler):
             itemseverity = hmap.get(item.get('severity', 'E'),
                                     pygconst.Health.Critical)
             if itemseverity == pygconst.Health.Ok:
-                infoevents = True
                 continue
             if (summary['health'] < itemseverity):
                 summary['health'] = itemseverity
@@ -1342,7 +1338,6 @@ class OEMHandler(generic.OEMHandler):
                          '/FirmwareInventory/BMC-Backup']}, method='PATCH')
             uploadtask = await webclient.make_uploader(
                 self.webclient, upurl, filename, data, formwrap=False)
-            wc = self.webclient
             while not uploadtask.completed():
                 try:
                     await uploadtask.join(3)

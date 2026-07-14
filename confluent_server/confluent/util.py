@@ -33,7 +33,6 @@ import re
 import socket
 import ssl
 import struct
-import random
 import subprocess
 import cryptography.x509 as x509
 try:
@@ -119,7 +118,7 @@ def get_bmc_subject_san(configmanager, nodename, addnames=()):
     dnsnames = set([])
     for addname in addnames:
         try:
-            addr = ipaddress.ip_address(addname)
+            ipaddress.ip_address(addname)
             ipas.add(addname)
         except Exception:
             dnsnames.add(addname)

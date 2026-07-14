@@ -1,8 +1,6 @@
 
 import asyncio
 import confluent.auth as auth
-import confluent.messages as msg
-import confluent.exceptions as exc
 import confluent.tasks as tasks
 import confluent.util as util
 import confluent.config.configmanager as configmanager
@@ -142,7 +140,7 @@ async def send_grant(conn, nodename, rqtype):
                 bmcuser = bmcuser.decode()
             if not isinstance(bmcpass, str):
                 bmcpass = bmcpass.decode()
-            rsp = await wc.grab_json_response_with_status(
+            await wc.grab_json_response_with_status(
                 '/login', {'data': [bmcuser, bmcpass]},
                 headers={'Content-Type': 'application/json',
                         'Accept': 'application/json'})

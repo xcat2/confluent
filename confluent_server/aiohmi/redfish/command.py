@@ -19,18 +19,13 @@ for redfish compliant endpoints
 """
 
 import asyncio
-import base64
-from datetime import datetime
-from datetime import timedelta
 import json
 import os
 import re
 import socket
 import struct
 import sys
-import time
 
-from dateutil import tz
 
 import aiohmi.constants as const
 import aiohmi.exceptions as exc
@@ -1551,7 +1546,8 @@ class Command(object):
          :param bank: Indicate a target 'bank' of firmware if supported
         """
         if progress is None:
-            progress = lambda x: True
+            def progress(x):
+                return True
         oem = await self.oem()
         return await oem.update_firmware(file, data, progress, bank, otherfields)
 

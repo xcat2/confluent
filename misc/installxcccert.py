@@ -1,7 +1,6 @@
 import argparse
 import pyghmi.redfish.command as cmd
 import os
-import sys
 
 ap = argparse.ArgumentParser(description='Certificate Generate')
 ap.add_argument('xcc', help='XCC address')

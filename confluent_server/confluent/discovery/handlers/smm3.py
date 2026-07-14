@@ -15,7 +15,6 @@
 import asyncio
 
 import confluent.discovery.handlers.redfishbmc as redfishbmc
-import confluent.util as util
 
 
 class NodeHandler(redfishbmc.NodeHandler):

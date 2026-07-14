@@ -15,7 +15,6 @@
 import asyncio
 import confluent.util as util
 import confluent.messages as msg
-import confluent.exceptions as exc
 import aiohmi.util.webclient as wc
 import confluent.tasks as tasks
 import time

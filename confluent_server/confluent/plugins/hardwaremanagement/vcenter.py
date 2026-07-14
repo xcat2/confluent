@@ -137,7 +137,8 @@ class VmwApiClient:
                 configmanager, vcsa, 'pubkeys.tls_hardwaremanager'
             ).verify_cert
         else:
-            cv = lambda x: True
+            def cv(x):
+                return True
 
         try:
             self.user = self.user.decode()
@@ -206,7 +207,6 @@ class VmwApiClient:
         hwver = rawinv['hardware']['version']
         uuid = fixuuid(rawinv['identity']['bios_uuid'])
         serial = rawinv['identity']['instance_uuid']
-        invitems = []
         sysinfo = {'name': 'System',
                    'present': True,
                    'information': {
@@ -237,7 +237,7 @@ class VmwApiClient:
     async def get_vm_host(self, vm):
         # unfortunately, the REST api doesn't manifest this as a simple attribute,
         vm = await self.index_vm(vm)
-        rsp = await self.wc.grab_json_response(f'/api/vcenter/host')
+        rsp = await self.wc.grab_json_response('/api/vcenter/host')
         for hostinfo in rsp:
             host = hostinfo['host']
             rsp = await self.wc.grab_json_response(f'/api/vcenter/vm?hosts={host}')
@@ -308,7 +308,7 @@ class VmwApiClient:
             state = 'start'
         elif state == 'off':
             state = 'stop'
-        rsp = await self.wc.grab_json_response_with_status(f'/api/vcenter/vm/{vm}/power?action={state}', method='POST')
+        await self.wc.grab_json_response_with_status(f'/api/vcenter/vm/{vm}/power?action={state}', method='POST')
         return targstate, current
 
 
@@ -333,10 +333,10 @@ class VmwApiClient:
                 for nic in currnics:
                     bootdevs.append({'type': 'ETHERNET', 'nic': nic['nic']})
             payload = {'devices': bootdevs}
-            rsp = await self.wc.grab_json_response_with_status(f'/api/vcenter/vm/{vm}/hardware/boot/device',
+            await self.wc.grab_json_response_with_status(f'/api/vcenter/vm/{vm}/hardware/boot/device',
                                                         payload,
                                                         method='PUT')
-            rsp = await self.wc.grab_json_response_with_status(f'/api/vcenter/vm/{vm}/hardware/boot',
+            await self.wc.grab_json_response_with_status(f'/api/vcenter/vm/{vm}/hardware/boot',
                                                         {'enter_setup_mode': entersetup},
                                                         method='PATCH')
         finally:
@@ -414,7 +414,6 @@ async def create(nodes, element, configmanager, inputdata):
 if __name__ == '__main__':
     import sys
     import os
-    from pprint import pprint
     myuser = os.environ['VMWUSER']
     mypass = os.environ['VMWPASS']
     vc = VmwApiClient(sys.argv[1], myuser, mypass, None)

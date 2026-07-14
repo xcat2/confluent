@@ -3,7 +3,6 @@ import pyghmi.redfish.command as ic
 import pyghmi.util.webclient as webclient
 import sys
 import os
-import time
 
 def iterm_draw(databuf):
     datalen = len(databuf)

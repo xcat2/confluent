@@ -31,7 +31,6 @@ import ctypes
 import ctypes.util
 import random
 import time
-import sys
 
 
 class PyObject_HEAD(ctypes.Structure):
@@ -86,7 +85,6 @@ async def connect_to_leader(cert=None, name=None, leader=None, remote=None, isre
     ocert = cert
     oname = name
     oleader = leader
-    oremote = remote
     if leader is None:
         leader = currentleader
     if not isretry:
@@ -128,7 +126,7 @@ async def connect_to_leader(cert=None, name=None, leader=None, remote=None, isre
                     await asyncio.sleep(0.3)
                     return await connect_to_leader(cert, name, leader, None, isretry=True)
                 if 'leader' in keydata:
-                    if keydata['leader'] == None:
+                    if keydata['leader'] is None:
                         return None
                     log.log(
                         {'info': 'Prospective leader {0} has redirected this '
@@ -144,8 +142,7 @@ async def connect_to_leader(cert=None, name=None, leader=None, remote=None, isre
                     log.log({'info':
                                  'Prospective leader {0} has inferior '
                                  'transaction count, becoming leader'
-                                 ''.format(leader), 'subsystem': 'collective',
-                             'subsystem': 'collective'})
+                                 ''.format(leader), 'subsystem': 'collective'})
                     return await become_leader(remote)
                 return False
                 follower.cancel()
@@ -817,7 +814,7 @@ async def reassimilate_missing():
     while True:
         try:
             await _assimilate_missing()
-        except Exception as e:
+        except Exception:
             cfm.logException()
         await asyncio.sleep(30)
 
@@ -962,7 +959,7 @@ async def start_collective():
                 else:
                     remote[1].close()
                     await remote[1].wait_closed()
-    except Exception as e:
+    except Exception:
         pass
     finally:
         if retrythread is None and follower is None:
