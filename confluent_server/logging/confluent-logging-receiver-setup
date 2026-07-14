@@ -1,0 +1,163 @@
+#!/bin/bash
+# Set up a confluent server to receive logs forwarded by deployed nodes
+# (see the logging.servers, logging.method and logging.tls node attributes).
+#
+# Usage: sh confluent-logging-receiver-setup <rsyslog|journal-remote> [--tls|--plain]
+#
+# With --tls (the default), the transport is encrypted and mutually
+# authenticated via the confluent certificate authority: a server certificate
+# is issued from the local confluent CA and only clients presenting a
+# certificate from that CA are accepted. With --plain, the plaintext receiver
+# examples are installed instead (rsyslog UDP port 514, journal-remote HTTP
+# port 19532).
+#
+# rsyslog reception writes per-node logs under /var/log/confluent/nodes/
+# (see confluent-nodes.logrotate for log rotation); journal-remote reception
+# writes journals under /var/log/journal/remote/, readable with
+#   journalctl -D /var/log/journal/remote
+#
+# Safe to re-run; regenerates the certificate and overwrites the
+# configuration it owns.
+
+set -e
+cd "$(dirname "$0")"
+
+method=""
+tls=1
+for arg in "$@"; do
+    case $arg in
+        rsyslog|journal-remote) method=$arg;;
+        --tls) tls=1;;
+        --plain) tls=0;;
+        *) echo "Unknown argument: $arg"; exit 1;;
+    esac
+done
+if [ -z "$method" ]; then
+    echo "Usage: sh confluent-logging-receiver-setup <rsyslog|journal-remote> [--tls|--plain]"
+    exit 1
+fi
+
+# issue_tls_cert <keyout> <certout> <cadest>: generate a key and certificate
+# signed by the local confluent CA, with SANs covering this server's names and
+# addresses. A dedicated directory is used per consumer: /etc/ssl/private is
+# not traversable by service users on Debian-style systems, and Ubuntu's
+# rsyslogd AppArmor profile only permits reads under /etc/rsyslog.d
+issue_tls_cert() {
+    mkdir -p $(dirname $1)
+    # Store the confluent CA certs into the trusted bundle used to
+    # authenticate clients
+    cat /var/lib/confluent/public/site/tls/*.pem > $3
+    myips=$(ip -j addr show 2>/dev/null | python3 -c 'import json,sys; print(",".join(a["local"] for i in json.load(sys.stdin) for a in i.get("addr_info", []) if a.get("scope") == "global"))')
+    mynames=$(hostname)
+    mydomain=$(dnsdomainname 2>/dev/null)
+    [ -n "$mydomain" ] && mynames=$mynames,$(hostname).$mydomain
+    [ -n "$myips" ] && mynames=$mynames,$myips
+    TDIR=$(mktemp -d)
+    # certutil runs the actual signing as the owner of /etc/confluent, which
+    # must be able to reach the CSR; the directory never holds the key
+    chmod 711 $TDIR
+    # Request a new certificate while generating a new key to go with it,
+    # the subject is replaced during signing
+    openssl req -new -newkey ec -pkeyopt ec_paramgen_curve:secp384r1 -nodes \
+        -keyout $1 -out $TDIR/csr.pem -subj /CN=$(hostname) > /dev/null 2>&1
+    # Have the confluent CA do an offline signing of the CSR (default
+    # validity of 3650 days)
+    (cd $TDIR && python3 /opt/confluent/lib/python/confluent/certutil.py -s $mynames -r csr.pem)
+    cp $TDIR/cert.pem $2
+    rm -rf $TDIR
+    chmod 600 $1
+    chmod 644 $2 $3
+    if [ -x /usr/sbin/restorecon ]; then
+        /usr/sbin/restorecon $1 $2 $3 2>/dev/null || true
+    fi
+}
+
+if [ $method = journal-remote ]; then
+    jrbin=""
+    for candidate in /usr/lib/systemd/systemd-journal-remote /lib/systemd/systemd-journal-remote; do
+        [ -f $candidate ] && jrbin=$candidate && break
+    done
+    if [ -z "$jrbin" ]; then
+        echo "systemd-journal-remote does not appear to be installed (install the systemd-journal-remote package)"
+        exit 1
+    fi
+    if [ $tls = 1 ]; then
+        # builds without gnutls reject --trust with "not available"; the exit
+        # status alone cannot be used, as gnutls builds also fail (with a
+        # conflict complaint) once a TrustedCertificateFile is configured
+        if $jrbin --trust=all --version 2>&1 | grep -qi 'not available'; then
+            echo "WARNING: this build of systemd-journal-remote was compiled without client"
+            echo "WARNING: certificate verification (its TrustedCertificateFile setting is"
+            echo "WARNING: silently ignored). The transport will be encrypted and nodes will"
+            echo "WARNING: verify this server, but uploads from ANY client will be accepted."
+            echo "WARNING: Use logging.method=rsyslog if client verification is required."
+        fi
+        tlsdir=/etc/ssl/confluent-logging
+        issue_tls_cert $tlsdir/journal-remote.key $tlsdir/journal-remote.crt $tlsdir/ca.pem
+        chown systemd-journal-remote $tlsdir/journal-remote.key
+        # Setting TrustedCertificateFile explicitly is what makes
+        # systemd-journal-remote verify client certificates; do not rely on
+        # the compiled-in defaults
+        mkdir -p /etc/systemd/journal-remote.conf.d
+        cat > /etc/systemd/journal-remote.conf.d/confluent.conf << 'EOF'
+# Log reception configured by confluent-logging-receiver-setup
+# Note: TrustedCertificateFile (client certificate verification) is silently
+# ignored by systemd-journal-remote builds lacking gnutls support
+[Remote]
+ServerKeyFile=/etc/ssl/confluent-logging/journal-remote.key
+ServerCertificateFile=/etc/ssl/confluent-logging/journal-remote.crt
+TrustedCertificateFile=/etc/ssl/confluent-logging/ca.pem
+EOF
+        # remove a plain-HTTP override from a previous --plain run
+        rm -f /etc/systemd/system/systemd-journal-remote.service.d/confluent.conf
+    else
+        mkdir -p /etc/systemd/system/systemd-journal-remote.service.d
+        cp journal-remote/confluent-journal-remote.conf /etc/systemd/system/systemd-journal-remote.service.d/confluent.conf
+        rm -f /etc/systemd/journal-remote.conf.d/confluent.conf
+    fi
+    systemctl daemon-reload
+    systemctl enable systemd-journal-remote.socket > /dev/null 2>&1
+    systemctl try-restart systemd-journal-remote.service 2>/dev/null || true
+    systemctl restart systemd-journal-remote.socket
+    echo "journal-remote reception configured; permit TCP port 19532 through the firewall, e.g.:"
+    echo "  firewall-cmd --permanent --add-port=19532/tcp && firewall-cmd --reload"
+else
+    if [ ! -d /etc/rsyslog.d ]; then
+        echo "rsyslog does not appear to be installed"
+        exit 1
+    fi
+    if [ $tls = 1 ]; then
+        tlsdriver=""
+        for moddir in /usr/lib64/rsyslog /usr/lib/rsyslog /usr/lib/*-linux-gnu/rsyslog; do
+            [ -f $moddir/lmnsd_ossl.so ] && tlsdriver=ossl && break
+            [ -f $moddir/lmnsd_gtls.so ] && tlsdriver=gtls && break
+        done
+        if [ -z "$tlsdriver" ]; then
+            echo "TLS reception requires the rsyslog-openssl or rsyslog-gnutls module"
+            exit 1
+        fi
+        tlsdir=/etc/rsyslog.d/confluent-tls
+        issue_tls_cert $tlsdir/rsyslog.key $tlsdir/rsyslog.crt $tlsdir/ca.pem
+        if getent passwd syslog > /dev/null 2>&1; then
+            # e.g. Ubuntu runs rsyslogd as the syslog user
+            chgrp syslog $tlsdir/rsyslog.key
+            chmod g+r $tlsdir/rsyslog.key
+        fi
+        sed 's/"ossl"/"'$tlsdriver'"/' rsyslog/confluent-nodes-tls.conf > /etc/rsyslog.d/confluent-nodes.conf
+        echo "TLS rsyslog reception configured; permit TCP port 6514 through the firewall, e.g.:"
+        echo "  firewall-cmd --permanent --add-port=6514/tcp && firewall-cmd --reload"
+    else
+        cp rsyslog/confluent-nodes.conf /etc/rsyslog.d/confluent-nodes.conf
+        echo "Plain rsyslog reception configured; permit UDP port 514 through the firewall, e.g.:"
+        echo "  firewall-cmd --permanent --add-service=syslog && firewall-cmd --reload"
+    fi
+    if [ -x /usr/sbin/restorecon ]; then
+        /usr/sbin/restorecon /etc/rsyslog.d/confluent-nodes.conf 2>/dev/null || true
+    fi
+    mkdir -p /var/log/confluent/nodes
+    if getent passwd syslog > /dev/null 2>&1; then
+        # e.g. Ubuntu runs rsyslogd as the syslog user
+        chown syslog /var/log/confluent/nodes
+    fi
+    systemctl restart rsyslog
+fi

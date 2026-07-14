@@ -414,6 +414,8 @@ async def handle_request(req, make_response, mimetype):
                 ncfg['loggingservers'].append(logsrv)
             ncfg['loggingmethod'] = deployinfo.get(
                 'logging.method', {}).get('value', '') or 'rsyslog'
+            ncfg['loggingtls'] = bool(deployinfo.get(
+                'logging.tls', {}).get('value', False))
         dnsdomain = deployinfo.get('dns.domain', {}).get('value', None)
         ncfg['dnsdomain'] = dnsdomain
         return await make_response(mimetype, 200, 'OK', body=dumper(ncfg))
