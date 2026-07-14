@@ -616,7 +616,7 @@ def checkaccess(user, filename, pwent):
         return False
 
 def isurl(value):
-    prefix, value = value.split('://', 1) if '://' in value else (None, value)
+    prefix, value = value.split('://', 1) if '://' in value else ('', value)
     if '/' in prefix:
         return False
     return True if prefix else False
