@@ -5,6 +5,20 @@ import os
 class SilentException(Exception):
     pass
 
+# List of models that are generally used for OS install disk (generally 2-disk mirroring)
+PRIORITY_MODELS = ('m.2 nvme 2-bay raid kit', 
+                   'thinksystem_m.2_vd',
+                   'thinksystem m.2',
+                   'thinksystem_m.2',
+                   'b540p-2hs',  # 7mm or M.2 in rear
+                   'b540d-2hs',  # M.2 in E3.S or 2.5inch
+                   'b550d-2hs',  # Front M.2
+                   'b550p-2hs',  # Rear M.2
+                   'raid b540p-2hs',
+                   'raid b540d-2hs',
+                   'raid b550d-2hs',
+                   'raid b550p-2hs')
+
 class DiskInfo(object):
     def __init__(self, devname):
         if devname.startswith('nvme') and 'c' in devname:
@@ -69,7 +83,7 @@ class DiskInfo(object):
 
     @property
     def priority(self):
-        if self.model.lower() in ('m.2 nvme 2-bay raid kit', 'thinksystem_m.2_vd', 'thinksystem m.2', 'thinksystem_m.2'):
+        if self.model.lower() in PRIORITY_MODELS:
             return 0
         if 'imsm' in self.mdcontainer:
             return 1
