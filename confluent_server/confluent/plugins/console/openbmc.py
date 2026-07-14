@@ -77,7 +77,7 @@ class OpenBmcConsole(conapi.Console):
         self.password = connparams['passphrase']
         self.bmc = connparams['bmc']
         self.origbmc = connparams['bmc']
-        if ':' in self.bmc:
+        if ':' in self.bmc and not self.bmc.startswith('['):
             self.bmc = '[{0}]'.format(self.bmc)
         self.datacallback = None
         self.nodeconfig = config
@@ -112,10 +112,6 @@ class OpenBmcConsole(conapi.Console):
             raise cexc.TargetEndpointUnreachable(str(e))
         if rsp[1] > 400:
             raise cexc.TargetEndpointBadCredentials
-        bmc = self.bmc
-        if '%' in self.bmc:
-            prefix = self.bmc.split('%')[0]
-            bmc = prefix + ']'
         self.ssl = CustomVerifier(kv)
         self.clisess = aiohttp.ClientSession(cookie_jar=wc.cookies)
         protos = []
