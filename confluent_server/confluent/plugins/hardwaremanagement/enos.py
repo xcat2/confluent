@@ -326,7 +326,7 @@ def retrieve_health(configmanager, creds, node, results, element):
     switch = gather_data(configmanager, creds, node)
     badreadings = []
     summary = "ok"
-    sensors = gather_data(configmanager, creds, node)["sensors"]
+    sensors = switch["sensors"]
 
     for sensor in sensors:
         if sensor.health not in ["ok"]:
