@@ -96,15 +96,12 @@ class OEMHandler(generic.OEMHandler):
                 continue
             for cpu in ('CPU0', 'CPU1'):
                 try:
-                    sensor_url = '/redfish/v1/Chassis/1/Sensors/BMC{}Cpu{}Temp'.format(nodeid, cpu)
+                    sensor_url = '/redfish/v1/Chassis/1/Sensors/BMC{}{}Temp'.format(nodeid, cpu)
                     sensor = await fishclient._do_web_request(sensor_url)
                     if sensor and 'Reading' in sensor:
                         cputemps.append({
-                            'name': 'CPU {} Node {}'.format(cpu, nodeid),
-                            'value': float(sensor['Reading']),
-                            'state_ids': [],
-                            'units': const.SensorUnits.Celsius,
-                            'imprecision': None,
+                            'Name': '{} Node {}'.format(cpu, nodeid),
+                            'ReadingCelsius': float(sensor['Reading']),
                         })
                 except Exception:
                     pass
