@@ -53,9 +53,7 @@ async def is_reachable(address):
     except (asyncio.TimeoutError, OSError):
         return False
 
-async def add_zone(lla):
-    if '%' in lla:
-        return lla
+async def get_nics():
     proc = await asyncio.create_subprocess_exec(
         'ip', '-json', 'link',
         stdout=asyncio.subprocess.PIPE,
@@ -64,23 +62,28 @@ async def add_zone(lla):
     stdout, _ = await proc.communicate()
     import json
     links = json.loads(stdout)
-    tocheck = []
     for link in links:
         if 'LOOPBACK' in link.get('flags', []):
             continue
         if 'LOWER_UP' not in link.get('flags', []):
             continue
+        yield link['ifname']
+
+async def add_zone(lla):
+    if '%' in lla:
+        return lla
+    tocheck = []
+    async for link in get_nics():
         tocheck.append(link)
-    
     tasks = []
     for link in tocheck:
-        zone_addr = lla + '%' + link['ifname']
+        zone_addr = lla + '%' + link
         tasks.append(is_reachable(zone_addr))
     
     results = await asyncio.gather(*tasks)
     for link, reachable in zip(tocheck, results):
         if reachable:
-            return lla + '%' + link['ifname']
+            return lla + '%' + link
     
     return lla
 
@@ -108,6 +111,19 @@ def _namesmatch(switchdesc, userdesc):
         return True
     return False
 
+async def ping_everywhere():
+    tasks = []
+    async for link in get_nics():
+        tasks.append(asyncio.create_subprocess_exec(
+            'ping', '-I', link, 'ff02::1', '-c', '2',
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        ))
+    
+    for task in tasks:
+        proc = await task
+        await proc.communicate()
+        
 async def main(switch, port):
     portname = None
     client = asynclient.Command()
@@ -123,8 +139,8 @@ async def main(switch, port):
     if portname:
         async for rsp in client.read(f'/networking/neighbors/by-switch/{switch}/by-port/{portname}/by-peerid/'):
             peerid = rsp.get('item', {}).get('href')
+    fe80found = False
     if peerid:
-        fe80found = False
         maybemac = None
         async for rsp in client.read(f'/networking/neighbors/by-switch/{switch}/by-port/{portname}/by-peerid/{peerid}'):
             if 'peeraddresses' in rsp:
@@ -139,9 +155,41 @@ async def main(switch, port):
             try:
                 maybella = mac2lla(maybemac)
                 maybella = await add_zone(maybella)
+                fe80found = True
                 print(maybella)
             except Exception as e:
                 pass
+    if not fe80found:
+        if not portname:
+            async for rsp in client.read(f'/networking/macs/by-switch/{switch}/by-port/'):
+                portcandidate = rsp.get('item', {}).get('href')[:-1]
+                if _namesmatch(portcandidate, port):
+                    if portname:
+                        sys.stderr.write(f"Multiple matches found for port {port} on switch {switch}\n")
+                        portname = None
+                    else:
+                        portname = portcandidate
+        if not portname:
+            await ping_everywhere()
+            async for rsp in client.update(f'/networking/macs/rescan', {'rescan': 'start'}):
+                pass
+            scanning = True
+            while scanning:
+                async for rsp in client.read(f'/networking/macs/rescan'):
+                    if 'scanning' in rsp:
+                        scanning = rsp['scanning']
+                if scanning:
+                    await asyncio.sleep(1)
+        async for rsp in client.read(f'/networking/macs/by-switch/{switch}/by-port/{portname}/by-mac/'):
+            mac = rsp.get('item', {}).get('href').replace('-', ':')
+            if mac:
+                try:
+                    maybella = mac2lla(mac)
+                    maybella = await add_zone(maybella)
+                    fe80found = True
+                    print(maybella)
+                except Exception as e:
+                    pass
 
             
     
