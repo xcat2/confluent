@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  ShellCheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Run ShellCheck (errors only)
+        # Check every tracked file that has a .sh extension or an sh/bash
+        # shebang. SC2148 (missing shebang) is excluded because many .sh
+        # files are sourced fragments or dracut hooks; ShellCheck then
+        # falls back to checking them as bash.
+        run: |
+          {
+            git ls-files '*.sh'
+            git ls-files | while IFS= read -r f; do
+              [ -f "$f" ] || continue
+              head -c 200 "$f" | head -n 1 | \
+                grep -qE '^#!.*[/ ](sh|bash|dash|ash|ksh)([ \t]|$)' && echo "$f"
+            done
+          } | sort -u | xargs -d '\n' shellcheck --severity=error --exclude=SC2148
+
+  python-compileall:
+    name: Python compileall
+    runs-on: ubuntu-latest
+    env:
+      # One entry per Python version shipped by the distros confluent
+      # targets, limited to versions actions/setup-python still provides
+      # on current runners (sles15/alma8 ship 3.6, which is unavailable).
+      # Newline-separated so it feeds both setup-python (multiline input)
+      # and the shell loop below (word-split on whitespace).
+      PYTHON_VERSIONS: |
+        3.8
+        3.9
+        3.10
+        3.12
+        3.13
+        3.14
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSIONS }}
+      - name: Compile all Python files
+        run: |
+          rc=0
+          for v in $PYTHON_VERSIONS; do
+            echo "::group::Python $v"
+            if "python$v" -W error -m compileall -q -x '/\.git/' .; then
+              echo "::endgroup::"
+            else
+              echo "::endgroup::"
+              echo "::error::Python $v compileall failed"
+              rc=1
+            fi
+          done
+          exit "$rc"

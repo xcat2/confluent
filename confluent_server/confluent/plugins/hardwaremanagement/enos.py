@@ -152,12 +152,12 @@ def gather_data(configmanager, creds, node):
     nssh = enos_login(node=node, configmanager=configmanager, creds=creds)
     switch_lines = enos_version(ssh=nssh)
     switch_data = {}
-    sysinfo = {"Product name": {"regex": ".*RackSwitch (\w+)"},
-               "Serial Number": {"regex": "ESN\s*\w*\s*: ([\w-]+)"},
-               "Board Serial Number": {"regex": "Switch Serial No: (\w+)"},
-               "Model": {"regex": "MTM\s*\w*\s*: ([\w-]+)"},
-               "FRU Number": {"regex": "Hardware Part\s*\w*\s*: (\w+)"},
-               "Airflow": {"regex": "System Fan Airflow\s*\w*\s*: ([\w-]+)"},
+    sysinfo = {"Product name": {"regex": r".*RackSwitch (\w+)"},
+               "Serial Number": {"regex": r"ESN\s*\w*\s*: ([\w-]+)"},
+               "Board Serial Number": {"regex": r"Switch Serial No: (\w+)"},
+               "Model": {"regex": r"MTM\s*\w*\s*: ([\w-]+)"},
+               "FRU Number": {"regex": r"Hardware Part\s*\w*\s*: (\w+)"},
+               "Airflow": {"regex": r"System Fan Airflow\s*\w*\s*: ([\w-]+)"},
               }
 
     invinfo = {
@@ -233,7 +233,7 @@ def gather_data(configmanager, creds, node):
     sysfw = {"Software Version": "Unknown", "Boot kernel": "Unknown"}
     for line in switch_lines:
         for key in sysfw.keys():
-            regex = f"{key}\s*\w*\s* ([0-9.]+)"
+            regex = rf"{key}\s*\w*\s* ([0-9.]+)"
             match = re.match(re.compile(regex), line)
             if match:
                 sysfw[key] = match.group(1)
@@ -250,7 +250,7 @@ def gather_psus(data):
         # others are:
         # Internal  Power Supply: On
         if "Power Supply" in line:
-            match = re.match(re.compile("Power Supply (\d)+.*"), line)
+            match = re.match(re.compile(r"Power Supply (\d)+.*"), line)
             if match:
                 psu = match.group(1)
                 if psu not in psus:
@@ -280,7 +280,7 @@ def gather_fans(data):
     for line in data:
         # look for presence of fans
         if "Fan" in line:
-            match = re.match(re.compile("Fan (\d)+.*"), line)
+            match = re.match(re.compile(r"Fan (\d)+.*"), line)
             if match:
                 fan = match.group(1)
                 if match:

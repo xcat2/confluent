@@ -782,6 +782,9 @@ async def relay_slaved_requests(name, listener):
                     msg = await lh.get_next_msg()
                 except Exception:
                     msg = None
+        except Exception:
+            # unexpected loss or misbehavior of the follower ends the relay
+            logException()
         finally:
             try:
                 listener.close()
@@ -798,10 +801,10 @@ async def relay_slaved_requests(name, listener):
                     *[_push_rpc(cfgstreams[s]['stream'], payload) for s in cfgstreams])
             if membership_callback:
                 membership_callback()
-            if not cfgstreams and not cfgleader:  # last one out, set cfgleader to boolean to mark dead collective
-                await stop_following(True)
-                return False
-            return True
+        if not cfgstreams and not cfgleader:  # last one out, set cfgleader to boolean to mark dead collective
+            await stop_following(True)
+            return False
+        return True
 
 lastheartbeat = None
 async def check_leader():

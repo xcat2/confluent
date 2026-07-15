@@ -396,7 +396,7 @@ class TimedAndSizeRotatingFileHandler(BaseRotatingHandler):
         prefix = baseName + "."
         if dirName not in self.dirContents or self.dirContents[dirName][1] < time.time():
             self.dirContents[dirName] = (os.listdir(dirName), time.time() + 5)
-        matchexp = re.compile(f'^{prefix}\.\d+$')
+        matchexp = re.compile(rf'^{prefix}\.\d+$')
         fileNames = [f for f in self.dirContents[dirName][0]
                      if matchexp.match(f)]
         plen = len(prefix)

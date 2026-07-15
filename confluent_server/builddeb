@@ -50,12 +50,30 @@ if ! grep wheezy /etc/os-release; then
 fi
 head -n -1 debian/control > debian/control1
 mv debian/control1 debian/control
-cat > debian/postinst << EOF
-if ! getent passwd confluent > /dev/null; then 
+cat > debian/postinst << \EOF
+if ! getent passwd confluent > /dev/null; then
     useradd -r confluent -d /var/lib/confluent -s /usr/sbin/nologin
-    mkdir -p /etc/confluent
-    chown confluent /etc/confluent
 fi
+mkdir -p /etc/confluent /var/lib/confluent /var/log/confluent /var/cache/confluent
+chown confluent:confluent /etc/confluent /var/lib/confluent /var/log/confluent /var/cache/confluent
+
+sysctl -p /usr/lib/sysctl.d/confluent.conf > /dev/null 2>&1
+NEEDCHOWN=0
+NEEDSTART=0
+[ -n "$(find /etc/confluent /var/log/confluent /var/cache/confluent -uid 0 -print -quit 2>/dev/null)" ] && NEEDCHOWN=1
+if [ $NEEDCHOWN = 1 ]; then
+    if systemctl is-active confluent > /dev/null; then
+        NEEDSTART=1
+        systemctl stop confluent
+    fi
+    chown -R confluent:confluent /etc/confluent /var/log/confluent /var/cache/confluent
+fi
+systemctl daemon-reload
+if systemctl is-active confluent > /dev/null || [ $NEEDSTART = 1 ]; then systemctl restart confluent > /dev/null 2>&1; fi
+if [ ! -e /etc/pam.d/confluent ]; then
+    ln -s /etc/pam.d/sshd /etc/pam.d/confluent
+fi
+true
 EOF
 echo 'export PYBUILD_INSTALL_ARGS=--install-lib=/opt/confluent/lib/python' >> debian/rules
 #echo 'Provides: python-'$DPKGNAME >> debian/control
