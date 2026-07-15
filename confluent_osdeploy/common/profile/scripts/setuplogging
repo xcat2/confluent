@@ -171,6 +171,10 @@ else
         # with chain validation alone any of them could pose as the server.
         # rsyslog matches pinned peers only against DNS-type SANs, so IP
         # targets can only validate the chain (x509/certvalid).
+        # The bounded async queue keeps an unreachable or hung log server
+        # from wedging the main queue (and with it local logging); once it
+        # fills, further forwarded messages are dropped instead.
+        fwdqueue='action.resumeRetryCount="-1" queue.type="linkedList" queue.size="10000"'
         for loggingsrv in $loggingservers; do
             case $loggingsrv in
                 *:*) isname=0 ;;        # IPv6 literal
@@ -178,9 +182,9 @@ else
                 *) isname=0 ;;          # IPv4 literal
             esac
             if [ $isname = 1 ]; then
-                echo '*.* action(type="omfwd" target="'$loggingsrv'" port="6514" protocol="tcp" StreamDriverMode="1" StreamDriverAuthMode="x509/name" StreamDriverPermittedPeers="'$loggingsrv'")' >> $syslogconf
+                echo '*.* action(type="omfwd" target="'$loggingsrv'" port="6514" protocol="tcp" StreamDriverMode="1" StreamDriverAuthMode="x509/name" StreamDriverPermittedPeers="'$loggingsrv'" '"$fwdqueue"')' >> $syslogconf
             else
-                echo '*.* action(type="omfwd" target="'$loggingsrv'" port="6514" protocol="tcp" StreamDriverMode="1" StreamDriverAuthMode="x509/certvalid")' >> $syslogconf
+                echo '*.* action(type="omfwd" target="'$loggingsrv'" port="6514" protocol="tcp" StreamDriverMode="1" StreamDriverAuthMode="x509/certvalid" '"$fwdqueue"')' >> $syslogconf
             fi
         done
     else
