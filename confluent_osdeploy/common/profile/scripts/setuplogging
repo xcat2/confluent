@@ -21,6 +21,108 @@ loggingtls=$(sed -n 's/^loggingtls: //p' /etc/confluent/confluent.deploycfg)
 if [ -z "$loggingmethod" ]; then
     loggingmethod=rsyslog
 fi
+if [ "$loggingtls" != true ]; then
+    # drop renewal artifacts from a previous TLS-enabled run
+    rm -f /etc/confluent/logging-tls-renew
+    if [ -d /run/systemd/system ]; then
+        systemctl disable --now confluent-logging-renew.timer 2>/dev/null
+    fi
+    rm -f /etc/systemd/system/confluent-logging-renew.service /etc/systemd/system/confluent-logging-renew.timer
+fi
+
+# setup_cert_renewal <keyfile> <certfile> <keygroup> <service>: install a
+# daily randomized systemd timer that renews the forwarding certificate once
+# less than half of its validity remains, so short pubkeys.tls_lifetime
+# values (including the 47 day default) keep working. Renewal authenticates
+# with the api key persisted during deployment, which remains valid
+# regardless of deployment.apiarmed; the server derives the certificate
+# identity from its node configuration, not from the request.
+setup_cert_renewal() {
+    renewscript=/etc/confluent/logging-tls-renew
+    {
+        echo '#!/bin/sh'
+        echo '# Renew the confluent log forwarding TLS certificate when less than half'
+        echo '# of its validity remains; installed by the confluent setuplogging'
+        echo '# deployment script (see the logging.tls node attribute)'
+        echo "keyfile=$1"
+        echo "certfile=$2"
+        echo "keygroup=$3"
+        echo "service=$4"
+        cat << 'RENEWEOF'
+umask 077
+[ -s "$certfile" ] || exit 0
+notbefore=$(openssl x509 -startdate -noout -in "$certfile" | cut -d= -f2-)
+notafter=$(openssl x509 -enddate -noout -in "$certfile" | cut -d= -f2-)
+startts=$(date -d "$notbefore" +%s 2>/dev/null)
+endts=$(date -d "$notafter" +%s 2>/dev/null)
+now=$(date +%s)
+if [ -n "$startts" ] && [ -n "$endts" ] && [ $((endts - now)) -gt $(( (endts - startts) / 2 )) ]; then
+    exit 0
+fi
+confapiclient=""
+[ -f /opt/confluent/bin/apiclient ] && confapiclient=/opt/confluent/bin/apiclient
+[ -f /etc/confluent/apiclient ] && confapiclient=/etc/confluent/apiclient
+if [ -z "$confapiclient" ]; then
+    logger -t confluent-logging-renew "unable to locate the confluent apiclient, cannot renew $certfile"
+    exit 0
+fi
+TDIR=$(mktemp -d)
+openssl req -new -newkey ec -pkeyopt ec_paramgen_curve:secp384r1 -nodes \
+    -keyout $TDIR/key.pem -out $TDIR/csr.pem -subj /CN=$(hostname) > /dev/null 2>&1
+python3 $confapiclient /confluent-api/self/tlscert $TDIR/csr.pem -o $TDIR/cert.pem
+if [ ! -s $TDIR/cert.pem ]; then
+    rm -rf $TDIR
+    logger -t confluent-logging-renew "failed to obtain a renewed certificate from the confluent CA for $certfile, will retry"
+    exit 0
+fi
+# stage beside the live files (same filesystem), then replace atomically;
+# a failure never disturbs the material currently in use
+cp $TDIR/key.pem $keyfile.new
+cp $TDIR/cert.pem $certfile.new
+rm -rf $TDIR
+chmod 644 $certfile.new
+if [ -n "$keygroup" ]; then
+    chgrp $keygroup $keyfile.new 2>/dev/null
+    chmod g+r $keyfile.new
+fi
+if [ -x /usr/sbin/restorecon ]; then
+    /usr/sbin/restorecon $keyfile.new $certfile.new 2>/dev/null
+fi
+mv $keyfile.new $keyfile
+mv $certfile.new $certfile
+logger -t confluent-logging-renew "renewed $certfile (expires $(openssl x509 -enddate -noout -in $certfile | cut -d= -f2-))"
+systemctl try-restart $service 2>/dev/null
+exit 0
+RENEWEOF
+    } > $renewscript
+    chmod 755 $renewscript
+    if [ -x /usr/sbin/restorecon ]; then
+        /usr/sbin/restorecon $renewscript 2>/dev/null
+    fi
+    [ -d /run/systemd/system ] || return 0
+    cat > /etc/systemd/system/confluent-logging-renew.service << EOF
+[Unit]
+Description=Renew the confluent log forwarding TLS certificate
+
+[Service]
+Type=oneshot
+ExecStart=$renewscript
+EOF
+    cat > /etc/systemd/system/confluent-logging-renew.timer << EOF
+[Unit]
+Description=Daily confluent log forwarding TLS certificate renewal check
+
+[Timer]
+OnCalendar=daily
+RandomizedDelaySec=6h
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
+    systemctl daemon-reload 2>/dev/null
+    systemctl enable --now confluent-logging-renew.timer > /dev/null 2>&1
+}
 
 # request_tls_cert <keyout> <certout>: generate a key and have the confluent
 # CA sign a certificate for this node via the deployment API
@@ -111,6 +213,7 @@ if [ "$loggingmethod" = journal-remote ]; then
         fi
         chgrp systemd-journal $tlsdir/journal-upload.key 2>/dev/null
         chmod g+r $tlsdir/journal-upload.key
+        setup_cert_renewal $tlsdir/journal-upload.key $tlsdir/journal-upload.crt systemd-journal systemd-journal-upload.service
         echo 'URL=https://'$loggingsrv':19532' >> $journalconf
         echo 'ServerKeyFile='$tlsdir'/journal-upload.key' >> $journalconf
         echo 'ServerCertificateFile='$tlsdir'/journal-upload.crt' >> $journalconf
@@ -156,11 +259,14 @@ else
         if ! request_tls_cert $tlsdir/rsyslog.key $tlsdir/rsyslog.crt $tlsdir/ca.pem; then
             exit 0
         fi
+        rsyslogkeygroup=""
         if getent passwd syslog > /dev/null 2>&1; then
             # e.g. Ubuntu runs rsyslogd as the syslog user
+            rsyslogkeygroup=syslog
             chgrp syslog $tlsdir/rsyslog.key 2>/dev/null
             chmod g+r $tlsdir/rsyslog.key
         fi
+        setup_cert_renewal $tlsdir/rsyslog.key $tlsdir/rsyslog.crt "$rsyslogkeygroup" rsyslog.service
         echo '# Syslog forwarding configured by confluent during deployment' > $syslogconf
         echo 'global(DefaultNetstreamDriver="'$tlsdriver'"' >> $syslogconf
         echo '       DefaultNetstreamDriverCAFile="'$tlsdir'/ca.pem"' >> $syslogconf
