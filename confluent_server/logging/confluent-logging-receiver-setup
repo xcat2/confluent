@@ -143,7 +143,14 @@ else
             chgrp syslog $tlsdir/rsyslog.key
             chmod g+r $tlsdir/rsyslog.key
         fi
-        sed 's/"ossl"/"'$tlsdriver'"/' rsyslog/confluent-nodes-tls.conf > /etc/rsyslog.d/confluent-nodes.conf
+        # spread the TLS sessions over several input workers where the
+        # imtcp workerthreads parameter exists (>=8.2504.0)
+        # has it); probe the local rsyslogd rather than track versions
+        workerthreads=""
+        if ! echo 'module(load="imtcp" workerthreads="4")' | rsyslogd -N1 -f /dev/stdin 2>&1 | grep -q 'not known'; then
+            workerthreads=' workerthreads="4"'
+        fi
+        sed -e 's/"ossl"/"'$tlsdriver'"/' -e 's/keepAlive="on"/&'"$workerthreads"'/' rsyslog/confluent-nodes-tls.conf > /etc/rsyslog.d/confluent-nodes.conf
         echo "TLS rsyslog reception configured; permit TCP port 6514 through the firewall, e.g.:"
         echo "  firewall-cmd --permanent --add-port=6514/tcp && firewall-cmd --reload"
     else
