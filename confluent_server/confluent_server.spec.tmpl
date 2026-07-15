@@ -68,10 +68,7 @@ chown confluent:confluent /etc/confluent /var/lib/confluent /var/log/confluent /
 sysctl -p /usr/lib/sysctl.d/confluent.conf >& /dev/null
 NEEDCHOWN=0
 NEEDSTART=0
-find /etc/confluent -uid 0 | grep -E '.*' > /dev/null && NEEDCHOWN=1
-find /var/log/confluent -uid 0 | grep -E '.*' > /dev/null && NEEDCHOWN=1
-find /var/run/confluent -uid 0 | grep -E '.*' > /dev/null && NEEDCHOWN=1
-find /var/cache/confluent -uid 0 | grep -E '.*' > /dev/null && NEEDCHOWN=1
+[ -n "$(find /etc/confluent /var/log/confluent /var/cache/confluent -uid 0 -print -quit 2>/dev/null)" ] && NEEDCHOWN=1
 if [ $NEEDCHOWN = 1 ]; then
     if systemctl is-active confluent > /dev/null; then
         NEEDSTART=1
