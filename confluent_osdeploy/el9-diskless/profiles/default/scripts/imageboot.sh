@@ -153,6 +153,9 @@ mkdir -p /sysroot/opt/confluent/bin
 curl -sf https://$confluent_whost/confluent-public/os/$confluent_profile/scripts/onboot.sh > /sysroot/opt/confluent/bin/onboot.sh
 chmod +x /sysroot/opt/confluent/bin/onboot.sh
 cp /opt/confluent/bin/apiclient /sysroot/opt/confluent/bin
+set_selinux_context system_u:object_r:systemd_unit_file_t:s0 /sysroot/etc/systemd/system/onboot.service
+set_selinux_context system_u:object_r:bin_t:s0 /sysroot/opt/confluent/bin/onboot.sh
+set_selinux_context system_u:object_r:bin_t:s0 /sysroot/opt/confluent/bin/apiclient
 ln -s /etc/systemd/system/onboot.service /sysroot/etc/systemd/system/multi-user.target.wants/onboot.service
 cp /etc/confluent/functions /sysroot/etc/confluent/functions
 if grep installtodisk /proc/cmdline > /dev/null; then

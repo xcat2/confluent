@@ -108,6 +108,12 @@ run_remote_parts() {
     unset confluentscripttmpdir
 }
 
+set_selinux_context() {
+    if [ -x /usr/bin/chcon ]; then
+        /usr/bin/chcon "$1" "$2"
+    fi
+}
+
 source_remote() {
     set_confluent_vars
     unsettmpdir=0
@@ -150,9 +156,7 @@ run_remote() {
     if [ $? != 0 ]; then echo $requestedcmd failed to download; return 1; fi
     chmod +x $1
     cmd=$1
-    if [ -x /usr/bin/chcon ]; then
-        chcon system_u:object_r:bin_t:s0 $cmd
-    fi
+    set_selinux_context system_u:object_r:bin_t:s0 "$cmd"
     shift
     ./$cmd $*
     retcode=$?
