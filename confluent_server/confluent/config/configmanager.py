@@ -1389,7 +1389,7 @@ class ConfigManager(object):
             return _cfgstore['main']
         return _cfgstore['tenant'][self.tenant]
 
-    def __init__(self, tenant, decrypt=False, username=None):
+    def __init__(self, tenant, decrypt=False, username=None, create_tenant=False):
         self.clientfiles = {}
         global _cfgstore
         self.inrestore = False
@@ -1411,12 +1411,14 @@ class ConfigManager(object):
                     self._cfgstore['nodes'] = {}
                     self._bg_sync_to_file()
                 return
-            elif 'tenant' not in _cfgstore:
+            elif 'tenant' not in _cfgstore and create_tenant:
                 _cfgstore['tenant'] = {tenant: {}}
                 self._bg_sync_to_file()
-            elif tenant not in _cfgstore['tenant']:
+            elif tenant not in _cfgstore['tenant'] and create_tenant:
                 _cfgstore['tenant'][tenant] = {}
                 self._bg_sync_to_file()
+            elif tenant and tenant not in _cfgstore.get('tenant', {}):
+                raise ValueError("Tenant {0} does not exist".format(tenant))
             self.tenant = tenant
             if 'nodegroups' not in self._cfgstore:
                 self._cfgstore['nodegroups'] = {'everything': {}}
