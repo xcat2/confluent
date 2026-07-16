@@ -773,9 +773,14 @@ class ElHandler(OsHandler):
         lfuses = glob.glob(os.path.join(hostpath, '/usr/lib64/libfuse.so.2'))
         if not lfuses:
             needpkgs.append('fuse-libs')
-        if not os.path.exists(os.path.join(hostpath, '/usr/bin/ipcalc')):
+        if (self.oscategory != 'el10' and
+                not os.path.exists(os.path.join(hostpath, '/usr/bin/ipcalc'))):
             needpkgs.append('ipcalc')
-        if not os.path.exists(os.path.join(hostpath, 'usr/sbin/dhclient')):
+        if (self.oscategory == 'el10' and
+                not os.path.exists(os.path.join(hostpath, 'usr/sbin/dhcpcd'))):
+            needpkgs.append('dhcpcd')
+        elif (self.oscategory != 'el10' and
+                not os.path.exists(os.path.join(hostpath, 'usr/sbin/dhclient'))):
             needpkgs.append('dhcp-client')
         if not os.path.exists(os.path.join(hostpath, 'usr/sbin/mount.nfs')):
             needpkgs.append('nfs-utils')
