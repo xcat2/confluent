@@ -294,9 +294,11 @@ else
             fi
         done
     else
+        # Plain TCP forwarding (no encryption)
+        fwdqueue='action.resumeRetryCount="-1" queue.type="linkedList" queue.size="10000"'
         echo '# Syslog forwarding configured by confluent during deployment' > $syslogconf
         for loggingsrv in $loggingservers; do
-            echo '*.* action(type="omfwd" target="'$loggingsrv'" port="514" protocol="udp")' >> $syslogconf
+            echo '*.* action(type="omfwd" target="'$loggingsrv'" port="514" protocol="tcp" '"$fwdqueue"')' >> $syslogconf
         done
     fi
     if [ -x /usr/sbin/restorecon ]; then
