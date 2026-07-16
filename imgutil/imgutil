@@ -683,6 +683,8 @@ class DebHandler(OsHandler):
         needpkgs = []
         if not os.path.exists(os.path.join(hostpath, 'usr/bin/tpm2_getcap')):
             needpkgs.append('tpm2-tools')
+        if not os.path.exists(os.path.join(hostpath, 'usr/bin/unsquashfs')):
+            needpkgs.append('squashfs-tools')
         lfuses = glob.glob(os.path.join(hostpath, '/lib/*/libfuse.so.2'))
         if not lfuses:
             needpkgs.append('libfuse2')
@@ -779,6 +781,10 @@ class ElHandler(OsHandler):
             needpkgs.append('dhcp-client')
         if not os.path.exists(os.path.join(hostpath, 'usr/sbin/mount.nfs')):
             needpkgs.append('nfs-utils')
+        if (self.oscategory in ('el9', 'el10') and
+                not os.path.exists(os.path.join(hostpath, 'usr/sbin/unsquashfs')) and
+                not os.path.exists(os.path.join(hostpath, 'usr/bin/unsquashfs'))):
+            needpkgs.append('squashfs-tools')
         if needpkgs:
             needapt = 'Missing packages needed in target for capture, to add required packages: dnf install ' + ' '.join(needpkgs)
             self.captureprereqs.append(needapt)
