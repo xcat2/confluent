@@ -32,6 +32,19 @@ if v4cfg == 'static' or v4cfg =='dhcp':
 if not server:
     server = '[{}]'.format(server6)
 
+try:
+    with open('/etc/confluentimg.buildinfo') as buildinfo:
+        if not any(line.startswith('BUILDSRC=') for line in buildinfo):
+            # image was built from the build system repositories (imgutil
+            # build without --source), so no distribution tree exists on
+            # the deployment server
+            sys.stdout.write('Image was built from the build system '
+                             'repositories, no local distribution to add, '
+                             'skipping\n')
+            sys.exit(0)
+except IOError:
+    pass
+
 path = '/confluent-public/os/{0}/distribution/'.format(profile)
 clnt = apiclient.HTTPSClient()
 cfgdata = clnt.grab_url(path + '.treeinfo').decode()
