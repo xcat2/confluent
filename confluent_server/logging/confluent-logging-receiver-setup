@@ -8,7 +8,7 @@
 # authenticated via the confluent certificate authority: a server certificate
 # is issued from the local confluent CA and only clients presenting a
 # certificate from that CA are accepted. With --plain, the plaintext receiver
-# examples are installed instead (rsyslog UDP port 514, journal-remote HTTP
+# examples are installed instead (rsyslog TCP port 514, journal-remote HTTP
 # port 19532).
 #
 # rsyslog reception writes per-node logs under /var/log/confluent/nodes/
@@ -155,8 +155,8 @@ else
         echo "  firewall-cmd --permanent --add-port=6514/tcp && firewall-cmd --reload"
     else
         cp rsyslog/confluent-nodes.conf /etc/rsyslog.d/confluent-nodes.conf
-        echo "Plain rsyslog reception configured; permit UDP port 514 through the firewall, e.g.:"
-        echo "  firewall-cmd --permanent --add-service=syslog && firewall-cmd --reload"
+        echo "Plain rsyslog reception configured; permit TCP port 514 through the firewall, e.g.:"
+        echo "  firewall-cmd --permanent --add-port=514/tcp && firewall-cmd --reload"
     fi
     if [ -x /usr/sbin/restorecon ]; then
         /usr/sbin/restorecon /etc/rsyslog.d/confluent-nodes.conf 2>/dev/null || true

@@ -722,7 +722,7 @@ node = {
     'logging.method': {
         'description': 'Method used to forward logs to logging.servers. '
                        '"rsyslog" (the default if unset) forwards syslog '
-                       'using rsyslog over UDP port 514. "journal-remote" '
+                       'using rsyslog over TCP port 514. "journal-remote" '
                        'uploads the systemd journal using '
                        'systemd-journal-upload to systemd-journal-remote on '
                        'port 19532; note that systemd-journal-upload supports '
