@@ -1414,7 +1414,7 @@ class ConfigManager(object):
             elif 'tenant' not in _cfgstore and create_tenant:
                 _cfgstore['tenant'] = {tenant: {}}
                 self._bg_sync_to_file()
-            elif tenant not in _cfgstore['tenant'] and create_tenant:
+            elif tenant not in _cfgstore.get('tenant', {}) and create_tenant:
                 _cfgstore['tenant'][tenant] = {}
                 self._bg_sync_to_file()
             elif tenant and tenant not in _cfgstore.get('tenant', {}):
