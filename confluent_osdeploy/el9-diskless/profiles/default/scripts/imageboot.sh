@@ -29,9 +29,10 @@ if grep '^Format: confluent_crypted' /tmp/rootimg.info > /dev/null; then
     mountsrc=/dev/mapper/cryptimg
 fi
 
-if grep '^Format: squashfs' /tmp/rootimg.info > /dev/null; then
+rootimgformat=$(awk -F': ' '/^Format:/ {print $2; exit}' /tmp/rootimg.info)
+if [ "$rootimgformat" = squashfs ]; then
     mount -o ro $mountsrc /mnt/remote
-elif grep  '^Format: confluent_multisquash' /tmp/rootimg.info; then
+elif [ "$rootimgformat" = confluent_multisquash ]; then
     tail -n +3 /tmp/rootimg.info  | awk '{gsub("/", "_"); print "echo 0 " $4 " linear '$mountsrc' " $3 " | dmsetup create mproot" $7}' > /tmp/setupmount.sh
     . /tmp/setupmount.sh
     cat /tmp/setupmount.sh |awk '{printf "mount /dev/mapper/"$NF" "; sub("mproot", ""); gsub("_", "/"); print "/mnt/remote"$NF}' > /tmp/mountparts.sh
@@ -54,27 +55,7 @@ if [ "untethered" = "$(getarg confluent_imagemethod)" -o "uncompressed" = "$(get
     else
         mount -t tmpfs disklessroot /sysroot
     fi
-    echo -en "Decrypting and extracting root filesystem: 0%\r"
-    srcsz=$(du -sk /mnt/remote | awk '{print $1}')
-    while [ -f /mnt/remoteimg/rootimg.sfs ]; do
-        dstsz=$(du -sk /sysroot | awk '{print $1}')
-        pct=$((dstsz * 100 / srcsz))
-        if [ $pct -gt 99 ]; then
-            pct=99
-        fi
-        echo -en "Decrypting and extracting root filesystem: $pct%\r"
-        sleep 0.25
-    done &
-    cp -ax /mnt/remote/* /sysroot/
-    umount /mnt/remote
-    if [ -e /dev/mapper/cryptimg ]; then
-        dmsetup remove cryptimg
-    fi
-    losetup -d $loopdev
-    rm /mnt/remoteimg/rootimg.sfs
-    umount /mnt/remoteimg
-    wait
-    echo -e "Decrypting and extracting root filesystem: 100%"
+    extract_untethered_rootimg || return 1
 else
     TETHERED=1
     mount -o discard /dev/zram0 /mnt/overlay

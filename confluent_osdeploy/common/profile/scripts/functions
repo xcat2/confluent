@@ -212,5 +212,106 @@ run_remote_config() {
     echo '---------------------------------------------------------------------------'
     return
 }
+startlegacyprogress() {
+    [ -n "$progresspid" ] && return
+    echo -en "Decrypting and extracting root filesystem: 0%\r"
+    srcsz=$(du -sk /mnt/remote | awk '{print $1}')
+    while [ -f /mnt/remoteimg/rootimg.sfs ]; do
+        dstsz=$(du -sk /sysroot | awk '{print $1}')
+        pct=$((dstsz * 100 / srcsz))
+        if [ $pct -gt 99 ]; then
+            pct=99
+        fi
+        echo -en "Decrypting and extracting root filesystem: $pct%\r"
+        sleep 0.25
+    done &
+    progresspid=$!
+}
+
+extractmultisquash() {
+    multisquashrc=1
+    while read -r _ partsrc partmount; do
+        normalizedmount=${partmount%/}
+        [ "$normalizedmount" = /mnt/remote ] || continue
+        if unsquashfs -force -d /sysroot "$partsrc"; then
+            multisquashrc=0
+        fi
+        break
+    done < /tmp/mountparts.sh
+    [ $multisquashrc -eq 0 ] || return 1
+    while read -r _ partsrc partmount; do
+        normalizedmount=${partmount%/}
+        [ "$normalizedmount" = /mnt/remote ] && continue
+        partdest=/sysroot${normalizedmount#/mnt/remote}
+        mkdir -p "$partdest"
+        if ! unsquashfs -force -d "$partdest" "$partsrc"; then
+            return 1
+        fi
+    done < /tmp/mountparts.sh
+}
+
+cleanupremotemounts() {
+    if [ -f /tmp/mountparts.sh ]; then
+        for partmount in $(awk '{ mounts[NR] = $3 } END { for (idx = NR; idx > 0; idx--) print mounts[idx] }' /tmp/mountparts.sh); do
+            umount "$partmount"
+        done
+        for partdev in $(awk '{ devices[NR] = $NF } END { for (idx = NR; idx > 0; idx--) print devices[idx] }' /tmp/setupmount.sh); do
+            dmsetup remove "$partdev"
+        done
+    else
+        umount /mnt/remote
+    fi
+}
+
+# Extract an untethered/uncompressed diskless root image into /sysroot and
+# tear down the source devices; expects rootimgformat, mountsrc, and loopdev
+# from imageboot.sh and the image content mounted under /mnt/remote.
+extract_untethered_rootimg() {
+    extractrc=1
+    progresspid=
+    if [ "$rootimgformat" = squashfs ] && command -v unsquashfs > /dev/null 2>&1; then
+        echo "Decrypting and extracting root filesystem in parallel"
+        if unsquashfs -force -d /sysroot "$mountsrc"; then
+            extractrc=0
+        else
+            echo "Parallel root filesystem extraction failed, retrying with cp"
+        fi
+    elif [ "$rootimgformat" = confluent_multisquash ] && command -v unsquashfs > /dev/null 2>&1; then
+        echo "Decrypting and extracting multipart root filesystem in parallel"
+        if extractmultisquash; then
+            extractrc=0
+        else
+            echo "Parallel multipart root filesystem extraction failed, retrying with cp"
+        fi
+    fi
+    if [ $extractrc -ne 0 ]; then
+        rm -rf /sysroot/* /sysroot/.[!.]* /sysroot/..?*
+        startlegacyprogress
+        if cp -a /mnt/remote/. /sysroot/; then
+            extractrc=0
+        fi
+    fi
+    if [ $extractrc -ne 0 ]; then
+        if [ -n "$progresspid" ]; then
+            kill "$progresspid" 2> /dev/null || true
+            wait "$progresspid" 2> /dev/null || true
+            progresspid=
+        fi
+        echo "Failed to extract the root filesystem"
+    fi
+    cleanupremotemounts
+    if [ -e /dev/mapper/cryptimg ]; then
+        dmsetup remove cryptimg
+    fi
+    losetup -d $loopdev
+    rm /mnt/remoteimg/rootimg.sfs
+    umount /mnt/remoteimg
+    if [ -n "$progresspid" ]; then
+        wait "$progresspid"
+        echo -e "Decrypting and extracting root filesystem: 100%"
+    fi
+    return $extractrc
+}
+
 #If invoked as a command, use the arguments to actually run a function
 (return 0 2>/dev/null) || $1 "${@:2}"
