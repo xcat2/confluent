@@ -2,3 +2,6 @@ include pam/*
 include sysvinit/*
 include systemd/*
 include sysctl/*
+include logging/*
+include logging/rsyslog/*
+include logging/journal-remote/*

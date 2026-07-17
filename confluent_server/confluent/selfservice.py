@@ -295,7 +295,7 @@ async def handle_request(req, make_response, mimetype):
             ncfg['ipv4_method'] = 'static'
         deployinfo = cfg.get_node_attributes(
             nodename, ('deployment.*', 'console.method', 'crypted.*',
-                       'dns.*', 'ntp.*'))
+                       'dns.*', 'ntp.*', 'logging.*'))
         deployinfo = deployinfo.get(nodename, {})
         profile = deployinfo.get(
             'deployment.pendingprofile', {}).get('value', '')
@@ -405,6 +405,17 @@ async def handle_request(req, make_response, mimetype):
             ncfg['ntpservers'] = []
             for ntpsrv in ntpsrvs:
                 ncfg['ntpservers'].append(ntpsrv)
+        logsrvs = deployinfo.get('logging.servers', {}).get('value', '')
+        if logsrvs:
+            logsrvs = logsrvs.split(',')
+        if logsrvs:
+            ncfg['loggingservers'] = []
+            for logsrv in logsrvs:
+                ncfg['loggingservers'].append(logsrv)
+            ncfg['loggingmethod'] = deployinfo.get(
+                'logging.method', {}).get('value', '') or 'rsyslog'
+            ncfg['loggingtls'] = bool(deployinfo.get(
+                'logging.tls', {}).get('value', False))
         dnsdomain = deployinfo.get('dns.domain', {}).get('value', None)
         ncfg['dnsdomain'] = dnsdomain
         return await make_response(mimetype, 200, 'OK', body=dumper(ncfg))

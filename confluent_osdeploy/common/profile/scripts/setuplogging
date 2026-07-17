@@ -1,0 +1,311 @@
+#!/bin/bash
+# Configure the deployed node to forward logs to the servers from the
+# logging.servers attribute (surfaced as loggingservers in
+# confluent.deploycfg), using the method from the logging.method attribute
+# (surfaced as loggingmethod): rsyslog (the default) or journal-remote.
+# When logging.tls (surfaced as loggingtls) is true, the forwarding is
+# encrypted and mutually authenticated using certificates from the confluent
+# certificate authority (see the confluent-logging-receiver-setup helper
+# under /opt/confluent/share/examples/logging for the receiving side).
+# Does nothing when logging.servers is unset.
+
+[ -f /lib/confluent/functions ] && . /lib/confluent/functions
+[ -f /etc/confluent/functions ] && . /etc/confluent/functions
+
+if ! grep '^loggingservers:' /etc/confluent/confluent.deploycfg > /dev/null 2>&1; then
+    exit 0
+fi
+loggingservers=$(sed -n '/^loggingservers:/,/^[^-]/p' /etc/confluent/confluent.deploycfg|sed 1d|sed '$d' | sed -e 's/^- //')
+loggingmethod=$(sed -n 's/^loggingmethod: //p' /etc/confluent/confluent.deploycfg)
+loggingtls=$(sed -n 's/^loggingtls: //p' /etc/confluent/confluent.deploycfg)
+if [ -z "$loggingmethod" ]; then
+    loggingmethod=rsyslog
+fi
+if [ "$loggingtls" != true ]; then
+    # drop renewal artifacts from a previous TLS-enabled run
+    rm -f /etc/confluent/logging-tls-renew
+    if [ -d /run/systemd/system ]; then
+        systemctl disable --now confluent-logging-renew.timer 2>/dev/null
+    fi
+    rm -f /etc/systemd/system/confluent-logging-renew.service /etc/systemd/system/confluent-logging-renew.timer
+fi
+
+# setup_cert_renewal <keyfile> <certfile> <keygroup> <service>: install a
+# daily randomized systemd timer that renews the forwarding certificate once
+# less than half of its validity remains, so short pubkeys.tls_lifetime
+# values (including the 47 day default) keep working. Renewal authenticates
+# with the api key persisted during deployment, which remains valid
+# regardless of deployment.apiarmed; the server derives the certificate
+# identity from its node configuration, not from the request.
+setup_cert_renewal() {
+    renewscript=/etc/confluent/logging-tls-renew
+    {
+        echo '#!/bin/sh'
+        echo '# Renew the confluent log forwarding TLS certificate when less than half'
+        echo '# of its validity remains; installed by the confluent setuplogging'
+        echo '# deployment script (see the logging.tls node attribute)'
+        echo "keyfile=$1"
+        echo "certfile=$2"
+        echo "keygroup=$3"
+        echo "service=$4"
+        cat << 'RENEWEOF'
+umask 077
+[ -s "$certfile" ] || exit 0
+notbefore=$(openssl x509 -startdate -noout -in "$certfile" | cut -d= -f2-)
+notafter=$(openssl x509 -enddate -noout -in "$certfile" | cut -d= -f2-)
+startts=$(date -d "$notbefore" +%s 2>/dev/null)
+endts=$(date -d "$notafter" +%s 2>/dev/null)
+now=$(date +%s)
+if [ -n "$startts" ] && [ -n "$endts" ] && [ $((endts - now)) -gt $(( (endts - startts) / 2 )) ]; then
+    exit 0
+fi
+confapiclient=""
+[ -f /opt/confluent/bin/apiclient ] && confapiclient=/opt/confluent/bin/apiclient
+[ -f /etc/confluent/apiclient ] && confapiclient=/etc/confluent/apiclient
+if [ -z "$confapiclient" ]; then
+    logger -t confluent-logging-renew "unable to locate the confluent apiclient, cannot renew $certfile"
+    exit 0
+fi
+TDIR=$(mktemp -d)
+openssl req -new -newkey ec -pkeyopt ec_paramgen_curve:secp384r1 -nodes \
+    -keyout $TDIR/key.pem -out $TDIR/csr.pem -subj /CN=$(hostname) > /dev/null 2>&1
+python3 $confapiclient /confluent-api/self/tlscert $TDIR/csr.pem -o $TDIR/cert.pem
+if [ ! -s $TDIR/cert.pem ]; then
+    rm -rf $TDIR
+    logger -t confluent-logging-renew "failed to obtain a renewed certificate from the confluent CA for $certfile, will retry"
+    exit 0
+fi
+# stage beside the live files (same filesystem), then replace atomically;
+# a failure never disturbs the material currently in use
+cp $TDIR/key.pem $keyfile.new
+cp $TDIR/cert.pem $certfile.new
+rm -rf $TDIR
+chmod 644 $certfile.new
+if [ -n "$keygroup" ]; then
+    chgrp $keygroup $keyfile.new 2>/dev/null
+    chmod g+r $keyfile.new
+fi
+if [ -x /usr/sbin/restorecon ]; then
+    /usr/sbin/restorecon $keyfile.new $certfile.new 2>/dev/null
+fi
+mv $keyfile.new $keyfile
+mv $certfile.new $certfile
+logger -t confluent-logging-renew "renewed $certfile (expires $(openssl x509 -enddate -noout -in $certfile | cut -d= -f2-))"
+systemctl try-restart $service 2>/dev/null
+exit 0
+RENEWEOF
+    } > $renewscript
+    chmod 755 $renewscript
+    if [ -x /usr/sbin/restorecon ]; then
+        /usr/sbin/restorecon $renewscript 2>/dev/null
+    fi
+    [ -d /run/systemd/system ] || return 0
+    cat > /etc/systemd/system/confluent-logging-renew.service << EOF
+[Unit]
+Description=Renew the confluent log forwarding TLS certificate
+
+[Service]
+Type=oneshot
+ExecStart=$renewscript
+EOF
+    cat > /etc/systemd/system/confluent-logging-renew.timer << EOF
+[Unit]
+Description=Daily confluent log forwarding TLS certificate renewal check
+
+[Timer]
+OnCalendar=daily
+RandomizedDelaySec=6h
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
+    systemctl daemon-reload 2>/dev/null
+    systemctl enable --now confluent-logging-renew.timer > /dev/null 2>&1
+}
+
+# request_tls_cert <keyout> <certout>: generate a key and have the confluent
+# CA sign a certificate for this node via the deployment API
+request_tls_cert() {
+    if ! type confluentpython > /dev/null 2>&1; then
+        confluentpython() { python3 "$@"; }
+    fi
+    confapiclient=""
+    [ -f /opt/confluent/bin/apiclient ] && confapiclient=/opt/confluent/bin/apiclient
+    [ -f /etc/confluent/apiclient ] && confapiclient=/etc/confluent/apiclient
+    if [ -z "$confapiclient" ]; then
+        echo "logging.tls: unable to locate the confluent apiclient, skipping log forwarding setup"
+        return 1
+    fi
+    if ! command -v openssl > /dev/null 2>&1; then
+        echo "logging.tls: openssl is required but not available, skipping log forwarding setup"
+        return 1
+    fi
+    if [ ! -s /etc/confluent/ca.pem ]; then
+        echo "logging.tls: /etc/confluent/ca.pem is missing, skipping log forwarding setup"
+        return 1
+    fi
+    # $3 is the destination for the CA trust anchor. A dedicated directory is
+    # used per consumer: /etc/ssl/private is not traversable by service users
+    # on Debian-style systems, and Ubuntu's rsyslogd AppArmor profile only
+    # permits reads under /etc/rsyslog.d
+    # stage beside the live files (same filesystem), then replace atomically;
+    # a failure never disturbs material a previous run may have left in use
+    mkdir -p $(dirname $1)
+    cat /etc/confluent/ca.pem > $3.new
+    CRTDIR=$(mktemp -d)
+    openssl req -new -newkey ec -pkeyopt ec_paramgen_curve:secp384r1 -nodes \
+        -keyout $1.new -out $CRTDIR/csr.pem -subj /CN=$(hostname) > /dev/null 2>&1
+    echo -n > $2.new
+    confluentpython $confapiclient /confluent-api/self/tlscert $CRTDIR/csr.pem -o $2.new
+    rm -rf $CRTDIR
+    if [ ! -s "$2.new" ]; then
+        echo "logging.tls: failed to obtain a certificate from the confluent CA, skipping log forwarding setup"
+        rm -f $1.new $2.new $3.new
+        return 1
+    fi
+    chmod 600 $1.new
+    chmod 644 $2.new $3.new
+    if [ -x /usr/sbin/restorecon ]; then
+        /usr/sbin/restorecon $1.new $2.new $3.new 2>/dev/null
+    fi
+    mv $1.new $1
+    mv $2.new $2
+    mv $3.new $3
+    return 0
+}
+
+if [ "$loggingmethod" = journal-remote ]; then
+    # drop forwarding state left by a previous rsyslog-method configuration
+    if [ -f /etc/rsyslog.d/60-confluent.conf ]; then
+        rm -f /etc/rsyslog.d/60-confluent.conf
+        if [ -d /run/systemd/system ]; then
+            systemctl try-restart rsyslog.service 2>/dev/null
+        fi
+    fi
+    uploadbin=""
+    for candidate in /usr/lib/systemd/systemd-journal-upload /lib/systemd/systemd-journal-upload; do
+        if [ -x $candidate ]; then
+            uploadbin=$candidate
+            break
+        fi
+    done
+    if [ -z "$uploadbin" ]; then
+        echo "systemd-journal-upload does not appear to be installed, skipping log forwarding setup"
+        exit 0
+    fi
+    loggingsrv=$(echo "$loggingservers" | sed -n 1p)
+    if [ "$(echo "$loggingservers" | wc -l)" -gt 1 ]; then
+        echo "journal-remote supports only a single destination, forwarding to $loggingsrv and ignoring the other logging.servers entries"
+    fi
+    case $loggingsrv in
+        *:*) loggingsrv="[$loggingsrv]" ;;  # bracket IPv6 literals for the URL
+    esac
+    mkdir -p /etc/systemd/journal-upload.conf.d
+    journalconf=/etc/systemd/journal-upload.conf.d/confluent.conf
+    echo '# Log forwarding configured by confluent during deployment' > $journalconf
+    echo '[Upload]' >> $journalconf
+    if [ "$loggingtls" = true ]; then
+        tlsdir=/etc/ssl/confluent-logging
+        if ! request_tls_cert $tlsdir/journal-upload.key $tlsdir/journal-upload.crt $tlsdir/ca.pem; then
+            rm -f $journalconf
+            exit 0
+        fi
+        chgrp systemd-journal $tlsdir/journal-upload.key 2>/dev/null
+        chmod g+r $tlsdir/journal-upload.key
+        setup_cert_renewal $tlsdir/journal-upload.key $tlsdir/journal-upload.crt systemd-journal systemd-journal-upload.service
+        echo 'URL=https://'$loggingsrv':19532' >> $journalconf
+        echo 'ServerKeyFile='$tlsdir'/journal-upload.key' >> $journalconf
+        echo 'ServerCertificateFile='$tlsdir'/journal-upload.crt' >> $journalconf
+        echo 'TrustedCertificateFile='$tlsdir'/ca.pem' >> $journalconf
+    else
+        echo 'URL=http://'$loggingsrv':19532' >> $journalconf
+    fi
+    if [ -x /usr/sbin/restorecon ]; then
+        /usr/sbin/restorecon $journalconf 2>/dev/null
+    fi
+    systemctl enable systemd-journal-upload.service 2>/dev/null
+    if [ -d /run/systemd/system ]; then
+        systemctl restart systemd-journal-upload.service 2>/dev/null
+    fi
+else
+    # drop forwarding state left by a previous journal-remote-method
+    # configuration
+    if [ -f /etc/systemd/journal-upload.conf.d/confluent.conf ]; then
+        rm -f /etc/systemd/journal-upload.conf.d/confluent.conf
+        systemctl disable systemd-journal-upload.service 2>/dev/null
+        if [ -d /run/systemd/system ]; then
+            systemctl stop systemd-journal-upload.service 2>/dev/null
+        fi
+    fi
+    if [ ! -d /etc/rsyslog.d ]; then
+        echo "rsyslog does not appear to be installed, skipping log forwarding setup"
+        exit 0
+    fi
+    syslogconf=/etc/rsyslog.d/60-confluent.conf
+    if [ "$loggingtls" = true ]; then
+        # forwarding with TLS needs a network stream driver module
+        # (rsyslog-openssl or rsyslog-gnutls)
+        tlsdriver=""
+        for moddir in /usr/lib64/rsyslog /usr/lib/rsyslog /usr/lib/*-linux-gnu/rsyslog; do
+            [ -f $moddir/lmnsd_ossl.so ] && tlsdriver=ossl && break
+            [ -f $moddir/lmnsd_gtls.so ] && tlsdriver=gtls && break
+        done
+        if [ -z "$tlsdriver" ]; then
+            echo "logging.tls requires the rsyslog-openssl or rsyslog-gnutls module on the node, skipping log forwarding setup"
+            exit 0
+        fi
+        tlsdir=/etc/rsyslog.d/confluent-tls
+        if ! request_tls_cert $tlsdir/rsyslog.key $tlsdir/rsyslog.crt $tlsdir/ca.pem; then
+            exit 0
+        fi
+        rsyslogkeygroup=""
+        if getent passwd syslog > /dev/null 2>&1; then
+            # e.g. Ubuntu runs rsyslogd as the syslog user
+            rsyslogkeygroup=syslog
+            chgrp syslog $tlsdir/rsyslog.key 2>/dev/null
+            chmod g+r $tlsdir/rsyslog.key
+        fi
+        setup_cert_renewal $tlsdir/rsyslog.key $tlsdir/rsyslog.crt "$rsyslogkeygroup" rsyslog.service
+        echo '# Syslog forwarding configured by confluent during deployment' > $syslogconf
+        echo 'global(DefaultNetstreamDriver="'$tlsdriver'"' >> $syslogconf
+        echo '       DefaultNetstreamDriverCAFile="'$tlsdir'/ca.pem"' >> $syslogconf
+        echo '       DefaultNetstreamDriverCertFile="'$tlsdir'/rsyslog.crt"' >> $syslogconf
+        echo '       DefaultNetstreamDriverKeyFile="'$tlsdir'/rsyslog.key")' >> $syslogconf
+        # For name-valued targets, pin the server identity (x509/name): the
+        # confluent CA also issues certificates to every node and BMC, and
+        # with chain validation alone any of them could pose as the server.
+        # rsyslog matches pinned peers only against DNS-type SANs, so IP
+        # targets can only validate the chain (x509/certvalid).
+        # The bounded async queue keeps an unreachable or hung log server
+        # from wedging the main queue (and with it local logging); once it
+        # fills, further forwarded messages are dropped instead.
+        fwdqueue='action.resumeRetryCount="-1" queue.type="linkedList" queue.size="10000"'
+        for loggingsrv in $loggingservers; do
+            case $loggingsrv in
+                *:*) isname=0 ;;        # IPv6 literal
+                *[!0-9.]*) isname=1 ;;  # anything besides digits and dots
+                *) isname=0 ;;          # IPv4 literal
+            esac
+            if [ $isname = 1 ]; then
+                echo '*.* action(type="omfwd" target="'$loggingsrv'" port="6514" protocol="tcp" StreamDriverMode="1" StreamDriverAuthMode="x509/name" StreamDriverPermittedPeers="'$loggingsrv'" '"$fwdqueue"')' >> $syslogconf
+            else
+                echo '*.* action(type="omfwd" target="'$loggingsrv'" port="6514" protocol="tcp" StreamDriverMode="1" StreamDriverAuthMode="x509/certvalid" '"$fwdqueue"')' >> $syslogconf
+            fi
+        done
+    else
+        # Plain TCP forwarding (no encryption)
+        fwdqueue='action.resumeRetryCount="-1" queue.type="linkedList" queue.size="10000"'
+        echo '# Syslog forwarding configured by confluent during deployment' > $syslogconf
+        for loggingsrv in $loggingservers; do
+            echo '*.* action(type="omfwd" target="'$loggingsrv'" port="514" protocol="tcp" '"$fwdqueue"')' >> $syslogconf
+        done
+    fi
+    if [ -x /usr/sbin/restorecon ]; then
+        /usr/sbin/restorecon $syslogconf 2>/dev/null
+    fi
+    if [ -d /run/systemd/system ]; then
+        systemctl try-restart rsyslog.service 2>/dev/null
+    fi
+fi
+exit 0

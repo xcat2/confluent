@@ -705,4 +705,53 @@ node = {
     'dns.servers': {
         'description': 'DNS Server or servers to provide to node',
     },
+    'logging.servers': {
+        'description': 'Remote logging server or servers (comma separated) '
+                       'for the OS deployment to configure the node to '
+                       'forward logs to, using the method indicated by '
+                       'logging.method. May be set to the deployment server '
+                       'or any other logging server. With logging.tls and '
+                       'the rsyslog method, prefer DNS names resolvable by '
+                       'the nodes over IP addresses: a name lets the node '
+                       'verify the specific server identity, while an IP '
+                       'only validates that the certificate came from the '
+                       'confluent CA. See '
+                       '/opt/confluent/share/examples/logging for cfg '
+                       'examples. If unset, no forwarding is configured.',
+    },
+    'logging.method': {
+        'description': 'Method used to forward logs to logging.servers. '
+                       '"rsyslog" (the default if unset) forwards syslog '
+                       'using rsyslog over TCP port 514. "journal-remote" '
+                       'uploads the systemd journal using '
+                       'systemd-journal-upload to systemd-journal-remote on '
+                       'port 19532; note that systemd-journal-upload supports '
+                       'only a single destination, so only the first entry of '
+                       'logging.servers is used.',
+        'validvalues': ('rsyslog', 'journal-remote', ''),
+    },
+    'logging.tls': {
+        'description': 'Whether to encrypt the forwarded logs with TLS, with '
+                       'node and logging server mutually authenticated via '
+                       'the confluent TLS certificate authority. With '
+                       'rsyslog, logs are forwarded over TCP port 6514 and '
+                       'the node needs the rsyslog-openssl or rsyslog-gnutls '
+                       'module; with journal-remote, over HTTPS port 19532. '
+                       'Caution: some distributions build '
+                       'systemd-journal-remote without client certificate '
+                       'verification (e.g. EL10 and Ubuntu). '
+                       'The transport is still encrypted and '
+                       'the node verifies the server, but such receivers '
+                       'accept uploads from any client; use the rsyslog '
+                       'method when client verification is required. '
+                       'The node certificate is issued during deployment '
+                       'with validity governed by pubkeys.tls_lifetime '
+                       '(default 47 days) and renewed automatically: a '
+                       'daily randomized systemd timer on the node requests '
+                       'a fresh certificate once less than half of the '
+                       'validity remains. To set up the receiving side, see the '
+                       'confluent-logging-receiver-setup helper under '
+                       '/opt/confluent/share/examples/logging.',
+        'type': bool,
+    },
 }

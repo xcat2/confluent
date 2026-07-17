@@ -27,6 +27,7 @@ chmod 600 /var/log/confluent/confluent-onboot.log
 tail -f /var/log/confluent/confluent-onboot.log > /dev/console &
 logshowpid=$!
 
+run_remote setuplogging
 run_remote_python syncfileclient
 run_remote_python confignet
 
