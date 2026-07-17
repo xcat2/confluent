@@ -3136,6 +3136,11 @@ async def restore_db_from_directory(location, password, merge=False, skipped=Non
                 kdd = None
     except IOError as e:
         if e.errno == 2:
+            otherformat = 'json' if format == 'yaml' else 'yaml'
+            if os.path.exists(os.path.join(location, f'keys.{otherformat}')):
+                raise Exception(
+                    f'Cannot find keys.{format}, but keys.{otherformat} '
+                    f'exists; this appears to be a {otherformat} format dump')
             raise Exception("Cannot restore without keys, this may be a "
                             "redacted dump")
     if not merge:
