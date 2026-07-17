@@ -214,7 +214,7 @@ async def capture_remote(args):
     subprocess.check_call(['rsync', __file__, '{0}:/run/imgutil/capenv/'.format(targ)])
     finfo = subprocess.check_output(['ssh', targ, 'python3', '/run/imgutil/capenv/imgutil', 'getfingerprint']).decode('utf8')
     finfo = json.loads(finfo)
-    if finfo['oscategory'] not in ('el8', 'el9', 'ubuntu20.04', 'ubuntu22.04', 'ubuntu24.04', 'ubuntu26.04'):
+    if finfo['oscategory'] not in ('el8', 'el9', 'el10', 'ubuntu20.04', 'ubuntu22.04', 'ubuntu24.04', 'ubuntu26.04'):
         sys.stderr.write('Not yet supported for capture: ' + repr(finfo) + '\n')
         sys.exit(1)
     unmet = finfo.get('unmetprereqs', [])
@@ -773,9 +773,14 @@ class ElHandler(OsHandler):
         lfuses = glob.glob(os.path.join(hostpath, '/usr/lib64/libfuse.so.2'))
         if not lfuses:
             needpkgs.append('fuse-libs')
-        if not os.path.exists(os.path.join(hostpath, '/usr/bin/ipcalc')):
+        if (self.oscategory != 'el10' and
+                not os.path.exists(os.path.join(hostpath, '/usr/bin/ipcalc'))):
             needpkgs.append('ipcalc')
-        if not os.path.exists(os.path.join(hostpath, 'usr/sbin/dhclient')):
+        if (self.oscategory == 'el10' and
+                not os.path.exists(os.path.join(hostpath, 'usr/sbin/dhcpcd'))):
+            needpkgs.append('dhcpcd')
+        elif (self.oscategory != 'el10' and
+                not os.path.exists(os.path.join(hostpath, 'usr/sbin/dhclient'))):
             needpkgs.append('dhcp-client')
         if not os.path.exists(os.path.join(hostpath, 'usr/sbin/mount.nfs')):
             needpkgs.append('nfs-utils')
