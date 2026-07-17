@@ -3096,6 +3096,34 @@ def _dump_keys(password, dojson=True):
     return keydata
 
 
+# PyYAML implements YAML 1.1 implicit typing, under which hand edited values
+# like 'yes', '52:54:00:12:34:56' (sexagesimal), or '2026-07-17' load as bool,
+# int, and date rather than str.  Restrict implicit typing to a subset of the
+# forms the PyYAML dumper quotes when emitting strings, so ambiguous hand
+# edited scalars stay strings and dump/restore round trips stay faithful.
+class _RestrictedYamlLoader(yaml.SafeLoader):
+    yaml_implicit_resolvers = {
+        key: [(tag, regexp) for tag, regexp in resolvers
+              if tag.rsplit(':', 1)[-1] not in ('bool', 'int', 'float',
+                                                'timestamp')]
+        for key, resolvers in yaml.SafeLoader.yaml_implicit_resolvers.items()
+    }
+
+_RestrictedYamlLoader.add_implicit_resolver(
+    'tag:yaml.org,2002:bool',
+    re.compile(r'^(?:true|True|TRUE|false|False|FALSE)$'),
+    list('tTfF'))
+_RestrictedYamlLoader.add_implicit_resolver(
+    'tag:yaml.org,2002:int',
+    re.compile(r'^[-+]?(?:0|[1-9][0-9]*)$'),
+    list('-+0123456789'))
+_RestrictedYamlLoader.add_implicit_resolver(
+    'tag:yaml.org,2002:float',
+    re.compile(r'''^(?:[-+]?[0-9]+\.[0-9]*(?:[eE][-+][0-9]+)?
+                    |\.[0-9]+(?:[eE][-+][0-9]+)?)$''', re.X),
+    list('-+0123456789.'))
+
+
 async def restore_db_from_directory(location, password, merge=False, skipped=None, format='json'):
     """Restore database from a directory
     
@@ -3116,7 +3144,7 @@ async def restore_db_from_directory(location, password, merge=False, skipped=Non
             if format == 'json':
                 kdd = json.loads(keydata)
             else:
-                kdd = yaml.safe_load(keydata)
+                kdd = yaml.load(keydata, _RestrictedYamlLoader)
                 if kdd is None:
                     raise ValueError(f"Invalid or empty YAML content in {keys_file}")
             
@@ -3150,7 +3178,7 @@ async def restore_db_from_directory(location, password, merge=False, skipped=Non
                 if format == 'json':
                     moreglobals = json.load(globin)
                 else:
-                    moreglobals = yaml.safe_load(globin)
+                    moreglobals = yaml.load(globin, _RestrictedYamlLoader)
                     if moreglobals is None:
                         raise ValueError(f"Invalid or empty YAML content in {globals_file}")
                 
@@ -3165,7 +3193,7 @@ async def restore_db_from_directory(location, password, merge=False, skipped=Non
                 if format == 'json':
                     collective = json.load(collin)
                 else:
-                    collective = yaml.safe_load(collin)
+                    collective = yaml.load(collin, _RestrictedYamlLoader)
                     if collective is None:
                         raise ValueError(f"Invalid or empty YAML content in {collective_file}")
                 
@@ -3181,7 +3209,7 @@ async def restore_db_from_directory(location, password, merge=False, skipped=Non
         cfgdata = cfgfile.read()
         if format == 'yaml':
             # Convert YAML to JSON string for _load_from_json
-            yaml_data = yaml.safe_load(cfgdata)
+            yaml_data = yaml.load(cfgdata, _RestrictedYamlLoader)
             if yaml_data is None:
                 raise ValueError(f"Invalid or empty YAML content in {main_file}")
             cfgdata = json.dumps(yaml_data)
