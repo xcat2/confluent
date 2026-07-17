@@ -13,7 +13,7 @@ dracut_install du df ssh-keygen scp
 dracut_install /lib64/libnss_dns*
 dracut_install /usr/lib64/libnl-3.so.200
 dracut_install /etc/nsswitch.conf /etc/services /etc/protocols
-dracut_install chmod whoami head tail basename tr
+dracut_install chmod chcon whoami head tail basename tr
 dracut_install /usr/sbin/arping dhcpcd logger hostnamectl
 inst /bin/bash /bin/sh
 dracut_install /lib64/libfuse.so.2
