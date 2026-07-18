@@ -24,6 +24,6 @@
 # Entries under MERGE: will attempt to be intelligently merged. This supports /etc/group and /etc/passwd
 # Any supporting entries in /etc/shadow or /etc/gshadow are added automatically, with password disabled
 # It also will not inject 'system' ids (under 1,000 usually) as those tend to be local and rpm managed.
-MERGE:
+# MERGE:
 # /etc/passwd
 # /etc/group
