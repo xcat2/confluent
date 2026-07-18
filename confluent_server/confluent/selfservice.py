@@ -480,10 +480,17 @@ async def handle_request(req, make_response, mimetype):
             mrsp = await make_response(mimetype, 200, 'Ok')
             await mrsp.write(b'Accepted')
             return
+        stayarmed = False
         if update['status'] == 'staged':
             targattr = 'deployment.stagedprofile'
         elif update['status'] == 'complete':
             targattr = 'deployment.profile'
+        elif update['status'] == 'booted':
+            # a stateless node reporting a successful boot; record the booted
+            # profile as current, but leave pendingprofile armed since the
+            # node needs it to network boot the same image on next boot
+            targattr = 'deployment.profile'
+            stayarmed = True
         else:
             raise Exception('Unknown update status request')
         currattr = cfg.get_node_attributes(nodename, 'deployment.*').get(
@@ -495,17 +502,19 @@ async def handle_request(req, make_response, mimetype):
             pending = currattr.get('deployment.pendingprofile', {}).get('value', '')
         updates = {}
         if pending:
-            updates['deployment.pendingprofile'] = {'value': ''}
-            if targattr == 'deployment.profile':
-                updates['deployment.stagedprofile'] = {'value': ''}
-                dls = cfg.get_node_attributes(nodename, 'deployment.lock')
-                dls = dls.get(nodename, {}).get('deployment.lock', {}).get('value', None)
-                if dls == 'autolock':
-                    updates['deployment.lock'] = 'locked'
+            if not stayarmed:
+                updates['deployment.pendingprofile'] = {'value': ''}
+                if targattr == 'deployment.profile':
+                    updates['deployment.stagedprofile'] = {'value': ''}
+                    dls = cfg.get_node_attributes(nodename, 'deployment.lock')
+                    dls = dls.get(nodename, {}).get('deployment.lock', {}).get('value', None)
+                    if dls == 'autolock':
+                        updates['deployment.lock'] = 'locked'
             currprof = currattr.get(targattr, {}).get('value', '')
             if currprof != pending:
                 updates[targattr] = {'value': pending}
-            await cfg.set_node_attributes({nodename: updates})
+            if updates:
+                await cfg.set_node_attributes({nodename: updates})
             return await make_response('text/plain', 200, 'OK', body='OK')
         else:
             return await make_response('text/plain', 500, 'Error', body='No pending profile detected, unable to accept status update')

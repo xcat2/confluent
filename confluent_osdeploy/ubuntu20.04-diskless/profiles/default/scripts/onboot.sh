@@ -36,5 +36,5 @@ run_remote_parts onboot.d
 # Induce execution of remote configuration, e.g. ansible plays in ansible/onboot.d/
 run_remote_config onboot.d
 
-#curl -X POST -d 'status: booted' -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $confluent_apikey" https://$confluent_mgr/confluent-api/self/updatestatus
+printf 'state: booted\nstatus: booted' | curl -X POST --data-binary @- -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $confluent_apikey" https://$confluent_mgr/confluent-api/self/updatestatus
 kill $logshowpid
