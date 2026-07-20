@@ -280,8 +280,10 @@ def fixup(rootdir, vols):
                 with open(rgcfg, 'r') as gin:
                     tgrubcfg = gin.read()
                 tgrubcfg = tgrubcfg.split('\n')
-                if 'search --no-floppy --fs-uuid --set=dev' in tgrubcfg[0]:
-                    tgrubcfg[0] = 'search --no-floppy --fs-uuid --set=dev ' + bootuuid
+                if tgrubcfg[0].startswith('search') and '--set=dev' in tgrubcfg[0]:
+                    searchparts = tgrubcfg[0].split()
+                    searchparts[-1] = bootuuid
+                    tgrubcfg[0] = ' '.join(searchparts)
                 with open(rgcfg, 'w') as gout:
                     for gcline in tgrubcfg:
                         gout.write(gcline)
