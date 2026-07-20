@@ -3250,13 +3250,14 @@ async def dump_db_to_directory(location, password, redact=None, skipkeys=False, 
         writecfg('globals', json.dumps(bkupglobals))
     # Handle tenants
     try:
-        for tenant in os.listdir(
-                os.path.join(ConfigManager._cfgdir, '/tenants/')):
-            writecfg(os.path.join('tenants', tenant, 'main'),
-                     await ConfigManager(tenant=tenant)._dump_to_json(
-                         redact=redact))
+        tenants = os.listdir(os.path.join(ConfigManager._cfgdir, 'tenants'))
     except OSError:
-        pass
+        tenants = []
+    for tenant in tenants:
+        os.makedirs(os.path.join(location, 'tenants', tenant), exist_ok=True)
+        writecfg(os.path.join('tenants', tenant, 'main'),
+                 await ConfigManager(tenant=tenant)._dump_to_json(
+                     redact=redact))
 
 
 def get_globals():
