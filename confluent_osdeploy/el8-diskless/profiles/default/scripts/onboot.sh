@@ -70,5 +70,5 @@ if [ -f /run/confluent/onboot_sleep.pid ]; then
     kill "$sleeppid"
     rm -f /run/confluent/onboot_sleep.pid
 fi
-#curl -X POST -d 'status: booted' -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $confluent_apikey" https://$confluent_mgr/confluent-api/self/updatestatus
+printf 'state: booted\nstatus: booted' | curl -X POST --data-binary @- -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $confluent_apikey" https://$confluent_mgr/confluent-api/self/updatestatus
 kill $logshowpid
