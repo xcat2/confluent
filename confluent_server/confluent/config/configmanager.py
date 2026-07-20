@@ -3096,30 +3096,58 @@ def _dump_keys(password, dojson=True):
     return keydata
 
 
-async def restore_db_from_directory(location, password, merge=False, skipped=None, format='json'):
+# PyYAML implements YAML 1.1 implicit typing, under which hand edited values
+# like 'yes', '52:54:00:12:34:56' (sexagesimal), or '2026-07-17' load as bool,
+# int, and date rather than str.  Restrict implicit typing to a subset of the
+# forms the PyYAML dumper quotes when emitting strings, so ambiguous hand
+# edited scalars stay strings and dump/restore round trips stay faithful.
+class _RestrictedYamlLoader(yaml.SafeLoader):
+    yaml_implicit_resolvers = {
+        key: [(tag, regexp) for tag, regexp in resolvers
+              if tag.rsplit(':', 1)[-1] not in ('bool', 'int', 'float',
+                                                'timestamp')]
+        for key, resolvers in yaml.SafeLoader.yaml_implicit_resolvers.items()
+    }
+
+_RestrictedYamlLoader.add_implicit_resolver(
+    'tag:yaml.org,2002:bool',
+    re.compile(r'^(?:true|True|TRUE|false|False|FALSE)$'),
+    list('tTfF'))
+_RestrictedYamlLoader.add_implicit_resolver(
+    'tag:yaml.org,2002:int',
+    re.compile(r'^[-+]?(?:0|[1-9][0-9]*)$'),
+    list('-+0123456789'))
+_RestrictedYamlLoader.add_implicit_resolver(
+    'tag:yaml.org,2002:float',
+    re.compile(r'''^(?:[-+]?[0-9]+\.[0-9]*(?:[eE][-+][0-9]+)?
+                    |\.[0-9]+(?:[eE][-+][0-9]+)?)$''', re.X),
+    list('-+0123456789.'))
+
+
+async def restore_db_from_directory(location, password, merge=False, skipped=None, fmt='json'):
     """Restore database from a directory
-    
+
     :param location: Directory containing the configuration
     :param password: Password to decrypt sensitive data
     :param merge: If True, merge with existing configuration
     :param skipped: List of elements to skip during restore
-    :param format: Format of the files ('json' [default] or 'yaml')
+    :param fmt: Format of the files ('json' [default] or 'yaml')
     """
-    if format not in ('json', 'yaml'):
+    if fmt not in ('json', 'yaml'):
         raise ValueError("Format must be 'json' or 'yaml'")
 
     kdd = None
     try:
-        keys_file = os.path.join(location, f'keys.{format}')
+        keys_file = os.path.join(location, f'keys.{fmt}')
         with open(keys_file, 'r') as cfgfile:
             keydata = cfgfile.read()
-            if format == 'json':
+            if fmt == 'json':
                 kdd = json.loads(keydata)
             else:
-                kdd = yaml.safe_load(keydata)
+                kdd = yaml.load(keydata, _RestrictedYamlLoader)
                 if kdd is None:
                     raise ValueError(f"Invalid or empty YAML content in {keys_file}")
-            
+
             if merge:
                 if 'cryptkey' in kdd:
                     kdd['cryptkey'] = _parse_key(kdd['cryptkey'], password)
@@ -3128,42 +3156,43 @@ async def restore_db_from_directory(location, password, merge=False, skipped=Non
                 else:
                     kdd['integritykey'] = None  # GCM
             else:
-                if format == 'json':
-                    _restore_keys(keydata, password)
-                else:
-                    # Convert YAML to JSON string for _restore_keys
-                    _restore_keys(json.dumps(kdd), password)
+                _restore_keys(kdd, password)
                 kdd = None
     except IOError as e:
         if e.errno == 2:
+            otherfmt = 'json' if fmt == 'yaml' else 'yaml'
+            if os.path.exists(os.path.join(location, f'keys.{otherfmt}')):
+                raise Exception(
+                    f'Cannot find keys.{fmt}, but keys.{otherfmt} '
+                    f'exists; this appears to be a {otherfmt} format dump')
             raise Exception("Cannot restore without keys, this may be a "
                             "redacted dump")
     if not merge:
         try:
-            globals_file = os.path.join(location, f'globals.{format}')
+            globals_file = os.path.join(location, f'globals.{fmt}')
             with open(globals_file, 'r') as globin:
-                if format == 'json':
+                if fmt == 'json':
                     moreglobals = json.load(globin)
                 else:
-                    moreglobals = yaml.safe_load(globin)
+                    moreglobals = yaml.load(globin, _RestrictedYamlLoader)
                     if moreglobals is None:
                         raise ValueError(f"Invalid or empty YAML content in {globals_file}")
-                
+
                 for globvar in moreglobals:
                     set_global(globvar, moreglobals[globvar])
         except IOError as e:
             if e.errno != 2:
                 raise
         try:
-            collective_file = os.path.join(location, f'collective.{format}')
+            collective_file = os.path.join(location, f'collective.{fmt}')
             with open(collective_file, 'r') as collin:
-                if format == 'json':
+                if fmt == 'json':
                     collective = json.load(collin)
                 else:
-                    collective = yaml.safe_load(collin)
+                    collective = yaml.load(collin, _RestrictedYamlLoader)
                     if collective is None:
                         raise ValueError(f"Invalid or empty YAML content in {collective_file}")
-                
+
                 _cfgstore['collective'] = {}
                 for coll in collective:
                     await add_collective_member(coll, collective[coll]['address'],
@@ -3171,81 +3200,64 @@ async def restore_db_from_directory(location, password, merge=False, skipped=Non
         except IOError as e:
             if e.errno != 2:
                 raise
-    main_file = os.path.join(location, f'main.{format}')
+    main_file = os.path.join(location, f'main.{fmt}')
     with open(main_file, 'r') as cfgfile:
         cfgdata = cfgfile.read()
-        if format == 'yaml':
+        if fmt == 'yaml':
             # Convert YAML to JSON string for _load_from_json
-            yaml_data = yaml.safe_load(cfgdata)
+            yaml_data = yaml.load(cfgdata, _RestrictedYamlLoader)
             if yaml_data is None:
                 raise ValueError(f"Invalid or empty YAML content in {main_file}")
             cfgdata = json.dumps(yaml_data)
         await ConfigManager(tenant=None)._load_from_json(cfgdata, merge=merge, keydata=kdd, skipped=skipped)
     ConfigManager.wait_for_sync(True)
 
-async def dump_db_to_directory(location, password, redact=None, skipkeys=False, format='json'):
+async def dump_db_to_directory(location, password, redact=None, skipkeys=False, fmt='json'):
     """Dump database to a directory
-    
+
     :param location: Directory to store the configuration
     :param password: Password to protect sensitive data
     :param redact: If True, redact sensitive data
     :param skipkeys: If True, skip dumping keys
-    :param format: Format to use for dumping ('json' [default] or 'yaml')
+    :param fmt: Format to use for dumping ('json' [default] or 'yaml')
     """
-    if format not in ('json', 'yaml'):
+    if fmt not in ('json', 'yaml'):
         raise ValueError("Format must be 'json' or 'yaml'")
-    
-    # Handle keys file
-    if not redact and not skipkeys:
-        with open(os.path.join(location, f'keys.{format}'), 'w') as cfgfile:
-            if format == 'json':
-                cfgfile.write(_dump_keys(password))
-            else:
-                keydata = _dump_keys(password, dojson=False)
-                yaml.dump(keydata, cfgfile, default_flow_style=False)
-            cfgfile.write('\n')
-    
-    # Handle main config
-    main_data = await ConfigManager(tenant=None)._dump_to_json(redact=redact)
-    with open(os.path.join(location, f'main.{format}'), 'wb' if format == 'json' else 'w') as cfgfile:
-        if format == 'json':
-            cfgfile.write(main_data)
-            cfgfile.write(b'\n')
-        else:
-            # Convert JSON to Python object, then dump as YAML
-            yaml.dump(json.loads(main_data.decode('utf-8')), cfgfile, default_flow_style=False)
-    
-    # Handle collective data
-    if 'collective' in _cfgstore:
-        with open(os.path.join(location, f'collective.{format}'), 'w') as cfgfile:
-            if format == 'json':
-                cfgfile.write(json.dumps(_cfgstore['collective']))
+
+    def writecfg(name, jsondata):
+        # jsondata is serialized JSON (str or bytes), written as-is for
+        # json format or converted for yaml
+        with open(os.path.join(location, f'{name}.{fmt}'), 'w') as cfgfile:
+            if fmt == 'json':
+                cfgfile.write(confluent.util.stringify(jsondata))
                 cfgfile.write('\n')
             else:
-                yaml.dump(_cfgstore['collective'], cfgfile, default_flow_style=False)
-    
+                yaml.safe_dump(json.loads(jsondata), cfgfile,
+                               default_flow_style=False)
+
+    # Handle keys file
+    if not redact and not skipkeys:
+        writecfg('keys', _dump_keys(password))
+    # Handle main config
+    writecfg('main',
+             await ConfigManager(tenant=None)._dump_to_json(redact=redact))
+    # Handle collective data
+    if 'collective' in _cfgstore:
+        writecfg('collective', json.dumps(_cfgstore['collective']))
     # Handle globals
     bkupglobals = get_globals()
     if bkupglobals:
-        with open(os.path.join(location, f'globals.{format}'), 'w') as globout:
-            if format == 'json':
-                json.dump(bkupglobals, globout)
-            else:
-                yaml.dump(bkupglobals, globout, default_flow_style=False)
-    
+        writecfg('globals', json.dumps(bkupglobals))
     # Handle tenants
     try:
-        for tenant in os.listdir(
-                os.path.join(ConfigManager._cfgdir, '/tenants/')):
-            tenant_data = await ConfigManager(tenant=tenant)._dump_to_json(redact=redact)
-            with open(os.path.join(location, 'tenants', tenant, f'main.{format}'), 'wb' if format == 'json' else 'w') as cfgfile:
-                if format == 'json':
-                    cfgfile.write(tenant_data)
-                    cfgfile.write(b'\n')
-                else:
-                    yaml.dump(json.loads(tenant_data.decode('utf-8')), cfgfile, default_flow_style=False)
+        tenants = os.listdir(os.path.join(ConfigManager._cfgdir, 'tenants'))
     except OSError:
-        pass
+        tenants = []
+    for tenant in tenants:
+        os.makedirs(os.path.join(location, 'tenants', tenant), exist_ok=True)
+        writecfg(os.path.join('tenants', tenant, 'main'),
+                 await ConfigManager(tenant=tenant)._dump_to_json(
+                     redact=redact))
 
 
 def get_globals():
