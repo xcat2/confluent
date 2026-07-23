@@ -4,6 +4,7 @@ if [[ "$confluent_whost" == *:* ]] && [[ "$confluent_whost" != "["* ]]; then
     confluent_whost="[$confluent_mgr]"
 fi
 mkdir -p /mnt/remoteimg /mnt/remote /mnt/overlay /sysroot
+set_selinux_context system_u:object_r:bin_t:s0 /opt/confluent/bin/urlmount
 if [ "untethered" = "$(getarg confluent_imagemethod)" -o "uncompressed" = "$(getarg confluent_imagemethod)" ]; then
     mount -t tmpfs untethered /mnt/remoteimg
     curl https://$confluent_whost/confluent-public/os/$confluent_profile/rootimg.sfs -o /mnt/remoteimg/rootimg.sfs
@@ -181,6 +182,7 @@ if [ $TETHERED -eq 1 ]; then
 else
     rm -rf /lib/modules/$(uname -r) /lib/modules/$(uname -r)-ramfs /lib/firmware-ramfs /usr/lib64/libcrypto.so* /usr/lib64/systemd/ /kernel/ /usr/bin/ /usr/sbin/ /usr/libexec/
 fi
+set_selinux_context system_u:object_r:root_t:s0 /sysroot
 if grep debugssh /proc/cmdline >& /dev/null; then
     exec /opt/confluent/bin/start_root
 else
