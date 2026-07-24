@@ -20,6 +20,7 @@ import json
 import os
 import tempfile
 import time
+import datetime
 import yaml
 try:
     from yaml import CSafeDumper as SafeDumper
@@ -475,7 +476,7 @@ async def handle_request(req, make_response, mimetype):
         if statusdetail:
             stateupdate['deployment.state_detail'] = statusdetail
         if stateupdate:
-            stateupdate['deployment.state_last_updated'] = time.strftime('%Y-%m-%dT%H:%M:%S%z', time.localtime())
+            stateupdate['deployment.state_last_updated'] = datetime.datetime.now().astimezone().isoformat()
             await cfg.set_node_attributes({nodename: stateupdate})
         if 'status' not in update and stateupdate:
             mrsp = await make_response(mimetype, 200, 'Ok')
