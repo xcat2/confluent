@@ -2699,9 +2699,13 @@ class ConfigManager(object):
         for confarea in _config_areas:
             if confarea not in dumpdata:
                 continue
+            if confarea in ('nodes', 'nodegroups'):
+                configarea = _get_validated_config_area(dumpdata, confarea)
+            else:
+                configarea = dumpdata[confarea]
             tmpconfig[confarea] = {}
-            for element in dumpdata[confarea]:
-                newelement = copy.deepcopy(dumpdata[confarea][element])
+            for element in configarea:
+                newelement = copy.deepcopy(configarea[element])
                 try:
                     noderange._parser.parseString(
                         '({0})'.format(element)).asList()
@@ -2709,7 +2713,7 @@ class ConfigManager(object):
                     raise ValueError(
                         '"{0}" is not a supported name, it must be renamed or '
                         'removed from backup to restore'.format(element))
-                for attribute in dumpdata[confarea][element]:
+                for attribute in configarea[element]:
                     if newelement[attribute] == '*REDACTED*':
                         raise Exception(
                             "Unable to restore from redacted backup")
@@ -3124,7 +3128,68 @@ _RestrictedYamlLoader.add_implicit_resolver(
     list('-+0123456789.'))
 
 
-async def restore_db_from_directory(location, password, merge=False, skipped=None, fmt='json'):
+_EXCLUSION_PROTECTED_ATTRIBUTES = {
+    'nodes': frozenset(('groups', 'id.index')),
+    'nodegroups': frozenset(('noderange',)),
+}
+
+
+def _normalize_attribute_exclusions(exclude):
+    """Normalize requested attribute patterns."""
+    if not exclude:
+        return ()
+    if isinstance(exclude, str):
+        exclude = (exclude,)
+    patterns = []
+    for pattern in exclude:
+        pattern = pattern.strip()
+        if pattern:
+            patterns.append(pattern)
+    return tuple(patterns)
+
+
+def _attribute_matches_exclusion(attribute, patterns):
+    for pattern in patterns:
+        if (fnmatch.fnmatch(attribute, pattern)
+                or attribute.startswith(pattern + '.')):
+            return True
+    return False
+
+
+def _get_validated_config_area(dumpdata, confarea):
+    configarea = dumpdata.get(confarea, {})
+    if not isinstance(configarea, dict) or not all(
+            isinstance(x, dict) for x in configarea.values()):
+        raise ValueError(
+            "Invalid {0} section in backup: expected an object".format(
+                confarea))
+    return configarea
+
+
+def _exclude_node_attributes(jsondata, exclude, check_redacted=False):
+    """Remove matching node and node-group attributes from serialized data."""
+    patterns = _normalize_attribute_exclusions(exclude)
+    if not patterns:
+        return confluent.util.stringify(jsondata)
+    dumpdata = json.loads(jsondata)
+    for confarea in ('nodes', 'nodegroups'):
+        protected = _EXCLUSION_PROTECTED_ATTRIBUTES[confarea]
+        configarea = _get_validated_config_area(dumpdata, confarea)
+        for attributes in configarea.values():
+            for attribute in list(attributes):
+                if (check_redacted
+                        and attributes[attribute] == '*REDACTED*'):
+                    raise Exception(
+                        "Unable to restore from redacted backup")
+                if (attribute not in protected
+                        and _attribute_matches_exclusion(attribute, patterns)):
+                    del attributes[attribute]
+    return json.dumps(
+        dumpdata, sort_keys=True, indent=4, separators=(',', ': '))
+
+
+async def restore_db_from_directory(location, password, merge=False,
+                                    skipped=None, fmt='json', exclude=None):
     """Restore database from a directory
 
     :param location: Directory containing the configuration
@@ -3132,6 +3197,7 @@ async def restore_db_from_directory(location, password, merge=False, skipped=Non
     :param merge: If True, merge with existing configuration
     :param skipped: List of elements to skip during restore
     :param fmt: Format of the files ('json' [default] or 'yaml')
+    :param exclude: Node attribute patterns to exclude from restore
     """
     if fmt not in ('json', 'yaml'):
         raise ValueError("Format must be 'json' or 'yaml'")
@@ -3209,10 +3275,14 @@ async def restore_db_from_directory(location, password, merge=False, skipped=Non
             if yaml_data is None:
                 raise ValueError(f"Invalid or empty YAML content in {main_file}")
             cfgdata = json.dumps(yaml_data)
-        await ConfigManager(tenant=None)._load_from_json(cfgdata, merge=merge, keydata=kdd, skipped=skipped)
+        cfgdata = _exclude_node_attributes(
+            cfgdata, exclude, check_redacted=True)
+        await ConfigManager(tenant=None)._load_from_json(
+            cfgdata, merge=merge, keydata=kdd, skipped=skipped)
     ConfigManager.wait_for_sync(True)
 
-async def dump_db_to_directory(location, password, redact=None, skipkeys=False, fmt='json'):
+async def dump_db_to_directory(location, password, redact=None, skipkeys=False,
+                               fmt='json', exclude=None):
     """Dump database to a directory
 
     :param location: Directory to store the configuration
@@ -3220,6 +3290,7 @@ async def dump_db_to_directory(location, password, redact=None, skipkeys=False, 
     :param redact: If True, redact sensitive data
     :param skipkeys: If True, skip dumping keys
     :param fmt: Format to use for dumping ('json' [default] or 'yaml')
+    :param exclude: Node attribute patterns to exclude from the dump
     """
     if fmt not in ('json', 'yaml'):
         raise ValueError("Format must be 'json' or 'yaml'")
@@ -3239,8 +3310,8 @@ async def dump_db_to_directory(location, password, redact=None, skipkeys=False, 
     if not redact and not skipkeys:
         writecfg('keys', _dump_keys(password))
     # Handle main config
-    writecfg('main',
-             await ConfigManager(tenant=None)._dump_to_json(redact=redact))
+    maincfg = await ConfigManager(tenant=None)._dump_to_json(redact=redact)
+    writecfg('main', _exclude_node_attributes(maincfg, exclude))
     # Handle collective data
     if 'collective' in _cfgstore:
         writecfg('collective', json.dumps(_cfgstore['collective']))
@@ -3255,9 +3326,10 @@ async def dump_db_to_directory(location, password, redact=None, skipkeys=False, 
         tenants = []
     for tenant in tenants:
         os.makedirs(os.path.join(location, 'tenants', tenant), exist_ok=True)
+        tenant_data = await ConfigManager(tenant=tenant)._dump_to_json(
+            redact=redact)
         writecfg(os.path.join('tenants', tenant, 'main'),
-                 await ConfigManager(tenant=tenant)._dump_to_json(
-                     redact=redact))
+                 _exclude_node_attributes(tenant_data, exclude))
 
 
 def get_globals():
