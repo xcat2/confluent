@@ -159,14 +159,22 @@ def scan_confluents(confuuid=None):
     srvs = {}
     s6 = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
     s6.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
-    s6.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+    try:
+        s6.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+    except Exception:
+        # REUSPORT is ideal, but if python is missing it, just live with the limitation
+        pass
     try:  # We would like to bind for firewall rules, however if not possible then leave it alone
         s6.bind(('::', 1900))
     except Exception:
         pass
     s4 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     s4.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-    s4.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+    try:
+        s4.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+    except Exception:
+        # REUSPORT is ideal, but if python is missing it, just live with the limitation
+        pass
     try:
         s4.bind(('0.0.0.0', 1900))
     except Exception:
