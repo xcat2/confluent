@@ -476,7 +476,7 @@ async def handle_request(req, make_response, mimetype):
         if statusdetail:
             stateupdate['deployment.state_detail'] = statusdetail
         if stateupdate:
-            stateupdate['deployment.state_last_updated'] = datetime.datetime.now().astimezone().isoformat()
+            stateupdate['deployment.state_last_updated'] = datetime.datetime.now().astimezone().replace(microsecond=0).isoformat()
             await cfg.set_node_attributes({nodename: stateupdate})
         if 'status' not in update and stateupdate:
             mrsp = await make_response(mimetype, 200, 'Ok')
