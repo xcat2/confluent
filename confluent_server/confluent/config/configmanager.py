@@ -3291,9 +3291,11 @@ def _init_indexes():
     ConfigManager._bg_sync_to_file()
 
 
-def init(stateless=False):
+def init(stateless=False, cfgdir=None):
     global _cfgstore
     global _ready
+    if cfgdir is not None:
+        ConfigManager._cfgdir = cfgdir
     if stateless:
         _cfgstore = {}
         return

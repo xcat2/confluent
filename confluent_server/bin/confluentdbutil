@@ -34,6 +34,8 @@ import confluent.noderange as noderange
 argparser = optparse.OptionParser(
     usage="Usage: %prog [options] [dump|restore|merge] [path]\n"
           "       %prog [-u] [-v] showattrib <noderange> <attribute>...")
+argparser.add_option('-d', '--directory', dest='directory', default=None,
+                     help='Directory of binary confluent configuration, defaults to /etc/confluent/cfg')
 argparser.add_option('-p', '--password',
                      help='Password to use to protect/unlock a protected dump')
 argparser.add_option('-i', '--interactivepassword', help='Prompt for password',
@@ -86,7 +88,7 @@ def show_attrib(options, args):
     # otherwise the key is stored unprotected and init_masterkey unlocks it
     # without any password.  autogen=False keeps this read-only (never create a
     # key).
-    cfm.init()
+    cfm.init(cfgdir=options.directory)
     try:
         main._initsecurity(conf.get_config())
         if not cfm._masterkey:
@@ -180,7 +182,7 @@ if args[0] in ('restore', 'merge'):
         password = getpass.getpass('Enter password to restore backup: ')
     try:
         stateless = args[0] == 'restore'
-        cfm.init(stateless)
+        cfm.init(stateless, cfgdir=options.directory)
         cfm.statelessmode = stateless
         skipped = {'nodes': [], 'nodegroups': []}
         
