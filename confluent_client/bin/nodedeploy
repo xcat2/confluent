@@ -216,7 +216,7 @@ def main(args):
                 else:
                     stateinfo = deploymentstate
                 if deploymentdate:
-                    stateinfo += ', updated: {}'.format(deploymentdate)
+                    stateinfo += ' - {}'.format(deploymentdate)
             if stateinfo:
                 print('{0}: {1} ({2})'.format(node, profile, stateinfo))
             else:
