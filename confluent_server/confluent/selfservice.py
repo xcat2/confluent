@@ -116,10 +116,10 @@ async def handle_request(req, make_response, mimetype):
     configmanager.check_quorum()
     cfg = configmanager.ConfigManager(None)
     reqpath = req.rel_url.path
-    nodename = req.headers.get('CONFLUENT_NODENAME', None)
+    nodename = req.headers.get('CONFLUENT_NODENAME', req.headers.get('CONFLUENT-NODENAME', None))
     clientip = req.headers.get('X-Forwarded-For', None)
     if reqpath == '/self/whoami':
-        clientids = req.headers.get('HTTP_CONFLUENT_IDS', None)
+        clientids = req.headers.get('CONFLUENT_IDS', req.headers.get('CONFLUENT-IDS', None))
         if not clientids:
             rsp = await make_response(mimetype, 400, 'Bad Request')
             await rsp.write(b'Bad Request')
@@ -134,10 +134,10 @@ async def handle_request(req, make_response, mimetype):
         rsp = await make_response(mimetype, 404, 'Unknown')
         return rsp
     if reqpath == '/self/registerapikey':
-        crypthmac = req.headers.get('HTTP_CONFLUENT_CRYPTHMAC', None)
+        crypthmac = req.headers.get('CONFLUENT_CRYPTHMAC', req.headers.get('CONFLUENT-CRYPTHMAC', None))
         if int(req.content_length) > 64:
             rsp = await make_response(mimetype, 400, 'Bad Request')
-            await rsp.write('Bad Request')
+            await rsp.write(b'Bad Request')
             return rsp
         cryptkey = await req.read()
         if not (crypthmac and cryptkey):
