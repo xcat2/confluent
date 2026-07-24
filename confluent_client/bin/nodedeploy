@@ -52,7 +52,7 @@ def setpending(nr, profile, profilebynodes, cli):
     if profilebynodes:
         for node in sortutil.natural_sort(profilebynodes):
             prof = profilebynodes[node]
-            args = {'deployment.pendingprofile': prof, 'deployment.state': '', 'deployment.state_detail': ''}
+            args = {'deployment.pendingprofile': prof, 'deployment.state': '', 'deployment.state_detail': '', 'deployment.state_last_updated': ''}
             if not prof.startswith('genesis-'):
                 args['deployment.stagedprofile'] = ''
                 args['deployment.profile'] = ''
@@ -60,7 +60,7 @@ def setpending(nr, profile, profilebynodes, cli):
                                   args):
                 pass
         return
-    args = {'deployment.pendingprofile': profile, 'deployment.state': '', 'deployment.state_detail': ''}
+    args = {'deployment.pendingprofile': profile, 'deployment.state': '', 'deployment.state_detail': '', 'deployment.state_last_updated': ''}
     if not profile.startswith('genesis-'):
         args['deployment.stagedprofile'] = ''
         args['deployment.profile'] = ''
@@ -179,7 +179,7 @@ def main(args):
                 if node not in databynode:
                     databynode[node] = {}
                 for attr in dbn[node]:
-                    if attr in ('deployment.pendingprofile', 'deployment.apiarmed', 'deployment.stagedprofile', 'deployment.profile', 'deployment.state', 'deployment.state_detail'):
+                    if attr in ('deployment.pendingprofile', 'deployment.apiarmed', 'deployment.stagedprofile', 'deployment.profile', 'deployment.state', 'deployment.state_detail', 'deployment.state_last_updated'):
                         databynode[node][attr] = dbn[node][attr].get('value', '')
         for node in sortutil.natural_sort(databynode):
             profile = databynode[node].get('deployment.pendingprofile', '')
@@ -203,11 +203,14 @@ def main(args):
             stateinfo = ''
             deploymentstate = databynode[node].get('deployment.state', '')
             if deploymentstate:
+                deploymentdate = databynode[node].get('deployment.state_last_updated', '')
                 statedetails = databynode[node].get('deployment.state_detail', '')
                 if statedetails:
                     stateinfo = '{}: {}'.format(deploymentstate, statedetails)
                 else:
                     stateinfo = deploymentstate
+                if deploymentdate:
+                    stateinfo += ' (last updated: {})'.format(deploymentdate)
             if stateinfo:
                 print('{0}: {1} ({2})'.format(node, profile, stateinfo))
             else:

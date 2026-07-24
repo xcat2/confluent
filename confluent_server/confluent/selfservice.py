@@ -466,17 +466,18 @@ async def handle_request(req, make_response, mimetype):
         update = yamlload(reqbody)
         statusstr = update.get('state', None)
         statusdetail = update.get('state_detail', None)
-        didstateupdate = False
         if statusstr or 'status' in update:
             await cfg.set_node_attributes({nodename: {
                 'deployment.client_ip': {'value': clientip}}})
+        stateupdate = {}
         if statusstr:
-            await cfg.set_node_attributes({nodename: {'deployment.state': statusstr}})
-            didstateupdate = True
+            stateupdate['deployment.state'] = statusstr
         if statusdetail:
-            await cfg.set_node_attributes({nodename: {'deployment.state_detail': statusdetail}})
-            didstateupdate = True
-        if 'status' not in update and didstateupdate:
+            stateupdate['deployment.state_detail'] = statusdetail
+        if stateupdate:
+            stateupdate['deployment.state_last_updated'] = time.strftime('%Y-%m-%dT%H:%M:%S%z', time.localtime())
+            await cfg.set_node_attributes({nodename: stateupdate})
+        if 'status' not in update and stateupdate:
             mrsp = await make_response(mimetype, 200, 'Ok')
             await mrsp.write(b'Accepted')
             return

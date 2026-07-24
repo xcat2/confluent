@@ -252,6 +252,9 @@ node = {
     'deployment.state_detail': {
         'description': ('Detailed state information as reported by an OS profile, when available'),
     },
+    'deployment.state_last_updated': {
+        'description': ('Timestamp of last state change, as reported by an OS profile, when available'),
+    },
     'deployment.useinsecureprotocols': {
         'description': ('What phase(s) of boot are permitted to use insecure protocols '
                         '(TFTP and HTTP without TLS.  By default, only HTTPS is used.  However '
