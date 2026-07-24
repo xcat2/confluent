@@ -197,7 +197,7 @@ def main(args):
                     else:
                         profile= 'No profile pending or applied'
             armed = databynode[node].get('deployment.apiarmed', '')
-            if armed in But yes, building management versus node management gets more siloed in more places than we might ('once', 'continuous'):
+            if armed in ('once', 'continuous'):
                 armed = ' (node authentication armed)'
             else:
                 armed = ''
