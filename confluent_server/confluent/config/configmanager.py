@@ -2624,6 +2624,11 @@ class ConfigManager(object):
                         nidx = 1
                     set_global('max_node_index', nidx + 1)
                 self._cfgstore['nodes'][node] = {'id.index': {'value': nidx}}
+                if merge == "skip":
+                    # the index just allocated is known to be free, while an
+                    # index carried in from a merged backup may already be
+                    # assigned to a node in this database
+                    attribmap[node].pop('id.index', None)
             cfgobj = self._cfgstore['nodes'][node]
             recalcexpressions = False
             for attrname in attribmap[node]:
