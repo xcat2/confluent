@@ -20,7 +20,6 @@ import csv
 import optparse
 import os
 import sys
-import time
 
 path = os.path.dirname(os.path.realpath(__file__))
 path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
@@ -364,7 +363,7 @@ async def assign_discovery(options, session, needid=True):
 async def blocking_scan(session):
     list([x async for x in session.update('/discovery/rescan', {'rescan': 'start'})])
     while(list([x async for x in session.read('/discovery/rescan')])[0].get('scanning', False)):
-        time.sleep(0.5)
+        await asyncio.sleep(0.5)
     list([x async for x in session.update('/networking/macs/rescan', {'rescan': 'start'})])
 
 

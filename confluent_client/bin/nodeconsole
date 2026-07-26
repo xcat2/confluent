@@ -910,7 +910,7 @@ async def do_screenshot():
             dorefresh = False
         else:
             dorefresh = True
-            time.sleep(options.interval)
+            await asyncio.sleep(options.interval)
     sys.exit(0)
 
 async def grab_vncs(urlbynode):
