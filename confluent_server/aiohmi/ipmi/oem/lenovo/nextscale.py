@@ -890,11 +890,9 @@ class SMMClient(object):
         rsp, status, _ = await wc.grab_response_with_status('/data', 'set=hostname:' + hostname)
         if status != 200:
             raise Exception(rsp)
-        await self.logout()
 
     async def get_hostname(self):
         currinfo = await self.get_netinfo()
-        await self.logout()
         for data in currinfo.find('netConfig').findall('hostname'):
             return data.text
 
@@ -913,11 +911,9 @@ class SMMClient(object):
         rsp, status, _ = await wc.grab_response_with_status('/data', 'set=dnsDomain:' + domain)
         if status != 200:
             raise Exception(rsp)
-        await self.logout()
 
     async def get_domain(self):
         currinfo = await self.get_netinfo()
-        await self.logout()
         for data in currinfo.find('netConfig').findall('dnsDomain'):
             return data.text
 
@@ -927,7 +923,6 @@ class SMMClient(object):
         if status != 200:
             raise Exception(rsp)
         info = fromstring(rsp)
-        await self.logout()
         for data in info.findall('ntpOpMode'):
             return data.text == '1'
 
@@ -939,7 +934,6 @@ class SMMClient(object):
             raise Exception(result)
         if not isinstance(result, str):
             result = result.decode('utf8')
-        await self.logout()
         if '<status>ok</status>' not in result:
             raise Exception("Unrecognized result: " + result)
 
@@ -953,7 +947,6 @@ class SMMClient(object):
             result = result.decode('utf8')
         if '<status>ok</status>' not in result:
             raise Exception("Unrecognized result: " + result)
-        await self.logout()
         return True
 
     async def get_ntp_servers(self):
@@ -970,7 +963,6 @@ class SMMClient(object):
             srvs.append(data.text)
         for data in result.findall('ntpServer3'):
             srvs.append(data.text)
-        await self.logout()
         return srvs
 
     async def update_firmware(self, filename, data=None, progress=None, bank=None):
