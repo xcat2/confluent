@@ -99,9 +99,9 @@ class ClientFile(object):
 
 
 
-def _sendmsg(loop, fut, sock, msg, fds, rfd):
-    if rfd is not None:
-        loop.remove_reader(rfd)
+def _sendmsg(loop, fut, sock, msg, fds, wfd):
+    if wfd is not None:
+        loop.remove_writer(wfd)
     if fut.cancelled():
         return
     try:
@@ -110,7 +110,7 @@ def _sendmsg(loop, fut, sock, msg, fds, rfd):
             [(socket.SOL_SOCKET, socket.SCM_RIGHTS, array.array("i", fds))])
     except (BlockingIOError, InterruptedError):
         fd = sock.fileno()
-        loop.add_reader(fd, _sendmsg, loop, fut, sock, fd)
+        loop.add_writer(fd, _sendmsg, loop, fut, sock, msg, fds, fd)
     except Exception as exc:
         fut.set_exception(exc)
     else:
@@ -127,6 +127,8 @@ def send_fds(sock, msg, fds):
 def _recvmsg(loop, fut, sock, msglen, maxfds, rfd):
     if rfd is not None:
         loop.remove_reader(rfd)
+    if fut.cancelled():
+        return
     fds = array.array("i")   # Array of ints
     try:
         msg, ancdata, flags, addr = sock.recvmsg(
