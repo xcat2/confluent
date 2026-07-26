@@ -736,11 +736,9 @@ class SMMClient(object):
             if not isinstance(username, str):
                 username = username.decode('utf8')
             wc = await self.wc()
-            rsp, status, _ = await wc.grab_response_with_status(
+            await wc.grab_response_with_status(
                 '/data', 'set=user({0},1,{1},511,,4,15,0)'.format(
                     uid, username))
-            if status != 200:
-                raise Exception(rsp)
 
     async def reseat_bay(self, bay):
         bay = int(bay)
@@ -831,6 +829,7 @@ class SMMClient(object):
     async def get_webclient(self):
         cv = self.ipmicmd.certverify
         wc = webclient.WebConnection(self.smm, 443, verifycallback=cv)
+        wc.set_header('Content-Type', 'application/x-www-form-urlencoded')
         wc.vintage = util._monotonic_time()
         loginform = urlencode(
             {
@@ -1016,9 +1015,8 @@ class SMMClient(object):
         if status != 200:
             raise Exception('Error validating firmware')
         progress({'phase': 'apply', 'progress': 0.0})
-        rsp, status, _ = await wc.grab_response_with_status('/data', 'set=securityrollback:1')
-        if status != 200:
-            raise Exception(rsp)
+        # only understood by newer SMM2 firmware, ignore rejection by older
+        await wc.grab_response_with_status('/data', 'set=securityrollback:1')
         rsp, status, _ = await wc.grab_response_with_status('/data', 'set=fwUpdate:1')
         if status != 200:
             raise Exception(rsp)
@@ -1094,9 +1092,8 @@ class SMMClient(object):
         self._wc = None
         if wc is None:
             return
-        rsp, status, _ = await wc.grab_response_with_status('/data/logout', None, method='POST')
-        if status != 200:
-            raise Exception(rsp)
+        # best effort, a stale session must not fail the caller's operation
+        await wc.grab_response_with_status('/data/logout', None, method='POST')
 
     async def wc(self):
         if (not self._wc or (self._wc.vintage
