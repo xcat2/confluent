@@ -1029,7 +1029,7 @@ class SMMClient(object):
                 progdata, status, _ = await wc.grab_response_with_status('/data', 'get=fwProgress,fwUpdate')
             except Exception:
                 if tries > 2:
-                     break
+                    raise
                 tries += 1
                 continue
             if status != 200:
