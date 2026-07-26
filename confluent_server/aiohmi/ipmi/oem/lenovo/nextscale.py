@@ -384,6 +384,7 @@ class SMMClient(object):
         self.username = ipmicmd.ipmi_session.userid
         self.password = ipmicmd.ipmi_session.password
         self._wc = None
+        self.weblogging = False
 
     async def clear_bmc_configuration(self):
         await self.ipmicmd.raw_command(0x32, 0xad)
@@ -830,7 +831,6 @@ class SMMClient(object):
         cv = self.ipmicmd.certverify
         wc = webclient.WebConnection(self.smm, 443, verifycallback=cv)
         wc.set_header('Content-Type', 'application/x-www-form-urlencoded')
-        wc.vintage = util._monotonic_time()
         loginform = urlencode(
             {
                 'user': self.username,
@@ -884,6 +884,7 @@ class SMMClient(object):
         if not wc.st2:
             raise Exception('Unable to locate ST2 token')
         wc.set_header('ST2', wc.st2)
+        wc.vintage = util._monotonic_time()
         return wc
 
     async def set_hostname(self, hostname):
@@ -1093,10 +1094,21 @@ class SMMClient(object):
         if wc is None:
             return
         # best effort, a stale session must not fail the caller's operation
-        await wc.grab_response_with_status('/data/logout', None, method='POST')
+        try:
+            await wc.grab_response_with_status('/data/logout', None, method='POST')
+        except Exception:
+            pass
 
     async def wc(self):
-        if (not self._wc or (self._wc.vintage
-                and self._wc.vintage < util._monotonic_time() - 30)):
-            self._wc = await self.get_webclient()
+        while self.weblogging:
+            await ipmisession.Session.pause(0.25)
+        self.weblogging = True
+        try:
+            if (not self._wc or (self._wc.vintage
+                    and self._wc.vintage < util._monotonic_time() - 30)):
+                # in case the existing session is still valid, dispose of it
+                await self.logout()
+                self._wc = await self.get_webclient()
+        finally:
+            self.weblogging = False
         return self._wc
