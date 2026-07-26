@@ -792,8 +792,6 @@ class SMMClient(object):
             if progress:
                 progress({'phase': 'initializing', 'progress': initpct})
         wc = await self.wc()
-        if wc is None:
-            raise Exception("Failed to connect to web api")
         if variant and variant >> 5:
             url = '/preview/smm2-ffdc.tgz?ST1={0}'.format(wc.st1)
         else:
