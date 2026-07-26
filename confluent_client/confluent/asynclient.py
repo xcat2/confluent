@@ -396,6 +396,7 @@ class Command(object):
         self.connection = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self.connection.setsockopt(socket.SOL_SOCKET, SO_PASSCRED, 1)
         self.connection.connect(self.serverloc)
+        self.connection.setblocking(False)
 
     async def _connect_tls(self):
         server, port = _parseserver(self.serverloc)
