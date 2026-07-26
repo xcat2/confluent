@@ -211,12 +211,12 @@ async def import_csv(options, session):
             alldata.append(nodedatum)
         allthere = True
         for nodedatum in alldata:
-            if not search_record(nodedatum, options, session) and not broken:
+            if not await search_record(nodedatum, options, session) and not broken:
                 allthere = False
                 await blocking_scan(session)
                 break
         for nodedatum in alldata:
-            if not allthere and not search_record(nodedatum, options, session):
+            if not allthere and not await search_record(nodedatum, options, session):
                 sys.stderr.write(
                     "Could not match the following data: " +
                     repr(nodedatum) + '\n')
@@ -224,11 +224,12 @@ async def import_csv(options, session):
             nodedata.append(nodedatum)
     if broken:
         sys.exit(1)
+    assignments = []
     for datum in nodedata:
-        maclist = search_record(datum, options, session)
+        maclist = await search_record(datum, options, session)
         datum = datum_to_attrib(datum)
         nodename = datum['name']
-        for res in session.create('/nodes/', datum):
+        async for res in session.create('/nodes/', datum):
             if 'error' in res:
                 sys.stderr.write(res['error'] + '\n')
                 exitcode |= res.get('errorcode', 1)
@@ -237,29 +238,28 @@ async def import_csv(options, session):
                 print('Defined ' + res['created'])
             else:
                 print(repr(res))
-        child = os.fork()
-        if child:
-            continue
-        for mac in maclist:
-            mysess = client.Command()
-            for res in mysess.update('/discovery/by-mac/{0}'.format(mac),
-                                      {'node': nodename}):
-                if 'error' in res:
-                    sys.stderr.write(res['error'] + '\n')
-                    exitcode |= res.get('errorcode', 1)
-                    continue
-                elif 'assigned' in res:
-                    print('Discovered ' + res['assigned'])
-                else:
-                    print(repr(res))
-        sys.exit(0)
-    while True:
-        try:
-            os.wait()
-        except ChildProcessError:
-            break
+        assignments.append(assign_macs(maclist, nodename))
+    for rcode in await asyncio.gather(*assignments):
+        exitcode |= rcode
     if exitcode:
         sys.exit(exitcode)
+
+
+async def assign_macs(maclist, nodename):
+    exitcode = 0
+    for mac in maclist:
+        mysess = client.Command()
+        async for res in mysess.update('/discovery/by-mac/{0}'.format(mac),
+                                       {'node': nodename}):
+            if 'error' in res:
+                sys.stderr.write(res['error'] + '\n')
+                exitcode |= res.get('errorcode', 1)
+                continue
+            elif 'assigned' in res:
+                print('Discovered ' + res['assigned'])
+            else:
+                print(repr(res))
+    return exitcode
 
 
 async def list_discovery(options, session):
