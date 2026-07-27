@@ -347,12 +347,12 @@ class Command(object):
             else:
                 ikey = key
             if input is None:
-                for res in await self.read('/nodegroups/{0}/{1}'.format(
+                async for res in self.read('/nodegroups/{0}/{1}'.format(
                         noderange, resource)):
                     rc = self.handle_results(ikey, rc, res)
             else:
                 kwargs[ikey] = input
-                for res in await self.update('/nodegroups/{0}/{1}'.format(
+                async for res in self.update('/nodegroups/{0}/{1}'.format(
                         noderange, resource), kwargs):
                     rc = self.handle_results(ikey, rc, res)
             return rc
@@ -396,6 +396,7 @@ class Command(object):
         self.connection = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self.connection.setsockopt(socket.SOL_SOCKET, SO_PASSCRED, 1)
         self.connection.connect(self.serverloc)
+        self.connection.setblocking(False)
 
     async def _connect_tls(self):
         server, port = _parseserver(self.serverloc)
@@ -667,10 +668,10 @@ def show_attr(attr, requestargs, seenattributes, options, node):
     return processattr
 
 
-def printgroupattributes(session, requestargs, showtype, nodetype, noderange, options):
+async def printgroupattributes(session, requestargs, showtype, nodetype, noderange, options):
     exitcode = 0
     seenattributes = set([])
-    for res in session.read('/{0}/{1}/attributes/{2}'.format(nodetype, noderange, showtype)):
+    async for res in session.read('/{0}/{1}/attributes/{2}'.format(nodetype, noderange, showtype)):
         if 'error' in res:
             sys.stderr.write(res['error'] + '\n')
             exitcode = 1

@@ -20,7 +20,6 @@ import csv
 import optparse
 import os
 import sys
-import time
 
 path = os.path.dirname(os.path.realpath(__file__))
 path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
@@ -51,10 +50,11 @@ columnmapping = {
 }
 #TODO: add chassis uuid
 
-def register_endpoint(options, session, addr):
+async def register_endpoint(options, session, addr):
     neednewline = False
     current = 0
-    for rsp in session.update('/discovery/register', {'addresses': addr}):
+    total = 0
+    async for rsp in session.update('/discovery/register', {'addresses': addr}):
         if 'count' in rsp:
             total = rsp['count']
         elif total > 1:
@@ -70,15 +70,15 @@ def register_endpoint(options, session, addr):
     if neednewline:
         print('')
 
-def subscribe_discovery(options, session, subscribe, targ):
+async def subscribe_discovery(options, session, subscribe, targ):
     keyn = 'subscribe' if subscribe else 'unsubscribe'
     payload = {keyn: targ}
     if subscribe:
-        for rsp in session.update('/discovery/subscriptions/{0}'.format(targ), payload):
+        async for rsp in session.update('/discovery/subscriptions/{0}'.format(targ), payload):
             if 'status' in rsp:
                 print(rsp['status'])
     else:
-        for rsp in session.delete('/discovery/subscriptions/{0}'.format(targ)):
+        async for rsp in session.delete('/discovery/subscriptions/{0}'.format(targ)):
             if 'status' in rsp:
                 print(rsp['status'])
     
@@ -180,6 +180,9 @@ def datum_to_attrib(datum):
 
 unique_fields = frozenset(['serial', 'mac', 'uuid'])
 
+# Cap how many nodes hold a discovery session at once while importing
+maxconcurrentassign = 128
+
 async def import_csv(options, session):
     nodedata = []
     unique_data = {}
@@ -211,12 +214,12 @@ async def import_csv(options, session):
             alldata.append(nodedatum)
         allthere = True
         for nodedatum in alldata:
-            if not search_record(nodedatum, options, session) and not broken:
+            if not await search_record(nodedatum, options, session) and not broken:
                 allthere = False
                 await blocking_scan(session)
                 break
         for nodedatum in alldata:
-            if not allthere and not search_record(nodedatum, options, session):
+            if not allthere and not await search_record(nodedatum, options, session):
                 sys.stderr.write(
                     "Could not match the following data: " +
                     repr(nodedatum) + '\n')
@@ -224,11 +227,13 @@ async def import_csv(options, session):
             nodedata.append(nodedatum)
     if broken:
         sys.exit(1)
+    assignments = []
+    assignlimit = asyncio.Semaphore(maxconcurrentassign)
     for datum in nodedata:
-        maclist = search_record(datum, options, session)
+        maclist = await search_record(datum, options, session)
         datum = datum_to_attrib(datum)
         nodename = datum['name']
-        for res in session.create('/nodes/', datum):
+        async for res in session.create('/nodes/', datum):
             if 'error' in res:
                 sys.stderr.write(res['error'] + '\n')
                 exitcode |= res.get('errorcode', 1)
@@ -237,13 +242,26 @@ async def import_csv(options, session):
                 print('Defined ' + res['created'])
             else:
                 print(repr(res))
-        child = os.fork()
-        if child:
-            continue
+        assignments.append(
+            asyncio.create_task(assign_macs(maclist, nodename, assignlimit)))
+    for rcode in await asyncio.gather(*assignments, return_exceptions=True):
+        if isinstance(rcode, BaseException):
+            sys.stderr.write('Error assigning discovery data: {0}\n'.format(rcode))
+            rcode = 1
+        exitcode |= rcode
+    if exitcode:
+        sys.exit(exitcode)
+
+
+async def assign_macs(maclist, nodename, assignlimit):
+    exitcode = 0
+    async with assignlimit:
+        # A session of our own, since the connection carries one request at a
+        # time and the caller's is busy defining the remaining nodes
+        mysess = client.Command()
         for mac in maclist:
-            mysess = client.Command()
-            for res in mysess.update('/discovery/by-mac/{0}'.format(mac),
-                                      {'node': nodename}):
+            async for res in mysess.update('/discovery/by-mac/{0}'.format(mac),
+                                           {'node': nodename}):
                 if 'error' in res:
                     sys.stderr.write(res['error'] + '\n')
                     exitcode |= res.get('errorcode', 1)
@@ -252,14 +270,7 @@ async def import_csv(options, session):
                     print('Discovered ' + res['assigned'])
                 else:
                     print(repr(res))
-        sys.exit(0)
-    while True:
-        try:
-            os.wait()
-        except ChildProcessError:
-            break
-    if exitcode:
-        sys.exit(exitcode)
+    return exitcode
 
 
 async def list_discovery(options, session):
@@ -364,7 +375,7 @@ async def assign_discovery(options, session, needid=True):
 async def blocking_scan(session):
     list([x async for x in session.update('/discovery/rescan', {'rescan': 'start'})])
     while(list([x async for x in session.read('/discovery/rescan')])[0].get('scanning', False)):
-        time.sleep(0.5)
+        await asyncio.sleep(0.5)
     list([x async for x in session.update('/networking/macs/rescan', {'rescan': 'start'})])
 
 
@@ -427,11 +438,11 @@ async def main():
     if args[0] == 'reassign':
         await assign_discovery(options, session, False)
     if args[0] == 'register':
-        register_endpoint(options, session, args[1])
+        await register_endpoint(options, session, args[1])
     if args[0] == 'subscribe':
-        subscribe_discovery(options, session, True, args[1])
+        await subscribe_discovery(options, session, True, args[1])
     if args[0] == 'unsubscribe':
-        subscribe_discovery(options, session, False, args[1])
+        await subscribe_discovery(options, session, False, args[1])
     if args[0] == 'rescan':
         await blocking_scan(session)
         print("Rescan complete")
