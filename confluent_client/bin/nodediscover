@@ -53,6 +53,7 @@ columnmapping = {
 async def register_endpoint(options, session, addr):
     neednewline = False
     current = 0
+    total = 0
     async for rsp in session.update('/discovery/register', {'addresses': addr}):
         if 'count' in rsp:
             total = rsp['count']
