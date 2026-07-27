@@ -3,7 +3,7 @@ confluentdbutil(8) -- Backup or restore confluent database
 
 ## SYNOPSIS
 
-`confluentdbutil [options] [dump|restore] <path>`
+`confluentdbutil [options] [dump|restore|merge] <path>`
 `confluentdbutil [-u] [-v] showattrib <noderange> <attribute>...`
 
 ## DESCRIPTION
@@ -51,6 +51,23 @@ stored one-way hashes.
   Keys do not change and as such they do not require
   incremental backup.
 
+* `-x ATTRIBUTE`, `--exclude=ATTRIBUTE`:
+  Exclude matching node and node group attributes from `dump`, `restore`,
+  or `merge`.
+  The option may be specified multiple times.  Attribute names may use
+  shell-style wildcards such as `net.*`.
+  A bare namespace such as `net` excludes all attributes below that namespace.
+  An exclusion omits the attribute from the data being written, it does not
+  preserve the value already in the database.  A `restore` replaces the
+  database outright, so attributes excluded there are missing from the
+  restored configuration entirely; use `merge` to leave existing objects
+  untouched.
+  Node `groups`, node `id.index`, and node-group `noderange` are retained
+  so that restore can reconstruct node-group membership and preserve
+  node index assignments.
+  During merge, existing nodes and node groups are skipped as whole objects;
+  exclusions affect only new objects imported from the backup.
+
 * `-y`, `--yaml`:
   Use YAML instead of JSON as file format
 
@@ -71,3 +88,6 @@ stored one-way hashes.
 * Get just the value, for use in a script:
     `# confluentdbutil -u -v showattrib n1 secret.hardwaremanagementpassword`
     `mypassword123`
+
+* Dump configuration without (dynamic) deployment state:
+    `# confluentdbutil -u -x 'deployment.state*' dump /root/confluent-backup`

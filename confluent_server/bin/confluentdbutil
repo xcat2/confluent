@@ -58,6 +58,11 @@ argparser.add_option('-s', '--skipkeys', action='store_true',
                            'protected keys.json file, and only the protected '
                            'data is needed.  keys do not change and as such '
                            'they do not require incremental backup')
+argparser.add_option('-x', '--exclude', action='append', default=None, metavar='ATTRIBUTE',
+                     help='Exclude matching node and node group attributes from dump, '
+                          'restore, or merge.  May be specified multiple times.  Names match '
+                          'with shell-style wildcards, and a bare namespace such as "net"'
+                          'excludes everything below it')
 argparser.add_option('-y', '--yaml', action='store_true',
                       help='Use YAML instead of JSON as file format')
 argparser.add_option('-v', '--value-only', dest='valueonly',
@@ -193,7 +198,8 @@ if args[0] in ('restore', 'merge'):
             dumpdir, password,
             merge="skip" if args[0] == 'merge' else False,
             skipped=skipped,
-            fmt=fmt)
+            fmt=fmt,
+            exclude=options.exclude)
         
         asyncio.run(dp)
         if skipped['nodes']:
@@ -237,7 +243,6 @@ elif args[0] == 'dump':
     # Use the format parameter based on the --yaml option
     fmt = 'yaml' if options.yaml else 'json'
     dp = cfm.dump_db_to_directory(dumpdir, password, options.redact,
-                                  options.skipkeys, fmt=fmt)
+                                  options.skipkeys, fmt=fmt,
+                                  exclude=options.exclude)
     asyncio.run(dp)
-
-
