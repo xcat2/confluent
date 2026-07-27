@@ -385,6 +385,7 @@ class SMMClient(object):
         self.password = ipmicmd.ipmi_session.password
         self._wc = None
         self.weblogging = False
+        self.updating = False
 
     async def clear_bmc_configuration(self):
         await self.ipmicmd.raw_command(0x32, 0xad)
@@ -798,15 +799,20 @@ class SMMClient(object):
             url = '/preview/smm-ffdc.tgz?ST1={0}'.format(wc.st1)
         if autosuffix and not savefile.endswith('.tgz'):
             savefile += '-smm-ffdc.tgz'
-        fd = webclient.make_downloader(wc, url, savefile)
-        while not fd.completed():
-            try:
-                await fd.join(1)
-            except asyncio.TimeoutError:
-                pass
-            if progress and await fd.get_progress():
-                progress({'phase': 'download',
-                          'progress': 100 * await fd.get_progress()})
+        # the download runs on this session, keep wc() from logging it out
+        self.updating = True
+        try:
+            fd = webclient.make_downloader(wc, url, savefile)
+            while not fd.completed():
+                try:
+                    await fd.join(1)
+                except asyncio.TimeoutError:
+                    pass
+                if progress and await fd.get_progress():
+                    progress({'phase': 'download',
+                              'progress': 100 * await fd.get_progress()})
+        finally:
+            self.updating = False
         if progress:
             progress({'phase': 'complete'})
         return savefile
@@ -985,53 +991,63 @@ class SMMClient(object):
                     break
         progress({'phase': 'upload', 'progress': 0.0})
         wc = await self.wc()
-        rsp, status, _ = await wc.grab_response_with_status('/data', 'set=fwType:10')  # SMM firmware
-        if status != 200:
-            raise Exception(rsp)
-        url = '/fwupload/fwupload.esp?ST1={0}'.format(wc.st1)
-        fu = await webclient.make_uploader(
-            wc, url, filename, data, formname='fileUpload',
-            otherfields={'preConfig': 'on'})
-        while not fu.completed():
-            try:
-                await fu.join(3)
-            except asyncio.TimeoutError:
-                pass
-            if progress:
-                progress({'phase': 'upload',
-                          'progress': 100 * await fu.get_progress()})
-        progress({'phase': 'validating', 'progress': 0.0})
-        url = '/data'
-        rsp, status, _ = await wc.grab_response_with_status(url, 'get=fwVersion,spfwInfo')
-        if status != 200:
-            raise Exception('Error validating firmware')
-        progress({'phase': 'apply', 'progress': 0.0})
-        # only understood by newer SMM2 firmware, ignore rejection by older
-        await wc.grab_response_with_status('/data', 'set=securityrollback:1')
-        rsp, status, _ = await wc.grab_response_with_status('/data', 'set=fwUpdate:1')
-        if status != 200:
-            raise Exception(rsp)
-        complete = False
-        tries = 0
-        while not complete:
-            await ipmisession.Session.pause(3)
-            try:
-                progdata, status, _ = await wc.grab_response_with_status('/data', 'get=fwProgress,fwUpdate')
-            except Exception:
-                if tries > 2:
-                    raise
-                tries += 1
-                continue
+        # the update runs on this session, keep wc() from logging it out
+        self.updating = True
+        try:
+            rsp, status, _ = await wc.grab_response_with_status(
+                '/data', 'set=fwType:10')  # SMM firmware
             if status != 200:
-                raise Exception('Error applying firmware')
-            progdata = fromstring(progdata)
-            if progdata.findall('fwUpdate')[0].text == 'invalid signature':
-                raise Exception('Firmware signature invalid')
-            percent = float(progdata.findall('fwProgress')[0].text)
+                raise Exception(rsp)
+            url = '/fwupload/fwupload.esp?ST1={0}'.format(wc.st1)
+            fu = await webclient.make_uploader(
+                wc, url, filename, data, formname='fileUpload',
+                otherfields={'preConfig': 'on'})
+            while not fu.completed():
+                try:
+                    await fu.join(3)
+                except asyncio.TimeoutError:
+                    pass
+                if progress:
+                    progress({'phase': 'upload',
+                              'progress': 100 * await fu.get_progress()})
+            progress({'phase': 'validating', 'progress': 0.0})
+            url = '/data'
+            rsp, status, _ = await wc.grab_response_with_status(
+                url, 'get=fwVersion,spfwInfo')
+            if status != 200:
+                raise Exception('Error validating firmware')
+            progress({'phase': 'apply', 'progress': 0.0})
+            # only understood by newer SMM2 firmware, ignore rejection by older
+            await wc.grab_response_with_status(
+                '/data', 'set=securityrollback:1')
+            rsp, status, _ = await wc.grab_response_with_status(
+                '/data', 'set=fwUpdate:1')
+            if status != 200:
+                raise Exception(rsp)
+            complete = False
+            tries = 0
+            while not complete:
+                await ipmisession.Session.pause(3)
+                try:
+                    progdata, status, _ = await wc.grab_response_with_status(
+                        '/data', 'get=fwProgress,fwUpdate')
+                except Exception:
+                    if tries > 2:
+                        raise
+                    tries += 1
+                    continue
+                if status != 200:
+                    raise Exception('Error applying firmware')
+                progdata = fromstring(progdata)
+                if progdata.findall('fwUpdate')[0].text == 'invalid signature':
+                    raise Exception('Firmware signature invalid')
+                percent = float(progdata.findall('fwProgress')[0].text)
 
-            progress({'phase': 'apply',
-                      'progress': percent})
-            complete = percent >= 100.0
+                progress({'phase': 'apply',
+                          'progress': percent})
+                complete = percent >= 100.0
+        finally:
+            self.updating = False
         return 'complete'
 
     async def get_inventory_descriptions(self, ipmicmd, variant):
@@ -1096,8 +1112,10 @@ class SMMClient(object):
         try:
             if (not self._wc or (self._wc.vintage
                     and self._wc.vintage < util._monotonic_time() - 30)):
-                # in case the existing session is still valid, dispose of it
-                await self.logout()
+                if not self.updating and self._wc:
+                    # in case the existing session is still valid, dispose
+                    # of it
+                    await self.logout()
                 self._wc = await self.get_webclient()
         finally:
             self.weblogging = False
