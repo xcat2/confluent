@@ -735,9 +735,11 @@ class SMMClient(object):
             username = bytes(rsp['data']).rstrip(b'\x00')
             if not isinstance(username, str):
                 username = username.decode('utf8')
-            await self.webrequest(
+            rsp, status = await self.webrequest(
                 '/data', 'set=user({0},1,{1},511,,4,15,0)'.format(
                     uid, username))
+            if status != 200:
+                raise Exception(rsp)
 
     async def reseat_bay(self, bay):
         bay = int(bay)
