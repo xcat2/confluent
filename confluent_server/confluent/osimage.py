@@ -1275,32 +1275,37 @@ class MediaImporter(object):
             nb = await wkr.stdout.read(128)
             currline += nb
             if b'\r' in currline:
-                if b'%' in currline:
-                    val = currline.split(b'%')[0].strip()
-                    if val:
-                        self.percent = float(val)
-                elif b'ERROR:' in currline:
+                if b'ERROR:' in currline:
                     self.error = currline.replace(b'ERROR:', b'')
                     if not isinstance(self.error, str):
                         self.error = self.error.decode('utf8')
                     self.phase = 'error'
                     self.percent = 100.0
                     return
+                elif b'%' in currline:
+                    val = currline.split(b'%')[0].strip()
+                    try:
+                        self.percent = float(val)
+                    except ValueError:
+                        pass
                 currline = b''
         a = await wkr.stdout.read(1)
         while a:
             currline += a
             if b'\r' in currline:
-                if b'%' in currline:
-                    val = currline.split(b'%')[0].strip()
-                    if val:
-                        self.percent = float(val)
-                elif b'ERROR:' in currline:
+                if b'ERROR:' in currline:
                     self.error = currline.replace(b'ERROR:', b'')
                     if not isinstance(self.error, str):
                         self.error = self.error.decode('utf8')
                     self.phase = 'error'
+                    self.percent = 100.0
                     return
+                elif b'%' in currline:
+                    val = currline.split(b'%')[0].strip()
+                    try:
+                        self.percent = float(val)
+                    except ValueError:
+                        pass
                 currline = b''
             a = await wkr.stdout.read(1)
         if self.oscategory:
