@@ -180,6 +180,9 @@ def datum_to_attrib(datum):
 
 unique_fields = frozenset(['serial', 'mac', 'uuid'])
 
+# Cap how many nodes hold a discovery session at once while importing
+maxconcurrentassign = 128
+
 async def import_csv(options, session):
     nodedata = []
     unique_data = {}
@@ -225,6 +228,7 @@ async def import_csv(options, session):
     if broken:
         sys.exit(1)
     assignments = []
+    assignlimit = asyncio.Semaphore(maxconcurrentassign)
     for datum in nodedata:
         maclist = await search_record(datum, options, session)
         datum = datum_to_attrib(datum)
@@ -238,27 +242,30 @@ async def import_csv(options, session):
                 print('Defined ' + res['created'])
             else:
                 print(repr(res))
-        assignments.append(assign_macs(maclist, nodename))
+        assignments.append(assign_macs(maclist, nodename, assignlimit))
     for rcode in await asyncio.gather(*assignments):
         exitcode |= rcode
     if exitcode:
         sys.exit(exitcode)
 
 
-async def assign_macs(maclist, nodename):
+async def assign_macs(maclist, nodename, assignlimit):
     exitcode = 0
-    for mac in maclist:
+    async with assignlimit:
+        # A session of our own, since the connection carries one request at a
+        # time and the caller's is busy defining the remaining nodes
         mysess = client.Command()
-        async for res in mysess.update('/discovery/by-mac/{0}'.format(mac),
-                                       {'node': nodename}):
-            if 'error' in res:
-                sys.stderr.write(res['error'] + '\n')
-                exitcode |= res.get('errorcode', 1)
-                continue
-            elif 'assigned' in res:
-                print('Discovered ' + res['assigned'])
-            else:
-                print(repr(res))
+        for mac in maclist:
+            async for res in mysess.update('/discovery/by-mac/{0}'.format(mac),
+                                           {'node': nodename}):
+                if 'error' in res:
+                    sys.stderr.write(res['error'] + '\n')
+                    exitcode |= res.get('errorcode', 1)
+                    continue
+                elif 'assigned' in res:
+                    print('Discovered ' + res['assigned'])
+                else:
+                    print(repr(res))
     return exitcode
 
 
