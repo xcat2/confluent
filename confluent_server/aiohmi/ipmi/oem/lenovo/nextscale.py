@@ -418,7 +418,7 @@ class SMMClient(object):
              'passwordReuseCheckNum,passwordFailAllowdNum,'
              'passwordLockoutTimePeriod,timeZone'))
         if status != 200:
-            raise Exception(rspbody)
+            raise Exception(rspbody.decode('utf8', 'replace'))
         accountinfo = fromstring(rspbody)
         for rule in self.rulemap:
             ruleinfo = accountinfo.find(self.rulemap[rule])
@@ -696,7 +696,7 @@ class SMMClient(object):
             rules = 'set={0}'.format(','.join(rules))
             rsp, status = await self.webrequest('/data', rules)
             if status != 200:
-                raise Exception(rsp)
+                raise Exception(rsp.decode('utf8', 'replace'))
         if powercfg != [None, None]:
             if variant != 6:
                 if None in powercfg:
@@ -739,7 +739,7 @@ class SMMClient(object):
                 '/data', 'set=user({0},1,{1},511,,4,15,0)'.format(
                     uid, username))
             if status != 200:
-                raise Exception(rsp)
+                raise Exception(rsp.decode('utf8', 'replace'))
 
     async def reseat_bay(self, bay):
         bay = int(bay)
@@ -842,7 +842,7 @@ class SMMClient(object):
         )
         authdata, status, _ = await wc.grab_response_with_status('/data/login', loginform)
         if status != 200:
-            raise Exception(authdata)
+            raise Exception(authdata.decode('utf8', 'replace'))
         authdata = fromstring(authdata)
         for data in authdata.findall('authResult'):
             if int(data.text) != 0:
@@ -861,7 +861,7 @@ class SMMClient(object):
             # This firmware puts tokens in the html file, parse that
             indexhtml, status, _ = await wc.grab_response_with_status('/index.html', method='GET')
             if status != 200:
-                raise Exception(indexhtml)
+                raise Exception(indexhtml.decode('utf8', 'replace'))
             if not isinstance(indexhtml, str):
                 indexhtml = indexhtml.decode('utf8')
             for line in indexhtml.split('\n'):
@@ -874,7 +874,7 @@ class SMMClient(object):
         if not wc.st2:
             body, status, _ = await wc.grab_response_with_status('/scripts/index.ajs', method='GET')
             if status != 200:
-                raise Exception(body)
+                raise Exception(body.decode('utf8', 'replace'))
             if not isinstance(body, str):
                 body = body.decode('utf8')
             for line in body.split('\n'):
@@ -894,7 +894,7 @@ class SMMClient(object):
         rsp, status = await self.webrequest(
             '/data', 'set=hostname:' + hostname)
         if status != 200:
-            raise Exception(rsp)
+            raise Exception(rsp.decode('utf8', 'replace'))
 
     async def get_hostname(self):
         currinfo = await self.get_netinfo()
@@ -906,7 +906,7 @@ class SMMClient(object):
         if status == 400:
             data, status = await self.webrequest('/data?get=hostname', '')
         if status != 200:
-            raise Exception(data)
+            raise Exception(data.decode('utf8', 'replace'))
         currinfo = fromstring(data)
         return currinfo
 
@@ -914,7 +914,7 @@ class SMMClient(object):
         rsp, status = await self.webrequest(
             '/data', 'set=dnsDomain:' + domain)
         if status != 200:
-            raise Exception(rsp)
+            raise Exception(rsp.decode('utf8', 'replace'))
 
     async def get_domain(self):
         currinfo = await self.get_netinfo()
@@ -924,7 +924,7 @@ class SMMClient(object):
     async def get_ntp_enabled(self, variant):
         rsp, status = await self.webrequest('/data', 'get=ntpOpMode')
         if status != 200:
-            raise Exception(rsp)
+            raise Exception(rsp.decode('utf8', 'replace'))
         info = fromstring(rsp)
         for data in info.findall('ntpOpMode'):
             return data.text == '1'
@@ -933,7 +933,7 @@ class SMMClient(object):
         result, status = await self.webrequest(
             '/data', 'set=ntpOpMode:{0}'.format(1 if enabled else 0))
         if status != 200:
-            raise Exception(result)
+            raise Exception(result.decode('utf8', 'replace'))
         if not isinstance(result, str):
             result = result.decode('utf8')
         if '<status>ok</status>' not in result:
@@ -943,7 +943,7 @@ class SMMClient(object):
         result, status = await self.webrequest(
             '/data', 'set=ntpServer{0}:{1}'.format(index + 1, server))
         if status != 200:
-            raise Exception(result)
+            raise Exception(result.decode('utf8', 'replace'))
         if not isinstance(result, str):
             result = result.decode('utf8')
         if '<status>ok</status>' not in result:
@@ -954,7 +954,7 @@ class SMMClient(object):
         rsp, status = await self.webrequest(
             '/data', 'get=ntpServer1,ntpServer2,ntpServer3')
         if status != 200:
-            raise Exception(rsp)
+            raise Exception(rsp.decode('utf8', 'replace'))
         result = fromstring(rsp)
         srvs = []
         for data in result.findall('ntpServer1'):
@@ -991,7 +991,7 @@ class SMMClient(object):
             rsp, status, _ = await wc.grab_response_with_status(
                 '/data', 'set=fwType:10')  # SMM firmware
             if status != 200:
-                raise Exception(rsp)
+                raise Exception(rsp.decode('utf8', 'replace'))
             url = '/fwupload/fwupload.esp?ST1={0}'.format(wc.st1)
             fu = await webclient.make_uploader(
                 wc, url, filename, data, formname='fileUpload',
@@ -1017,7 +1017,7 @@ class SMMClient(object):
             rsp, status, _ = await wc.grab_response_with_status(
                 '/data', 'set=fwUpdate:1')
             if status != 200:
-                raise Exception(rsp)
+                raise Exception(rsp.decode('utf8', 'replace'))
             complete = False
             tries = 0
             while not complete:
