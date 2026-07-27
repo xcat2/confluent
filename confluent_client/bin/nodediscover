@@ -242,8 +242,12 @@ async def import_csv(options, session):
                 print('Defined ' + res['created'])
             else:
                 print(repr(res))
-        assignments.append(assign_macs(maclist, nodename, assignlimit))
-    for rcode in await asyncio.gather(*assignments):
+        assignments.append(
+            asyncio.create_task(assign_macs(maclist, nodename, assignlimit)))
+    for rcode in await asyncio.gather(*assignments, return_exceptions=True):
+        if isinstance(rcode, BaseException):
+            sys.stderr.write('Error assigning discovery data: {0}\n'.format(rcode))
+            rcode = 1
         exitcode |= rcode
     if exitcode:
         sys.exit(exitcode)
