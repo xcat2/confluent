@@ -26,7 +26,7 @@ import time
 try:
     import yaml
 except ImportError:
-    pass
+    yaml = None
 path = os.path.dirname(os.path.realpath(__file__))
 path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
 if path.startswith('/opt'):
@@ -197,6 +197,18 @@ def build_el_boot_tree(targpath):
     gather_bootloader(targpath)
 
 
+def write_manifest(outdir, indir):
+    if not (osimage and yaml):
+        sys.stderr.write('Warning: confluent server libraries unavailable, skipping manifest.yaml, '
+                         'osdeploy rebase will not work for this profile\n')
+        return
+    hmap = asyncio.run(osimage.get_hashes(outdir, indir))
+    with open('{0}/manifest.yaml'.format(outdir), 'w') as yout:
+        yout.write('# This manifest enables rebase to know original source of profile data and if any customizations have been done\n')
+        manifestdata = {'distdir': indir, 'disthashes': hmap}
+        yout.write(yaml.dump(manifestdata, default_flow_style=False))
+
+
 def capture_remote(args):
     targ = args.node
     outdir = args.profilename
@@ -267,11 +279,7 @@ def capture_remote(args):
     indir = '{}/profiles/default'.format(confdir)
     if os.path.exists(indir):
         copy_tree(indir, outdir)
-        hmap = asyncio.run(osimage.get_hashes(outdir, indir))
-        with open('{0}/manifest.yaml'.format(outdir), 'w') as yout:
-            yout.write('# This manifest enables rebase to know original source of profile data and if any customizations have been done\n')
-            manifestdata = {'distdir': indir, 'disthashes': hmap}
-            yout.write(yaml.dump(manifestdata, default_flow_style=False))
+        write_manifest(outdir, indir)
     label = '{0} {1} ({2})'.format(finfo['name'], finfo['version'], profname)
     with open(os.path.join(outdir, 'profile.yaml'), 'w') as profileout:
         profileout.write('label: {}\n'.format(label))
@@ -1672,11 +1680,7 @@ def pack_image(args):
             indir = '{}/profiles/default'.format(confdir)
             if os.path.exists(indir):
                 copy_tree(indir, outdir)
-                hmap = asyncio.run(osimage.get_hashes(outdir, indir))
-                with open('{0}/manifest.yaml'.format(outdir), 'w') as yout:
-                    yout.write('# This manifest enables rebase to know original source of profile data and if any customizations have been done\n')
-                    manifestdata = {'distdir': indir, 'disthashes': hmap}
-                    yout.write(yaml.dump(manifestdata, default_flow_style=False))
+                write_manifest(outdir, indir)
             tryupdate = True
     try:
         pwd.getpwnam('confluent')
