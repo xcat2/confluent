@@ -197,7 +197,7 @@ def build_el_boot_tree(targpath):
     gather_bootloader(targpath)
 
 
-async def capture_remote(args):
+def capture_remote(args):
     targ = args.node
     outdir = args.profilename
     os.umask(0o022)
@@ -267,7 +267,7 @@ async def capture_remote(args):
     indir = '{}/profiles/default'.format(confdir)
     if os.path.exists(indir):
         copy_tree(indir, outdir)
-        hmap = await osimage.get_hashes(outdir, indir)
+        hmap = asyncio.run(osimage.get_hashes(outdir, indir))
         with open('{0}/manifest.yaml'.format(outdir), 'w') as yout:
             yout.write('# This manifest enables rebase to know original source of profile data and if any customizations have been done\n')
             manifestdata = {'distdir': indir, 'disthashes': hmap}
@@ -1015,13 +1015,13 @@ def main():
     if args.subcommand == 'build':
         build_root(args)
     elif args.subcommand == 'capture':
-        asyncio.run(capture_remote(args))
+        capture_remote(args)
     elif args.subcommand == 'unpack':
         unpack_image(args)
     elif args.subcommand == 'exec':
         exec_root(args)
     elif args.subcommand == 'pack':
-        asyncio.run(pack_image(args))
+        pack_image(args)
     else:
         parser.print_usage()
 
@@ -1544,7 +1544,7 @@ def recursecp(source, targ):
         shutil.copy2(source, targ)
 
 
-async def pack_image(args):
+def pack_image(args):
     outdir = args.profilename
     if '/' in outdir:
         raise Exception('Full path not supported, supply only the profile name\n')
@@ -1663,7 +1663,7 @@ async def pack_image(args):
             indir = '{}/profiles/default'.format(confdir)
             if os.path.exists(indir):
                 copy_tree(indir, outdir)
-                hmap = await osimage.get_hashes(outdir, indir)
+                hmap = asyncio.run(osimage.get_hashes(outdir, indir))
                 with open('{0}/manifest.yaml'.format(outdir), 'w') as yout:
                     yout.write('# This manifest enables rebase to know original source of profile data and if any customizations have been done\n')
                     manifestdata = {'distdir': indir, 'disthashes': hmap}
