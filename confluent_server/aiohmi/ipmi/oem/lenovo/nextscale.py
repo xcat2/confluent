@@ -1030,9 +1030,16 @@ class SMMClient(object):
                         raise
                     tries += 1
                     continue
-                tries = 0
                 if status != 200:
-                    raise Exception('Error applying firmware')
+                    # an SMM restarting its web service part way through the
+                    # apply answers for a while before it stops answering at
+                    # all, so spend the same budget on this as on a poll that
+                    # went unanswered
+                    if tries > 2:
+                        raise Exception('Error applying firmware')
+                    tries += 1
+                    continue
+                tries = 0
                 progdata = fromstring(progdata)
                 if progdata.findall('fwUpdate')[0].text == 'invalid signature':
                     raise Exception('Firmware signature invalid')
