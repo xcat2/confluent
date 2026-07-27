@@ -52,6 +52,8 @@ def mkdirp(path, mode=0o777):
 
 
 async def check_call(*cmd, **kwargs):
+    if len(cmd) == 1 and isinstance(cmd[0], (list, tuple)):
+        cmd = cmd[0]
     subproc = await asyncio.create_subprocess_exec(*cmd, **kwargs)
     rc = await subproc.wait()
     if rc != 0:
