@@ -1041,11 +1041,11 @@ def copy_file(src, dst):
 async def get_hash(fname):
     currhash = hashlib.sha512()
     with open(fname, 'rb') as currf:
-        currd = currf.read(2048)
+        currd = currf.read(1048576)
         await asyncio.sleep(0)
         while currd:
             currhash.update(currd)
-            currd = currf.read(2048)
+            currd = currf.read(1048576)
             await asyncio.sleep(0)
 
     return currhash.hexdigest()
