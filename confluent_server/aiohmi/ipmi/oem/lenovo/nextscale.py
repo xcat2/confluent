@@ -1036,6 +1036,7 @@ class SMMClient(object):
                         raise
                     tries += 1
                     continue
+                tries = 0
                 if status != 200:
                     raise Exception('Error applying firmware')
                 progdata = fromstring(progdata)
