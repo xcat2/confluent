@@ -1,0 +1,40 @@
+#!/bin/sh
+# Print the version to stamp on packages built from this checkout.
+#
+#   --tilde   use "~dev" rather than ".dev" (packages with no setup.py; "~" sorts
+#             before the release, ".dev" after, but PEP 440 requires ".dev")
+#
+# The root VERSION file names the release this branch is working toward. Release
+# tags do not always live on master (3.15.2 through 3.15.6 are on branch 3.15), so
+# git describe alone stamps master builds with an already-released version. The
+# newest tag reachable from HEAD is kept as a floor, so forgetting to bump VERSION
+# after tagging *this* branch cannot walk the version backwards; staying ahead of
+# tags on other branches is what the VERSION file itself is for. See README.md for
+# the branch-cutting order.
+cd "$(dirname "$0")" || exit 1
+sep=.
+case "$1" in
+    --tilde) sep='~' ;;
+    '') ;;
+    *) echo "mkversion: unknown argument '$1'" >&2; exit 1 ;;
+esac
+next=$(tr -d '[:space:]' < VERSION 2>/dev/null)
+case "$next" in
+    [0-9]*.[0-9]*.[0-9]*) ;;
+    *) echo "mkversion: VERSION must hold a release like 4.0.0, got '$next'" >&2; exit 1 ;;
+esac
+# plain describe: release tags are annotated, so lightweight ones (3.15.5-test) are
+# already ignored. Never guess a version -- a silent fallback here would label a dev
+# build as the release.
+desc=$(git describe 2>/dev/null) ||
+    { echo "mkversion: git describe failed, cannot version this build" >&2; exit 1; }
+tag=${desc%%-*}
+numcommits=$(echo "$desc" | cut -d- -f2)
+if [ "$numcommits" = "$tag" ]; then  # HEAD is exactly a tag: release build
+    echo "$tag"
+    exit 0
+fi
+bumped=$(echo "$tag" | awk -F. -v OFS=. '{$NF=$NF+1; print}')
+base=$(printf '%s\n%s\n' "$bumped" "$next" | sort -V | tail -1) && [ -n "$base" ] ||
+    { echo "mkversion: sort -V failed" >&2; exit 1; }
+echo "${base}${sep}dev${numcommits}+$(echo "$desc" | cut -d- -f3)"

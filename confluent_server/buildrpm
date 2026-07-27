@@ -3,8 +3,7 @@ cd `dirname $0`
 if [ -x ./makeman ]; then
     ./makeman
 fi
-./makesetup
-VERSION=`cat VERSION`
+VERSION=`./makesetup` || exit 1
 PKGNAME=$(basename $(pwd))
 python3 setup.py sdist > /dev/null 2>&1
 cp dist/*.tar.gz ~/rpmbuild/SOURCES

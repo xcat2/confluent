@@ -19,10 +19,7 @@ cd /tmp/confluent/$PKGNAME
 if [ -x ./makeman ]; then
     ./makeman
 fi
-sed -e 's/~/./' ./makesetup > ./makesetup.deb
-chmod +x ./makesetup.deb
-./makesetup.deb
-VERSION=`cat VERSION`
+VERSION=`./makesetup` || exit 1
 cat > setup.cfg << EOF
 [install]
 install_purelib=/opt/confluent/lib/python
