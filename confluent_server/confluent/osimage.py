@@ -1301,7 +1301,7 @@ class MediaImporter(object):
                         self.error = self.error.decode('utf8')
                     self.phase = 'error'
                     return
-            currline = b''
+                currline = b''
             a = await wkr.stdout.read(1)
         if self.oscategory:
             defprofile = '/opt/confluent/lib/osdeploy/{0}'.format(
