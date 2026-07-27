@@ -65,7 +65,7 @@ elif grep -q confluent_imagemethod=uncompressed /proc/cmdline; then
     mount -t tmpfs disklessroot /sysroot
 fi
 if [ "$TETHERED" = 0 ]; then
-    extract_untethered_rootimg || return 1
+    extract_untethered_rootimg
 elif [ ! -f /tmp/mountparts.sh ]; then
     mkdir -p /mnt/overlay/upper /mnt/overlay/work
     mount -t overlay -o upperdir=/mnt/overlay/upper,workdir=/mnt/overlay/work,lowerdir=/mnt/remote disklessroot /sysroot

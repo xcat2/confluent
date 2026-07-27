@@ -55,7 +55,7 @@ if [ "untethered" = "$(getarg confluent_imagemethod)" -o "uncompressed" = "$(get
     else
         mount -t tmpfs disklessroot /sysroot
     fi
-    extract_untethered_rootimg || return 1
+    extract_untethered_rootimg
 else
     TETHERED=1
     mount -o discard /dev/zram0 /mnt/overlay
