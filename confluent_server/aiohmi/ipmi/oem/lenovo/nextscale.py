@@ -411,8 +411,7 @@ class SMMClient(object):
 
     async def get_bmc_configuration(self, variant):
         settings = {}
-        wc = await self.wc()
-        rspbody, status, _ = await wc.grab_response_with_status(
+        rspbody, status = await self.webrequest(
             '/data',
             ('get=passwordMinLength,passwordForceChange,passwordDurationDays,'
              'passwordExpireWarningDays,passwordChangeInterval,'
@@ -695,8 +694,7 @@ class SMMClient(object):
                             changeset[key]['value']))
         if rules:
             rules = 'set={0}'.format(','.join(rules))
-            wc = await self.wc()
-            rsp, status, _ = await wc.grab_response_with_status('/data', rules)
+            rsp, status = await self.webrequest('/data', rules)
             if status != 200:
                 raise Exception(rsp)
         if powercfg != [None, None]:
@@ -737,8 +735,7 @@ class SMMClient(object):
             username = bytes(rsp['data']).rstrip(b'\x00')
             if not isinstance(username, str):
                 username = username.decode('utf8')
-            wc = await self.wc()
-            await wc.grab_response_with_status(
+            await self.webrequest(
                 '/data', 'set=user({0},1,{1},511,,4,15,0)'.format(
                     uid, username))
 
@@ -892,8 +889,8 @@ class SMMClient(object):
         return wc
 
     async def set_hostname(self, hostname):
-        wc = await self.wc()
-        rsp, status, _ = await wc.grab_response_with_status('/data', 'set=hostname:' + hostname)
+        rsp, status = await self.webrequest(
+            '/data', 'set=hostname:' + hostname)
         if status != 200:
             raise Exception(rsp)
 
@@ -903,18 +900,17 @@ class SMMClient(object):
             return data.text
 
     async def get_netinfo(self):
-        wc = await self.wc()
-        data, status, _ = await wc.grab_response_with_status('/data', 'get=hostname')
+        data, status = await self.webrequest('/data', 'get=hostname')
         if status == 400:
-            data, status, _ = await wc.grab_response_with_status('/data?get=hostname', '')
+            data, status = await self.webrequest('/data?get=hostname', '')
         if status != 200:
             raise Exception(data)
         currinfo = fromstring(data)
         return currinfo
 
     async def set_domain(self, domain):
-        wc = await self.wc()
-        rsp, status, _ = await wc.grab_response_with_status('/data', 'set=dnsDomain:' + domain)
+        rsp, status = await self.webrequest(
+            '/data', 'set=dnsDomain:' + domain)
         if status != 200:
             raise Exception(rsp)
 
@@ -924,8 +920,7 @@ class SMMClient(object):
             return data.text
 
     async def get_ntp_enabled(self, variant):
-        wc = await self.wc()
-        rsp, status, _ = await wc.grab_response_with_status('/data', 'get=ntpOpMode')
+        rsp, status = await self.webrequest('/data', 'get=ntpOpMode')
         if status != 200:
             raise Exception(rsp)
         info = fromstring(rsp)
@@ -933,9 +928,8 @@ class SMMClient(object):
             return data.text == '1'
 
     async def set_ntp_enabled(self, enabled):
-        wc = await self.wc()
-        result, status, _ = await wc.grab_response_with_status('/data', 'set=ntpOpMode:{0}'.format(
-            1 if enabled else 0))
+        result, status = await self.webrequest(
+            '/data', 'set=ntpOpMode:{0}'.format(1 if enabled else 0))
         if status != 200:
             raise Exception(result)
         if not isinstance(result, str):
@@ -944,9 +938,8 @@ class SMMClient(object):
             raise Exception("Unrecognized result: " + result)
 
     async def set_ntp_server(self, server, index):
-        wc = await self.wc()
-        result, status, _ = await wc.grab_response_with_status('/data', 'set=ntpServer{0}:{1}'.format(
-            index + 1, server))
+        result, status = await self.webrequest(
+            '/data', 'set=ntpServer{0}:{1}'.format(index + 1, server))
         if status != 200:
             raise Exception(result)
         if not isinstance(result, str):
@@ -956,8 +949,7 @@ class SMMClient(object):
         return True
 
     async def get_ntp_servers(self):
-        wc = await self.wc()
-        rsp, status, _ = await wc.grab_response_with_status(
+        rsp, status = await self.webrequest(
             '/data', 'get=ntpServer1,ntpServer2,ntpServer3')
         if status != 200:
             raise Exception(rsp)
@@ -1121,3 +1113,13 @@ class SMMClient(object):
         finally:
             self.weblogging = False
         return self._wc
+
+    async def webrequest(self, url, data):
+        wc = await self.wc()
+        rsp, status, _ = await wc.grab_response_with_status(url, data)
+        if status == 401:
+            # the SMM dropped the session, log back in and try once more
+            self._wc = None
+            wc = await self.wc()
+            rsp, status, _ = await wc.grab_response_with_status(url, data)
+        return rsp, status
