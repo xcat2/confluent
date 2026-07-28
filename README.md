@@ -27,3 +27,24 @@ Confluent is made available under the Apache 2.0 license: https://opensource.org
 # Developers
 
 Want to help? Submit a [Pull Request](https://github.com/xcat2/confluent/pulls).
+
+## Versioning and releases
+
+The top-level `VERSION` file names the release the current branch is working toward. Build scripts
+call `./mkversion`, which turns it into the version stamped on packages: the tag itself on a release
+tag (`4.0.1`), otherwise a development version (`4.0.1.dev5+gdeadbee`, or `4.0.1~dev5+gdeadbee` for
+the packages that have no `setup.py`).
+
+`mkversion` also derives a version from the newest tag reachable from HEAD and uses whichever is
+higher, so forgetting to bump `VERSION` after tagging the current branch cannot walk the version
+backwards. Staying ahead of tags on *other* branches is what `VERSION` itself is for: patch releases
+are tagged on release branches, which master never sees.
+
+Cutting a new series:
+
+1. Land the release commit on master and tag `X.Y.0` there.
+2. Create branch `X.Y` from that tag; it inherits `VERSION=X.Y.0`.
+3. Only then bump `VERSION` on master. Doing it before step 2 leaves the release branch on the
+   wrong series.
+
+Patch releases land on branch `X.Y` and are tagged `X.Y.Z` there; no `VERSION` edit is needed.

@@ -1,16 +1,8 @@
 cd $(dirname $0)
-VERSION=`git describe|cut -d- -f 1`
-NUMCOMMITS=`git describe|cut -d- -f 2`
-if [ "$NUMCOMMITS" != "$VERSION"  ]; then
-    LASTNUM=$(echo $VERSION|rev|cut -d . -f 1|rev)
-    LASTNUM=$((LASTNUM+1))
-    FIRSTPART=$(echo $VERSION|rev|cut -d . -f 2- |rev)
-    VERSION=${FIRSTPART}.${LASTNUM}
-    VERSION=$VERSION~dev$NUMCOMMITS+`git describe|cut -d- -f 3`
-fi
+VERSION=`../mkversion --tilde` || exit 1
 sed -e "s/#VERSION#/$VERSION/" confluent_osdeploy.spec.tmpl > confluent_osdeploy.spec
-cd ..
 cp ../LICENSE .
+cd ..
 tar Jcvf confluent_osdeploy.tar.xz confluent_osdeploy
 mv confluent_osdeploy.tar.xz ~/rpmbuild/SOURCES/
 cd -
