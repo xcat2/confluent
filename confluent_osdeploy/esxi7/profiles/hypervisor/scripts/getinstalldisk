@@ -1,12 +1,88 @@
 #!/usr/bin/python3
 import subprocess
+import json
 import os
 
 class SilentException(Exception):
     pass
 
+def list_slots():
+    slots = {}
+    current = None
+    dump = subprocess.check_output(['smbiosDump'])
+    if not isinstance(dump, str):
+        dump = dump.decode('utf8')
+    for line in dump.split('\n'):
+        if 'System Slot (Type 9):' in line:
+            current = {}
+        elif current is not None:
+            stripped = line.strip()
+            if stripped.startswith('Designation:'):
+                current['designation'] = stripped.split(':', 1)[1].strip().strip('"')
+            if stripped.startswith('Type:'):
+                current['type_label'] = stripped.split(':', 1)[1].strip()
+                current['type_number'] = int(stripped.split(':', 1)[1].strip().split(' ')[0], 16)
+                # 0x14 through 0x17 are M.2 slots, inclusively
+                if current['type_number'] in (0x14, 0x15, 0x16, 0x17):
+                    current['is_m2'] = True
+                else:
+                    current['is_m2'] = False
+            elif stripped.startswith('PCI Address:'):
+                addr = stripped.split(':', 1)[1].strip()
+                current['pci_address'] = addr
+                slots[addr] = current
+                current = None
+    return slots
+
+def list_m2_slots():
+    slots = list_slots()
+    m2slots = {}
+    for addr in slots:
+        slot = slots[addr]
+        if slot.get('is_m2', False):
+            m2slots[addr] = slot
+    return m2slots
+
+def get_deployment_storage():
+    apiclient = None
+    for clientpath in ('/opt/confluent/bin/apiclient', '/etc/confluent/apiclient'):
+        if os.path.exists(clientpath):
+            apiclient = clientpath
+            break
+    if not apiclient:
+        return None
+    for attriburl in ('/confluent-api/self/myattrib', '/confluent-api/self/myattribs'):
+        try:
+            attribs = subprocess.check_output(
+                ['python3', apiclient, attriburl, '-j'], stderr=subprocess.DEVNULL)
+            if not isinstance(attribs, str):
+                attribs = attribs.decode('utf8')
+            attribs = json.loads(attribs)
+            if not isinstance(attribs, dict):
+                continue
+            storage = attribs.get('deployment.storage', None)
+            if isinstance(storage, str) and storage.strip():
+                return storage.strip()
+        except Exception:
+            continue
+    return None
+
+# List of models that are generally used for OS install disk (generally 2-disk mirroring)
+PRIORITY_MODELS = ('m.2 nvme 2-bay raid kit', 
+                   'thinksystem_m.2_vd',
+                   'thinksystem m.2',
+                   'thinksystem_m.2',
+                   'b540p-2hs',  # 7mm or M.2 in rear
+                   'b540d-2hs',  # M.2 in E3.S or 2.5inch
+                   'b550d-2hs',  # Front M.2
+                   'b550p-2hs',  # Rear M.2
+                   'raid b540p-2hs',
+                   'raid b540d-2hs',
+                   'raid b550d-2hs',
+                   'raid b550p-2hs')
+
 class DiskInfo(object):
-    def __init__(self, devname, devinfo):
+    def __init__(self, devname, devinfo, storagespec=None):
         self.name = devname
         self.path = '/dev/' + devname
         self.wwn = None
@@ -23,13 +99,16 @@ class DiskInfo(object):
             raise SilentException("CD-ROM device")
         if self.size < 2048:
             raise SilentException("Too small")
-
-        
+        if storagespec and storagespec == 'm2':
+            if self.model.lower() not in PRIORITY_MODELS and not devinfo.get('m2_slot', None):
+                raise SilentException("Not an M.2 disk")
+               
+            
 
 
     @property
     def priority(self):
-        if self.model.lower() in ('m.2 nvme 2-bay raid kit', 'thinksystem_m.2_vd', 'thinksystem m.2', 'thinksystem_m.2'):
+        if self.model.lower() in PRIORITY_MODELS:
             return 0
         if self.driver == 'vmw_ahci':
             return 2
@@ -49,6 +128,7 @@ class DiskInfo(object):
 
 def list_disks():
     current_dev = None
+    m2slots = list_m2_slots()
     disks = {}
     devlist = subprocess.check_output(['localcli', 'storage', 'core', 'device', 'list'])
     if not isinstance(devlist, str):
@@ -96,31 +176,40 @@ def list_disks():
                 adp = ' '.join(line.split()[1:])
                 disks[dev]['adapter'] = adp
                 devbyadp.setdefault(adp, []).append(dev)
-    adapterlist = subprocess.check_output(['localcli', 'storage', 'core', 'adapter', 'list'])
+    adapterlist = subprocess.check_output(['localcli', 'storage', 'core', 'adapter', 'listdetailed'])
     if not isinstance(adapterlist, str):
         adapterlist = adapterlist.decode('utf8')
-    driverbyadp = {}
-    linenum = 0
+    adapters = {}
+    curradpinfo = {}
     for line in adapterlist.split('\n'):
-        linenum += 1
+        line = line.rstrip()
         if not line.strip():
+            curradpinfo = {}
             continue
-        if linenum < 3:
-            continue
-        parts = line.split()
-        if len(parts) < 2:
-            continue
-        adp = parts[0]
-        driver = parts[1]
-        driverbyadp[adp] = driver
+        if not line.startswith(' '):
+            curradpname = line.split(':', 1)[0].strip()
+            curradpinfo['name'] = curradpname
+            adapters[curradpname] = curradpinfo
+        else:
+            if '   Driver:' in line:
+                curradpinfo['driver'] = line.split(maxsplit=1)[1]
+            elif '   Description:' in line:
+                curradpinfo['description'] = line.split(maxsplit=1)[1]
+                if curradpinfo['description'].startswith('('):
+                    curradpinfo['pcieaddress'] = curradpinfo['description'].split('(')[1].split(')')[0]
     for adp in devbyadp:
-        driver = driverbyadp.get(adp, 'Unknown')
+        driver = adapters.get(adp, {}).get('driver', 'Unknown')
+        pcieaddr = adapters.get(adp, {}).get('pcieaddress', None)
         for dev in devbyadp[adp]:
             disks[dev]['adapter_driver'] = driver
+            disks[dev]['adapter_pcieaddress'] = pcieaddr
+            if pcieaddr and pcieaddr in m2slots:
+                disks[dev]['m2_slot'] = m2slots[pcieaddr]
     return disks
         
 def main():
     disks = []
+    storagespec = get_deployment_storage()
     try:
         alldisks = list_disks()
     except Exception as e:
@@ -128,7 +217,7 @@ def main():
         alldisks = {}
     for disk in alldisks:
         try:
-            disks.append(DiskInfo(disk, alldisks[disk]))
+            disks.append(DiskInfo(disk, alldisks[disk], storagespec=storagespec))
         except SilentException:
             pass
         except Exception as e:

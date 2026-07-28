@@ -1,6 +1,9 @@
 #!/usr/bin/python3
+import json
 import subprocess
 import os
+import shutil
+
 
 class SilentException(Exception):
     pass
@@ -71,6 +74,10 @@ class DiskInfo(object):
                 self.subsystype = v.replace('"', '')
             elif k == 'ATTR{ro}' and v == '"1"':
                 raise Exception("Device is read-only")
+            elif k == 'ATTRS{removable}' and v == '"1"':
+                raise Exception("Device is removable")
+            elif k == 'ATTRS{address}':
+                self.busaddr = v.replace('"', '')
         if not self.driver and 'imsm' not in self.mdcontainer and self.subsystype != 'nvm':
             raise Exception("No driver detected")
         if self.driver == 'sr':
@@ -106,6 +113,114 @@ class DiskInfo(object):
         })
 
 
+def get_dmi_type9_info():
+    dmidecode = shutil.which('dmidecode')
+    if not dmidecode:
+        return {}
+    try:
+        dmio = subprocess.check_output(
+            [dmidecode, '--type', '9'], stderr=subprocess.DEVNULL)
+    except Exception:
+        return {}
+    if not isinstance(dmio, str):
+        dmio = dmio.decode('utf8', errors='ignore')
+    slots = {}
+    currentslot = None
+    for line in dmio.split('\n'):
+        stripped = line.strip()
+        if not stripped:
+            if currentslot:
+                busaddr = currentslot.get('bus_address', None)
+                if busaddr:
+                    slots[busaddr] = currentslot
+                currentslot = None
+            continue
+        if stripped.startswith('Handle ') and ', DMI type 9,' in stripped:
+            if currentslot:
+                busaddr = currentslot.get('bus_address', None)
+                if busaddr:
+                    slots[busaddr] = currentslot
+            currentslot = {'handle': stripped.split(',', 1)[0].split(' ', 1)[1]}
+            continue
+        if currentslot is None:
+            continue
+        if ':' not in stripped:
+            continue
+        key, val = stripped.split(':', 1)
+        key = key.strip().lower().replace(' ', '_')
+        currentslot[key] = val.strip()
+    if currentslot:
+        busaddr = currentslot.get('bus_address', None)
+        if busaddr:
+            slots[busaddr] = currentslot
+    return slots
+
+def get_m2_slot_info():
+    slots = get_dmi_type9_info()
+    m2slots = {}
+    for slot in slots.values():
+        if 'm.2 socket' not in slot.get('type', '').lower():
+            continue
+        busaddr = slot.get('bus_address', None)
+        if not busaddr:
+            continue
+        m2slots[busaddr] = slot
+    return m2slots
+
+
+def get_deployment_storage():
+    apiclient = None
+    for clientpath in ('/opt/confluent/bin/apiclient', '/etc/confluent/apiclient'):
+        if os.path.exists(clientpath):
+            apiclient = clientpath
+            break
+    if not apiclient:
+        return None
+    for attriburl in ('/confluent-api/self/myattrib', '/confluent-api/self/myattribs'):
+        try:
+            attribs = subprocess.check_output(
+                ['python3', apiclient, attriburl, '-j'], stderr=subprocess.DEVNULL)
+            if not isinstance(attribs, str):
+                attribs = attribs.decode('utf8')
+            attribs = json.loads(attribs)
+            if not isinstance(attribs, dict):
+                continue
+            storage = attribs.get('deployment.storage', None)
+            if isinstance(storage, str) and storage.strip():
+                return storage.strip()
+        except Exception:
+            continue
+    return None
+
+
+def filter_deployment_storage(disks, storagespec, slotinfo=None):
+    if not storagespec:
+        return disks
+    spec = storagespec.strip().lower()
+    for disk in list(disks):
+        if spec == 'm2':
+            if disk.model.lower() in PRIORITY_MODELS:
+                continue
+            if not getattr(disk, 'busaddr', None):
+                disks.remove(disk)
+                continue
+            if slotinfo is None:
+                slotinfo = get_m2_slot_info()
+            if disk.busaddr not in slotinfo:
+                disks.remove(disk)
+    
+        elif spec.startswith('/dev/'):
+            bspec = os.path.basename(spec)
+            if disk.name.lower() == bspec:
+                return [disk]
+        else:
+            raise Exception("Unknown deployment.storage specification: {0}".format(storagespec))
+    
+    if not disks:
+        raise Exception("No disks match deployment.storage specification: {0}".format(storagespec))
+    return disks
+
+
 def main():
     disks = []
     for disk in sorted(os.listdir('/sys/class/block')):
@@ -116,9 +231,13 @@ def main():
             pass
         except Exception as e:
             print("Skipping {0}: {1}".format(disk, str(e)))
+    slotinfo = get_m2_slot_info()
+    disks = filter_deployment_storage(disks, get_deployment_storage(), slotinfo=slotinfo)
     nd = [x.name for x in sorted(disks, key=lambda x: [x.priority, x.size])]
     if nd:
         open('/tmp/installdisk', 'w').write(nd[0])
+    else:
+        raise Exception("No suitable install disk found")
 
 if __name__ == '__main__':
     main()

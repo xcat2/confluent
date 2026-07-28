@@ -255,6 +255,9 @@ node = {
     'deployment.state_last_updated': {
         'description': ('Timestamp of last state change, as reported by an OS profile, when available'),
     },
+    'deployment.storage': {
+        'description': ('Indicates the storage to use for OS deployment.  This may be a specific device name, or a more generic description such as "m2" to indicate that the OS should be deployed to an M.2 device.  If not specified, the default behavior is to prioritize according to various criteria and use the first disk based on that evaluation.'),
+    },
     'deployment.useinsecureprotocols': {
         'description': ('What phase(s) of boot are permitted to use insecure protocols '
                         '(TFTP and HTTP without TLS.  By default, only HTTPS is used.  However '
