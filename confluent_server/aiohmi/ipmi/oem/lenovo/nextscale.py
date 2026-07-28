@@ -384,6 +384,8 @@ class SMMClient(object):
         self.username = ipmicmd.ipmi_session.userid
         self.password = ipmicmd.ipmi_session.password
         self._wc = None
+        self.weblogging = False
+        self.updating = False
 
     async def clear_bmc_configuration(self):
         await self.ipmicmd.raw_command(0x32, 0xad)
@@ -409,15 +411,14 @@ class SMMClient(object):
 
     async def get_bmc_configuration(self, variant):
         settings = {}
-        wc = self.wc
-        wc.request(
-            'POST', '/data',
+        rspbody, status = await self.webrequest(
+            '/data',
             ('get=passwordMinLength,passwordForceChange,passwordDurationDays,'
              'passwordExpireWarningDays,passwordChangeInterval,'
              'passwordReuseCheckNum,passwordFailAllowdNum,'
              'passwordLockoutTimePeriod,timeZone'))
-        rsp = wc.getresponse()
-        rspbody = rsp.read()
+        if status != 200:
+            raise Exception(rspbody.decode('utf8', 'replace'))
         accountinfo = fromstring(rspbody)
         for rule in self.rulemap:
             ruleinfo = accountinfo.find(self.rulemap[rule])
@@ -693,9 +694,9 @@ class SMMClient(object):
                             changeset[key]['value']))
         if rules:
             rules = 'set={0}'.format(','.join(rules))
-            wc = self.wc
-            wc.request('POST', '/data', rules)
-            wc.getresponse().read()
+            rsp, status = await self.webrequest('/data', rules)
+            if status != 200:
+                raise Exception(rsp.decode('utf8', 'replace'))
         if powercfg != [None, None]:
             if variant != 6:
                 if None in powercfg:
@@ -734,12 +735,11 @@ class SMMClient(object):
             username = bytes(rsp['data']).rstrip(b'\x00')
             if not isinstance(username, str):
                 username = username.decode('utf8')
-            wc = self.wc
-            wc.request(
-                'POST', '/data', 'set=user({0},1,{1},511,,4,15,0)'.format(
+            rsp, status = await self.webrequest(
+                '/data', 'set=user({0},1,{1},511,,4,15,0)'.format(
                     uid, username))
-            rsp = wc.getresponse()
-            rsp.read()
+            if status != 200:
+                raise Exception(rsp.decode('utf8', 'replace'))
 
     async def reseat_bay(self, bay):
         bay = int(bay)
@@ -791,24 +791,27 @@ class SMMClient(object):
             rsp = await self.ipmicmd.raw_command(netfn=0x34, command=0x12, data=[1])
             if progress:
                 progress({'phase': 'initializing', 'progress': initpct})
-        wc = self.wc
-        if wc is None:
-            raise Exception("Failed to connect to web api")
+        wc = await self.wc()
         if variant and variant >> 5:
             url = '/preview/smm2-ffdc.tgz?ST1={0}'.format(wc.st1)
         else:
             url = '/preview/smm-ffdc.tgz?ST1={0}'.format(wc.st1)
         if autosuffix and not savefile.endswith('.tgz'):
             savefile += '-smm-ffdc.tgz'
-        fd = webclient.make_downloader(wc, url, savefile)
-        while not fd.completed():
-            try:
-                await fd.join(1)
-            except asyncio.TimeoutError:
-                pass
-            if progress and await fd.get_progress():
-                progress({'phase': 'download',
-                          'progress': 100 * await fd.get_progress()})
+        # the download runs on this session, keep wc() from logging it out
+        self.updating = True
+        try:
+            fd = webclient.make_downloader(wc, url, savefile)
+            while not fd.completed():
+                try:
+                    await fd.join(1)
+                except asyncio.TimeoutError:
+                    pass
+                if progress and await fd.get_progress():
+                    progress({'phase': 'download',
+                              'progress': 100 * await fd.get_progress()})
+        finally:
+            self.updating = False
         if progress:
             progress({'phase': 'complete'})
         return savefile
@@ -827,23 +830,19 @@ class SMMClient(object):
         fru['Model'] = mnum.strip(b' \x00\xff').replace(b'\xff', b'')
         return fru
 
-    def get_webclient(self):
+    async def get_webclient(self):
         cv = self.ipmicmd.certverify
-        wc = webclient.SecureHTTPConnection(self.smm, 443, verifycallback=cv)
         wc = webclient.WebConnection(self.smm, 443, verifycallback=cv)
-        wc.vintage = util._monotonic_time()
-        wc.connect()
+        wc.set_header('Content-Type', 'application/x-www-form-urlencoded')
         loginform = urlencode(
             {
                 'user': self.username,
                 'password': self.password
             }
         )
-        wc.request('POST', '/data/login', loginform)
-        rsp = wc.getresponse()
-        if rsp.status != 200:
-            raise Exception(rsp.read())
-        authdata = rsp.read()
+        authdata, status, _ = await wc.grab_response_with_status('/data/login', loginform)
+        if status != 200:
+            raise Exception(authdata.decode('utf8', 'replace'))
         authdata = fromstring(authdata)
         for data in authdata.findall('authResult'):
             if int(data.text) != 0:
@@ -860,11 +859,9 @@ class SMMClient(object):
             wc.st2 = data.text
         if not wc.st2:
             # This firmware puts tokens in the html file, parse that
-            wc.request('GET', '/index.html')
-            rsp = wc.getresponse()
-            if rsp.status != 200:
-                raise Exception(rsp.read())
-            indexhtml = rsp.read()
+            indexhtml, status, _ = await wc.grab_response_with_status('/index.html', method='GET')
+            if status != 200:
+                raise Exception(indexhtml.decode('utf8', 'replace'))
             if not isinstance(indexhtml, str):
                 indexhtml = indexhtml.decode('utf8')
             for line in indexhtml.split('\n'):
@@ -875,11 +872,9 @@ class SMMClient(object):
                     wc.st2 = line.split()[-1].replace(
                         '"', '').replace(',', '')
         if not wc.st2:
-            wc.request('GET', '/scripts/index.ajs')
-            rsp = wc.getresponse()
-            body = rsp.read()
-            if rsp.status != 200:
-                raise Exception(body)
+            body, status, _ = await wc.grab_response_with_status('/scripts/index.ajs', method='GET')
+            if status != 200:
+                raise Exception(body.decode('utf8', 'replace'))
             if not isinstance(body, str):
                 body = body.decode('utf8')
             for line in body.split('\n'):
@@ -892,92 +887,75 @@ class SMMClient(object):
         if not wc.st2:
             raise Exception('Unable to locate ST2 token')
         wc.set_header('ST2', wc.st2)
+        wc.vintage = util._monotonic_time()
         return wc
 
-    def set_hostname(self, hostname):
-        wc = self.wc
-        wc.request('POST', '/data', 'set=hostname:' + hostname)
-        rsp = wc.getresponse()
-        if rsp.status != 200:
-            raise Exception(rsp.read())
-        rsp.read()
-        self.logout()
+    async def set_hostname(self, hostname):
+        rsp, status = await self.webrequest(
+            '/data', 'set=hostname:' + hostname)
+        if status != 200:
+            raise Exception(rsp.decode('utf8', 'replace'))
 
-    def get_hostname(self):
-        currinfo = self.get_netinfo()
-        self.logout()
+    async def get_hostname(self):
+        currinfo = await self.get_netinfo()
         for data in currinfo.find('netConfig').findall('hostname'):
             return data.text
 
-    def get_netinfo(self):
-        wc = self.wc
-        wc.request('POST', '/data', 'get=hostname')
-        rsp = wc.getresponse()
-        data = rsp.read()
-        if rsp.status == 400:
-            wc.request('POST', '/data?get=hostname', '')
-            rsp = wc.getresponse()
-            data = rsp.read()
-        if rsp.status != 200:
-            raise Exception(data)
+    async def get_netinfo(self):
+        data, status = await self.webrequest('/data', 'get=hostname')
+        if status == 400:
+            data, status = await self.webrequest('/data?get=hostname', '')
+        if status != 200:
+            raise Exception(data.decode('utf8', 'replace'))
         currinfo = fromstring(data)
         return currinfo
 
-    def set_domain(self, domain):
-        wc = self.wc
-        wc.request('POST', '/data', 'set=dnsDomain:' + domain)
-        rsp = wc.getresponse()
-        if rsp.status != 200:
-            raise Exception(rsp.read())
-        rsp.read()
-        self.logout()
+    async def set_domain(self, domain):
+        rsp, status = await self.webrequest(
+            '/data', 'set=dnsDomain:' + domain)
+        if status != 200:
+            raise Exception(rsp.decode('utf8', 'replace'))
 
-    def get_domain(self):
-        currinfo = self.get_netinfo()
-        self.logout()
+    async def get_domain(self):
+        currinfo = await self.get_netinfo()
         for data in currinfo.find('netConfig').findall('dnsDomain'):
             return data.text
 
-    def get_ntp_enabled(self, variant):
-        wc = self.wc
-        wc.request('POST', '/data', 'get=ntpOpMode')
-        rsp = wc.getresponse()
-        info = fromstring(rsp.read())
-        self.logout()
+    async def get_ntp_enabled(self, variant):
+        rsp, status = await self.webrequest('/data', 'get=ntpOpMode')
+        if status != 200:
+            raise Exception(rsp.decode('utf8', 'replace'))
+        info = fromstring(rsp)
         for data in info.findall('ntpOpMode'):
             return data.text == '1'
 
-    def set_ntp_enabled(self, enabled):
-        wc = self.wc
-        wc.request('POST', '/data', 'set=ntpOpMode:{0}'.format(
-            1 if enabled else 0))
-        rsp = wc.getresponse()
-        result = rsp.read()
+    async def set_ntp_enabled(self, enabled):
+        result, status = await self.webrequest(
+            '/data', 'set=ntpOpMode:{0}'.format(1 if enabled else 0))
+        if status != 200:
+            raise Exception(result.decode('utf8', 'replace'))
         if not isinstance(result, str):
             result = result.decode('utf8')
-        self.logout()
         if '<status>ok</status>' not in result:
             raise Exception("Unrecognized result: " + result)
 
-    def set_ntp_server(self, server, index):
-        wc = self.wc
-        wc.request('POST', '/data', 'set=ntpServer{0}:{1}'.format(
-            index + 1, server))
-        rsp = wc.getresponse()
-        result = rsp.read()
+    async def set_ntp_server(self, server, index):
+        result, status = await self.webrequest(
+            '/data', 'set=ntpServer{0}:{1}'.format(index + 1, server))
+        if status != 200:
+            raise Exception(result.decode('utf8', 'replace'))
         if not isinstance(result, str):
             result = result.decode('utf8')
         if '<status>ok</status>' not in result:
             raise Exception("Unrecognized result: " + result)
-        self.logout()
         return True
 
-    def get_ntp_servers(self):
-        wc = self.wc
-        wc.request(
-            'POST', '/data', 'get=ntpServer1,ntpServer2,ntpServer3')
-        rsp = wc.getresponse()
-        result = fromstring(rsp.read())
+    async def get_ntp_servers(self):
+        rsp, status = await self.webrequest(
+            '/data', 'get=ntpServer1,ntpServer2,ntpServer3')
+        if status != 200:
+            raise Exception(rsp.decode('utf8', 'replace'))
+        result = fromstring(rsp)
         srvs = []
         for data in result.findall('ntpServer1'):
             srvs.append(data.text)
@@ -985,7 +963,6 @@ class SMMClient(object):
             srvs.append(data.text)
         for data in result.findall('ntpServer3'):
             srvs.append(data.text)
-        self.logout()
         return srvs
 
     async def update_firmware(self, filename, data=None, progress=None, bank=None):
@@ -1007,58 +984,72 @@ class SMMClient(object):
                     data = z.open(filename)
                     break
         progress({'phase': 'upload', 'progress': 0.0})
-        wc = self.wc
-        wc.request('POST', '/data', 'set=fwType:10')  # SMM firmware
-        rsp = wc.getresponse()
-        rsp.read()
-        url = '/fwupload/fwupload.esp?ST1={0}'.format(wc.st1)
-        fu = await webclient.make_uploader(
-            wc, url, filename, data, formname='fileUpload',
-            otherfields={'preConfig': 'on'})
-        while not fu.completed():
-            try:
-                await fu.join(3)
-            except asyncio.TimeoutError:
-                pass
-            if progress:
-                progress({'phase': 'upload',
-                          'progress': 100 * await fu.get_progress()})
-        progress({'phase': 'validating', 'progress': 0.0})
-        url = '/data'
-        wc.request('POST', url, 'get=fwVersion,spfwInfo')
-        rsp = wc.getresponse()
-        rsp.read()
-        if rsp.status != 200:
-            raise Exception('Error validating firmware')
-        progress({'phase': 'apply', 'progress': 0.0})
-        wc.request('POST', '/data', 'set=securityrollback:1')
-        wc.getresponse().read()
-        wc.request('POST', '/data', 'set=fwUpdate:1')
-        rsp = wc.getresponse()
-        rsp.read()
-        complete = False
-        tries = 0
-        while not complete:
-            await ipmisession.Session.pause(3)
-            wc.request('POST', '/data', 'get=fwProgress,fwUpdate')
-            try:
-                rsp = wc.getresponse()
-                progdata = rsp.read()
-            except Exception:
-                if tries > 2:
-                     break
-                tries += 1
-                continue
-            if rsp.status != 200:
-                raise Exception('Error applying firmware')
-            progdata = fromstring(progdata)
-            if progdata.findall('fwUpdate')[0].text == 'invalid signature':
-                raise Exception('Firmware signature invalid')
-            percent = float(progdata.findall('fwProgress')[0].text)
+        wc = await self.wc()
+        # the update runs on this session, keep wc() from logging it out
+        self.updating = True
+        try:
+            rsp, status, _ = await wc.grab_response_with_status(
+                '/data', 'set=fwType:10')  # SMM firmware
+            if status != 200:
+                raise Exception(rsp.decode('utf8', 'replace'))
+            url = '/fwupload/fwupload.esp?ST1={0}'.format(wc.st1)
+            fu = await webclient.make_uploader(
+                wc, url, filename, data, formname='fileUpload',
+                otherfields={'preConfig': 'on'})
+            while not fu.completed():
+                try:
+                    await fu.join(3)
+                except asyncio.TimeoutError:
+                    pass
+                if progress:
+                    progress({'phase': 'upload',
+                              'progress': 100 * await fu.get_progress()})
+            progress({'phase': 'validating', 'progress': 0.0})
+            url = '/data'
+            rsp, status, _ = await wc.grab_response_with_status(
+                url, 'get=fwVersion,spfwInfo')
+            if status != 200:
+                raise Exception('Error validating firmware')
+            progress({'phase': 'apply', 'progress': 0.0})
+            # only understood by newer SMM2 firmware, ignore rejection by older
+            await wc.grab_response_with_status(
+                '/data', 'set=securityrollback:1')
+            rsp, status, _ = await wc.grab_response_with_status(
+                '/data', 'set=fwUpdate:1')
+            if status != 200:
+                raise Exception(rsp.decode('utf8', 'replace'))
+            complete = False
+            tries = 0
+            while not complete:
+                await ipmisession.Session.pause(3)
+                try:
+                    progdata, status, _ = await wc.grab_response_with_status(
+                        '/data', 'get=fwProgress,fwUpdate')
+                except Exception:
+                    if tries > 2:
+                        raise
+                    tries += 1
+                    continue
+                if status != 200:
+                    # an SMM restarting its web service part way through the
+                    # apply answers for a while before it stops answering at
+                    # all, so spend the same budget on this as on a poll that
+                    # went unanswered
+                    if tries > 2:
+                        raise Exception('Error applying firmware')
+                    tries += 1
+                    continue
+                tries = 0
+                progdata = fromstring(progdata)
+                if progdata.findall('fwUpdate')[0].text == 'invalid signature':
+                    raise Exception('Firmware signature invalid')
+                percent = float(progdata.findall('fwProgress')[0].text)
 
-            progress({'phase': 'apply',
-                      'progress': percent})
-            complete = percent >= 100.0
+                progress({'phase': 'apply',
+                          'progress': percent})
+                complete = percent >= 100.0
+        finally:
+            self.updating = False
         return 'complete'
 
     async def get_inventory_descriptions(self, ipmicmd, variant):
@@ -1105,15 +1096,39 @@ class SMMClient(object):
             b' \x00\xff').decode('utf8'))
         return psui
 
-    def logout(self):
-        wc = self.wc
-        wc.request('POST', '/data/logout', None)
-        rsp = wc.getresponse()
-        rsp.read()
+    async def logout(self):
+        wc = self._wc
         self._wc = None
+        if wc is None:
+            return
+        # best effort, a stale session must not fail the caller's operation
+        try:
+            await wc.grab_response_with_status('/data/logout', None, method='POST')
+        except Exception:
+            pass
 
     async def wc(self):
-        if (not self._wc or self._wc.broken
-                or self._wc.vintage < util._monotonic_time() + 30):
-            self._wc = await self.get_webclient()
+        while self.weblogging:
+            await ipmisession.Session.pause(0.25)
+        self.weblogging = True
+        try:
+            if (not self._wc or (self._wc.vintage
+                    and self._wc.vintage < util._monotonic_time() - 30)):
+                if not self.updating and self._wc:
+                    # in case the existing session is still valid, dispose
+                    # of it
+                    await self.logout()
+                self._wc = await self.get_webclient()
+        finally:
+            self.weblogging = False
         return self._wc
+
+    async def webrequest(self, url, data):
+        wc = await self.wc()
+        rsp, status, _ = await wc.grab_response_with_status(url, data)
+        if status == 401:
+            # the SMM dropped the session, log back in and try once more
+            self._wc = None
+            wc = await self.wc()
+            rsp, status, _ = await wc.grab_response_with_status(url, data)
+        return rsp, status

@@ -360,7 +360,7 @@ class OEMHandler(generic.OEMHandler):
             srvs.append(ntpres['data'][129:257].rstrip('\x00'))
             return srvs
         if await self.is_fpc():
-            return self.smmhandler.get_ntp_servers()
+            return await self.smmhandler.get_ntp_servers()
         if self.has_tsma:
             return await self.tsmahandler.get_ntp_servers()
         return ()
@@ -375,7 +375,7 @@ class OEMHandler(generic.OEMHandler):
                     netfn=0x32, command=0xa8, data=(3, 0), timeout=15)
             return True
         if await self.is_fpc():
-            self.smmhandler.set_ntp_enabled(enabled)
+            await self.smmhandler.set_ntp_enabled(enabled)
             return True
         if self.has_tsma:
             await self.tsmahandler.set_ntp_enabled(enabled)
@@ -393,7 +393,7 @@ class OEMHandler(generic.OEMHandler):
             if not 0 <= index <= 2:
                 raise pygexc.InvalidParameterValue(
                     'SMM supports indexes 0 through 2')
-            self.smmhandler.set_ntp_server(server, index)
+            await self.smmhandler.set_ntp_server(server, index)
             return True
         elif self.has_tsma:
             if not (0 <= index <= 1):
@@ -940,7 +940,7 @@ class OEMHandler(generic.OEMHandler):
                 name += rsp['data'][:]
             return name.rstrip('\x00')
         elif await self.is_fpc():
-            return self.smmhandler.get_domain()
+            return await self.smmhandler.get_domain()
 
     async def set_oem_domain_name(self, name):
         if await self.has_tsm():
@@ -959,20 +959,20 @@ class OEMHandler(generic.OEMHandler):
             await self._restart_dns()
             return
         elif await self.is_fpc():
-            self.smmhandler.set_domain(name)
+            await self.smmhandler.set_domain(name)
 
     async def set_hostname(self, hostname):
         if await self.has_xcc():
             return await self.immhandler.set_hostname(hostname)
         elif await self.is_fpc():
-            return self.smmhandler.set_hostname(hostname)
+            return await self.smmhandler.set_hostname(hostname)
         return await super(OEMHandler, self).set_hostname(hostname)
 
     async def get_hostname(self):
         if await self.has_xcc():
             return await self.immhandler.get_hostname()
         elif await self.is_fpc():
-            return self.smmhandler.get_hostname()
+            return await self.smmhandler.get_hostname()
         return await super(OEMHandler, self).get_hostname()
 
     """ Gets a remote console launcher for a Lenovo ThinkServer.
