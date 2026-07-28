@@ -10,7 +10,6 @@ import os.path
 import pwd
 import shutil
 import sys
-import time
 
 path = os.path.dirname(os.path.realpath(__file__))
 path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
@@ -597,7 +596,7 @@ async def osimport(imagefile, checkonly=False, custname=None):
                     sys.stdout.flush()
                 else:
                     print(repr(rsp))
-                time.sleep(0.5)
+                await asyncio.sleep(0.5)
     finally:
         if shortname:
             async for x in c.delete('/deployment/importing/{0}'.format(shortname)):

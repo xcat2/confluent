@@ -834,7 +834,7 @@ def fingerprint_initramfs(archive):
     return None
 
 
-async def scan_iso(archive):
+def scan_iso(archive):
     scanudf = False
     filesizes = {}
     filecontents = {}
@@ -845,7 +845,6 @@ async def scan_iso(archive):
             for ent in reader:
                 if str(ent).endswith('TRANS.TBL'):
                     continue
-                await asyncio.sleep(0)
                 filesizes[str(ent)] = ent.size
                 if str(ent) == 'README.TXT':
                     readmecontents = b''
@@ -909,13 +908,13 @@ def parse_bfb(archive):
             archive.seek(currsize, os.SEEK_CUR)
     return None
 
-async def fingerprint(archive):
+def fingerprint(archive):
     archive.seek(0)
     header = archive.read(32768)
     archive.seek(32769)
     if archive.read(6) == b'CD001\x01':
         # ISO image
-        isoinfo = await scan_iso(archive)
+        isoinfo = scan_iso(archive)
         name = None
         for fun in globals():
             if fun.startswith('check_'):
@@ -947,7 +946,7 @@ async def import_image(filename, callback, backend=False, mfd=None, custtargpath
         archive = os.fdopen(int(mfd), 'rb')
     else:
         archive = open(filename, 'rb')
-    identity = await fingerprint(archive)
+    identity = await asyncio.to_thread(fingerprint, archive)
     if not identity:
         return -1
     identity, imginfo, funname = identity
@@ -1041,11 +1040,11 @@ def copy_file(src, dst):
 async def get_hash(fname):
     currhash = hashlib.sha512()
     with open(fname, 'rb') as currf:
-        currd = currf.read(2048)
+        currd = currf.read(1048576)
         await asyncio.sleep(0)
         while currd:
             currhash.update(currd)
-            currd = currf.read(2048)
+            currd = currf.read(1048576)
             await asyncio.sleep(0)
 
     return currhash.hexdigest()
@@ -1207,7 +1206,7 @@ class MediaImporter(object):
         else:
             medfile = open(media, 'rb')
         try:
-            identity = await fingerprint(medfile)
+            identity = await asyncio.to_thread(fingerprint, medfile)
         finally:
             if not self.medfile:
                 medfile.close()
@@ -1276,33 +1275,38 @@ class MediaImporter(object):
             nb = await wkr.stdout.read(128)
             currline += nb
             if b'\r' in currline:
-                if b'%' in currline:
-                    val = currline.split(b'%')[0].strip()
-                    if val:
-                        self.percent = float(val)
-                elif b'ERROR:' in currline:
+                if b'ERROR:' in currline:
                     self.error = currline.replace(b'ERROR:', b'')
                     if not isinstance(self.error, str):
                         self.error = self.error.decode('utf8')
                     self.phase = 'error'
                     self.percent = 100.0
                     return
+                elif b'%' in currline:
+                    val = currline.split(b'%')[0].strip()
+                    try:
+                        self.percent = float(val)
+                    except ValueError:
+                        pass
                 currline = b''
         a = await wkr.stdout.read(1)
         while a:
             currline += a
             if b'\r' in currline:
-                if b'%' in currline:
-                    val = currline.split(b'%')[0].strip()
-                    if val:
-                        self.percent = float(val)
-                elif b'ERROR:' in currline:
+                if b'ERROR:' in currline:
                     self.error = currline.replace(b'ERROR:', b'')
                     if not isinstance(self.error, str):
                         self.error = self.error.decode('utf8')
                     self.phase = 'error'
+                    self.percent = 100.0
                     return
-            currline = b''
+                elif b'%' in currline:
+                    val = currline.split(b'%')[0].strip()
+                    try:
+                        self.percent = float(val)
+                    except ValueError:
+                        pass
+                currline = b''
             a = await wkr.stdout.read(1)
         if self.oscategory:
             defprofile = '/opt/confluent/lib/osdeploy/{0}'.format(

@@ -26,7 +26,7 @@ import time
 try:
     import yaml
 except ImportError:
-    pass
+    yaml = None
 path = os.path.dirname(os.path.realpath(__file__))
 path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
 if path.startswith('/opt'):
@@ -197,7 +197,19 @@ def build_el_boot_tree(targpath):
     gather_bootloader(targpath)
 
 
-async def capture_remote(args):
+def write_manifest(outdir, indir):
+    if not (osimage and yaml):
+        sys.stderr.write('Warning: confluent server libraries unavailable, skipping manifest.yaml, '
+                         'osdeploy rebase will not work for this profile\n')
+        return
+    hmap = asyncio.run(osimage.get_hashes(outdir, indir))
+    with open('{0}/manifest.yaml'.format(outdir), 'w') as yout:
+        yout.write('# This manifest enables rebase to know original source of profile data and if any customizations have been done\n')
+        manifestdata = {'distdir': indir, 'disthashes': hmap}
+        yout.write(yaml.dump(manifestdata, default_flow_style=False))
+
+
+def capture_remote(args):
     targ = args.node
     outdir = args.profilename
     os.umask(0o022)
@@ -267,11 +279,7 @@ async def capture_remote(args):
     indir = '{}/profiles/default'.format(confdir)
     if os.path.exists(indir):
         copy_tree(indir, outdir)
-        hmap = await osimage.get_hashes(outdir)
-        with open('{0}/manifest.yaml'.format(outdir), 'w') as yout:
-            yout.write('# This manifest enables rebase to know original source of profile data and if any customizations have been done\n')
-            manifestdata = {'distdir': indir, 'disthashes': hmap}
-            yout.write(yaml.dump(manifestdata, default_flow_style=False))
+        write_manifest(outdir, indir)
     label = '{0} {1} ({2})'.format(finfo['name'], finfo['version'], profname)
     with open(os.path.join(outdir, 'profile.yaml'), 'w') as profileout:
         profileout.write('label: {}\n'.format(label))
@@ -385,28 +393,37 @@ def encrypt_image(plainfile, cryptfile, keyfile):
         neededblocks += 1
     loopdev = subprocess.check_output(['losetup', '-f']).decode('utf8').strip()
     subprocess.check_call(['losetup', loopdev, cryptfile])
-    subprocess.check_call(['dmsetup', 'create', dmname, '--table', '0 {} crypt aes-xts-plain64 {} 0 {} 8'.format(neededblocks, key, loopdev)])
-    subprocess.check_call(['dmsetup', 'mknodes', dmname])
-    with open('/dev/mapper/{}'.format(dmname), 'wb') as cryptout:
-        with open(plainfile, 'rb+') as plainin:
-            lastoffset = 0
-            chunk = plainin.read(2097152)
-            while chunk:
-                fallocate(plainin.fileno(), FALLOC_FL_KEEP_SIZE|FALLOC_FL_PUNCH_HOLE, lastoffset, len(chunk))
-                lastoffset = plainin.tell()
-                cryptout.write(chunk)
+    try:
+        subprocess.check_call(['dmsetup', 'create', dmname, '--table', '0 {} crypt aes-xts-plain64 {} 0 {} 8'.format(neededblocks, key, loopdev)])
+        subprocess.check_call(['dmsetup', 'mknodes', dmname])
+        with open('/dev/mapper/{}'.format(dmname), 'wb') as cryptout:
+            with open(plainfile, 'rb+') as plainin:
+                lastoffset = 0
                 chunk = plainin.read(2097152)
-    mounted = True
-    tries = 30
-    time.sleep(0.1)
-    while mounted:
-        tries -= 1
-        try:
-            subprocess.check_call(['dmsetup', 'remove', dmname])
-            mounted = False
-        except subprocess.CalledProcessError:
-            time.sleep(0.1)
-    subprocess.check_call(['losetup', '-d', loopdev])
+                while chunk:
+                    fallocate(plainin.fileno(), FALLOC_FL_KEEP_SIZE|FALLOC_FL_PUNCH_HOLE, lastoffset, len(chunk))
+                    lastoffset = plainin.tell()
+                    cryptout.write(chunk)
+                    chunk = plainin.read(2097152)
+    finally:
+        mounted = True
+        tries = 30
+        time.sleep(0.1)
+        while mounted and tries:
+            tries -= 1
+            try:
+                subprocess.check_call(['dmsetup', 'remove', dmname])
+                mounted = False
+            except subprocess.CalledProcessError:
+                time.sleep(0.1)
+        if mounted:
+            sys.stderr.write(
+                'Warning: unable to remove {0}, it and {1} are left behind\n'.format(dmname, loopdev))
+        else:
+            try:
+                subprocess.check_call(['losetup', '-d', loopdev])
+            except subprocess.CalledProcessError:
+                sys.stderr.write('Warning: unable to detach {0}\n'.format(loopdev))
     oum = os.umask(0o077)
     with open(keyfile, 'w') as keyout:
         keyout.write('aes-xts-plain64\n{}\n'.format(key))
@@ -1015,13 +1032,13 @@ def main():
     if args.subcommand == 'build':
         build_root(args)
     elif args.subcommand == 'capture':
-        asyncio.run(capture_remote(args))
+        capture_remote(args)
     elif args.subcommand == 'unpack':
         unpack_image(args)
     elif args.subcommand == 'exec':
         exec_root(args)
     elif args.subcommand == 'pack':
-        asyncio.run(pack_image(args))
+        pack_image(args)
     else:
         parser.print_usage()
 
@@ -1544,7 +1561,7 @@ def recursecp(source, targ):
         shutil.copy2(source, targ)
 
 
-async def pack_image(args):
+def pack_image(args):
     outdir = args.profilename
     if '/' in outdir:
         raise Exception('Full path not supported, supply only the profile name\n')
@@ -1663,11 +1680,7 @@ async def pack_image(args):
             indir = '{}/profiles/default'.format(confdir)
             if os.path.exists(indir):
                 copy_tree(indir, outdir)
-                hmap = await osimage.get_hashes(outdir)
-                with open('{0}/manifest.yaml'.format(outdir), 'w') as yout:
-                    yout.write('# This manifest enables rebase to know original source of profile data and if any customizations have been done\n')
-                    manifestdata = {'distdir': indir, 'disthashes': hmap}
-                    yout.write(yaml.dump(manifestdata, default_flow_style=False))
+                write_manifest(outdir, indir)
             tryupdate = True
     try:
         pwd.getpwnam('confluent')
