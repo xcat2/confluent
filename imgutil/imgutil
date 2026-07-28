@@ -234,6 +234,8 @@ def capture_remote(args):
         for cmd in unmet:
             sys.stderr.write(cmd + '\n')
         sys.exit(1)
+    for cmd in finfo.get('optionalprereqs', []):
+        sys.stderr.write(cmd + '\n')
     oscat = finfo['oscategory']
     subprocess.check_call(['ssh', '-o', 'LogLevel=QUIET', '-t', targ, 'python3', '/run/imgutil/capenv/imgutil', 'capturelocal'])
     utillib = __file__.replace('bin/imgutil', 'lib/imgutil')
@@ -488,6 +490,7 @@ class OsHandler(object):
         self.sourcepath = None
         self.osname = '{}-{}-{}'.format(name, version, arch)
         self.captureprereqs = []
+        self.captureadvisories = []
         try:
             pkglist = args.packagelist
         except AttributeError:
@@ -524,7 +527,8 @@ class OsHandler(object):
             if not isinstance(odata[idx], str):
                 odata[idx] = odata[idx].decode('utf8')
         info = {'oscategory': odata[0],
-                'version': odata[1], 'arch': odata[2], 'name': odata[3], 'unmetprereqs': self.captureprereqs}
+                'version': odata[1], 'arch': odata[2], 'name': odata[3], 'unmetprereqs': self.captureprereqs,
+                'optionalprereqs': self.captureadvisories}
         return json.dumps(info)
 
     def prep_root_premount(self, args):
@@ -698,14 +702,21 @@ class DebHandler(OsHandler):
         self.oscategory = name + version
         super().__init__(name, version, arch, args)
         needpkgs = []
+        wantpkgs = []
         if not os.path.exists(os.path.join(hostpath, 'usr/bin/tpm2_getcap')):
             needpkgs.append('tpm2-tools')
         lfuses = glob.glob(os.path.join(hostpath, '/lib/*/libfuse.so.2'))
         if not lfuses:
             needpkgs.append('libfuse2')
+        if not os.path.exists(os.path.join(hostpath, 'usr/bin/unsquashfs')):
+            wantpkgs.append('squashfs-tools')
         if needpkgs:
             needapt = 'Missing packages needed in target for capture, to add required packages: apt install ' + ' '.join(needpkgs)
             self.captureprereqs.append(needapt)
+        if wantpkgs:
+            wantapt = ('Missing optional packages in target, untethered boot will extract the image more slowly, '
+                       'to add them: apt install ' + ' '.join(wantpkgs))
+            self.captureadvisories.append(wantapt)
 
     def add_pkglists(self):
         self.includepkgs.extend(self.list_packages())
@@ -783,6 +794,7 @@ class ElHandler(OsHandler):
         self.yumargs = []
         super().__init__(name, version, arch, args)
         needpkgs = []
+        wantpkgs = []
         if not hostpath:
             return
         if not os.path.exists(os.path.join(hostpath, 'usr/bin/tpm2_getcap')):
@@ -801,9 +813,17 @@ class ElHandler(OsHandler):
             needpkgs.append('dhcp-client')
         if not os.path.exists(os.path.join(hostpath, 'usr/sbin/mount.nfs')):
             needpkgs.append('nfs-utils')
+        if (self.oscategory not in ('el7', 'el8') and
+                not os.path.exists(os.path.join(hostpath, 'usr/sbin/unsquashfs')) and
+                not os.path.exists(os.path.join(hostpath, 'usr/bin/unsquashfs'))):
+            wantpkgs.append('squashfs-tools')
         if needpkgs:
             needapt = 'Missing packages needed in target for capture, to add required packages: dnf install ' + ' '.join(needpkgs)
             self.captureprereqs.append(needapt)
+        if wantpkgs:
+            wantdnf = ('Missing optional packages in target, untethered boot will extract the image more slowly, '
+                       'to add them: dnf install ' + ' '.join(wantpkgs))
+            self.captureadvisories.append(wantdnf)
 
     def add_pkglists(self):
         self.yumargs.extend(self.list_packages())
