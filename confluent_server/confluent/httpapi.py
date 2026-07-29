@@ -1031,7 +1031,12 @@ async def resourcehandler_backend(req, make_response):
             if not webauthn:
                 rsp = await make_response('text/plain', 501, 'Not Implemented')
                 return rsp
-            wauthbody = await webauthn.handle_api_request(url, req, authorized['username'], cfgmgr, reqbody, authorized)
+            try:
+                wauthbody = await webauthn.handle_api_request(url, req, authorized['username'], cfgmgr, reqbody, authorized)
+            except Exception as e:
+                rsp = await make_response('text/plain', 401, 'Unauthorized')
+                await rsp.write(json.dumps({'error': 'Unable to complete passkey authentication'}).encode('utf8'))
+                return rsp
             return await make_response(body=wauthbody)
         resource = '.' + url[url.rindex('/'):]
         lquerydict = copy.deepcopy(querydict)
