@@ -44,7 +44,13 @@ async def assure_agent():
     if agent_pid is None:
         try:
             agent_starting = True
-            agent_tmpdir = tempfile.mkdtemp()
+            try:
+                os.makedirs('/run/confluent/ssh', mode=0o700)
+            except OSError as e:
+                if e.errno != 17:
+                    raise
+            os.chmod('/run/confluent/ssh', 0o700)
+            agent_tmpdir = tempfile.mkdtemp(dir='/run/confluent/ssh', prefix='agent.')
             os.chmod(agent_tmpdir, 0o700)
             sockpath = os.path.join(agent_tmpdir, 'agent.sock')
             sai = (await util.check_output(['ssh-agent', '-a', sockpath]))[0]
@@ -149,7 +155,13 @@ async def prep_ssh_key(keyname):
         ready_keys[keyname] = 1
         adding_key = False
         return
-    tmpdir = tempfile.mkdtemp()
+    try:
+        os.makedirs('/run/confluent/ssh', mode=0o700)
+    except OSError as e:
+        if e.errno != 17:
+            raise
+    os.chmod('/run/confluent/ssh', 0o700)
+    tmpdir = tempfile.mkdtemp(dir='/run/confluent/ssh', prefix='askpass.')
     try:
         askpass = os.path.join(tmpdir, 'askpass.sh')
         with open(askpass, 'w') as ap:
