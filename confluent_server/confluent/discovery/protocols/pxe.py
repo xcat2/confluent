@@ -313,10 +313,27 @@ async def proxydhcp(handler, nodeguess):
                                 disco.get('uuid', 'unknown'), disco.get('hwaddr', 'unknown')
                     )})
                 continue
+            cfd = cfg.get_node_attributes(
+                node, ('deployment.*', 'collective.managercandidates'))
+            if disco['arch'] is None:
+                continue
+            insecuremode = cfd.get(node, {}).get('deployment.useinsecureprotocols',
+                {}).get('value', 'never')
+            if not insecuremode:
+                insecuremode = 'never'
+            if insecuremode == 'never' and disco['arch'] != 'uefi-httpboot':
+                if not skiplogging:
+                    log.log(
+                        {'info': 'Boot attempt by {0} detected in insecure mode, but '
+                                'insecure mode is disabled.  Set the attribute '
+                                '`deployment.useinsecureprotocols` to `firmware` or '
+                                '`always` to enable support, or use UEFI HTTP boot '
+                                'with HTTPS.'.format(node)})
+                continue
             profile = None
             if not myipn:
                 myipn = socket.inet_aton(recv)
-                profile, stgprofile = get_deployment_profile(node, cfg)
+                profile, stgprofile = get_deployment_profile(node, cfg, cfd)
                 if profile:
                     log.log({
                         'info': 'Offering proxyDHCP boot from {0} to {1} ({2})'.format(recv, node, client[0])})
@@ -326,7 +343,7 @@ async def proxydhcp(handler, nodeguess):
                     continue
             if opts.get(77, None) == b'iPXE':
                 if not profile:
-                    profile, stgprofile = get_deployment_profile(node, cfg)
+                    profile, stgprofile = get_deployment_profile(node, cfg, cfd)
                 if not profile:
                     log.log({'info': 'No pending profile for {0}, skipping proxyDHCP reply'.format(node)})
                     continue
