@@ -210,6 +210,24 @@ def appendonce(basepath, filename):
     with open(targname, 'ab') as targhdl:
         targhdl.write(thedata)
 
+def syncerror(exc):
+    # grab_url_with_status raises with the raw response body.  Return the
+    # server reported error text, or None for anything else, e.g. a dropped
+    # connection.
+    msg = exc.args[0] if exc.args else None
+    if isinstance(msg, bytes):
+        msg = msg.decode('utf8', 'replace')
+    if not isinstance(msg, str):
+        return None
+    try:
+        parsed = json.loads(msg)
+    except ValueError:
+        return None
+    if isinstance(parsed, dict) and 'error' in parsed:
+        return parsed['error']
+    return None
+
+
 def synchronize():
     tmpdir = tempfile.mkdtemp()
     appendoncedir = tempfile.mkdtemp()
@@ -240,7 +258,17 @@ def synchronize():
             lastrsp = ''
             while status != 204:
                 time.sleep(1+(2*random.random()))
-                status, rsp = ac.grab_url_with_status('/confluent-api/self/remotesyncfiles')
+                try:
+                    status, rsp = ac.grab_url_with_status('/confluent-api/self/remotesyncfiles')
+                except Exception as e:
+                    errmsg = syncerror(e)
+                    if errmsg is None:
+                        # Not server reported, let the caller retry.
+                        raise
+                    sys.stderr.write(
+                        'Error performing syncfiles: {}\n'.format(errmsg))
+                    sys.stderr.flush()
+                    return 500
                 if not isinstance(rsp, str):
                     rsp = rsp.decode('utf8')
                 if status == 200:
@@ -268,6 +296,7 @@ def synchronize():
                     appendonce(appendoncedir, os.path.join(dirn[0], filen))
             if lastrsp:
                 lastrsp = json.loads(lastrsp)
+            if lastrsp:
                 opts = lastrsp.get('options', {})
                 for fname in opts:
                     uid = -1
@@ -306,5 +335,8 @@ if __name__ == '__main__':
             sys.stderr.write('\n')
             sys.stderr.flush()
             status = 300
+        if status >= 400 and status != 503:
+            # Terminal failure; 503 (sync already running) stays retryable.
+            sys.exit(1)
         if status not in (204, 200):
             time.sleep((random.random()*3)+2)

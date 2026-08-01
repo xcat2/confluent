@@ -356,7 +356,9 @@ def get_syncresult(nodename):
     try:
         result = syncrunners[nodename].result()
     except Exception as e:
+        # Report the failure rather than a success with no payload.
         print(repr(e))
-        result = None
+        del syncrunners[nodename]
+        return 500, 'Error', {'error': str(e)}
     del syncrunners[nodename]
     return 200, 'OK', result
