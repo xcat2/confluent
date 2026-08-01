@@ -682,23 +682,31 @@ def updateattrib(session, updateargs, nodetype, noderange, options, dictassign=N
                 sys.stderr.write('Error: ' + res['error'] + '\n')
         sys.exit(exitcode)
     elif hasattr(options, 'environment') and options.environment:
-        for key in updateargs[1:]:
-            key = key.replace('.', '_')
-            value = os.environ.get(
-                key, os.environ[key.upper()])
-            # Let's do one pass to make sure that there's not a usage problem
-        for key in updateargs[1:]:
-            key = key.replace('.', '_')
-            value = os.environ.get(
-                key, os.environ[key.upper()])
+        # The environment variable name substitutes '_' for '.'
+        attrvalues = {}
+        # Let's do one pass to make sure that there's not a usage problem
+        for attrib in updateargs[1:]:
+            envkey = attrib.replace('.', '_')
+            if envkey in os.environ:
+                attrvalues[attrib] = os.environ[envkey]
+            elif envkey.upper() in os.environ:
+                attrvalues[attrib] = os.environ[envkey.upper()]
+            else:
+                sys.stderr.write(
+                    'Error: {0} requested, but neither {1} nor {2} is set in '
+                    'the environment\n'.format(attrib, envkey, envkey.upper()))
+                sys.exit(1)
+        for attrib in updateargs[1:]:
             if (nodetype == "nodegroups"):
                 exitcode = session.simple_nodegroups_command(noderange,
                                                              'attributes/all',
-                                                             value, key)
+                                                             attrvalues[attrib],
+                                                             attrib)
             else:
                 exitcode = session.simple_noderange_command(noderange,
                                                             'attributes/all',
-                                                            value, key)
+                                                            attrvalues[attrib],
+                                                            attrib)
         sys.exit(exitcode)
     elif dictassign:
         for key in dictassign:
