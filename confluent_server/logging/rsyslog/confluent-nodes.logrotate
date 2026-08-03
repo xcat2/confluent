@@ -1,0 +1,21 @@
+# Example logrotate configuration for the per-node logs written by the
+# confluent-nodes.conf rsyslog example under /var/log/confluent/nodes/
+#
+# To activate:
+#   cp confluent-nodes.logrotate /etc/logrotate.d/confluent-nodes
+#
+# The following settings rotate logs once a week for up to 52 weeks (1 year)
+# and compress all logs older than 2 weeks
+
+/var/log/confluent/nodes/*.log {
+    weekly
+    rotate 52
+    compress
+    delaycompress
+    missingok
+    notifempty
+    sharedscripts
+    postrotate
+        /usr/bin/systemctl kill -s HUP rsyslog.service >/dev/null 2>&1 || true
+    endscript
+}
