@@ -10,26 +10,111 @@ echo '</authorized_keys>' >> /tmp/rootkeys.xml
 echo "LineMode: 1" > /etc/linuxrc.d/01-confluent
 autocons=""
 if ! grep console /proc/cmdline > /dev/null; then
-	autocons=$(/opt/confluent/bin/autocons)
-	if [ ! -z "$autocons" ]; then
-		echo "Serial console detected from firmware: $autocons" > ${autocons%,*}
-	fi
+    autocons=$(/opt/confluent/bin/autocons)
+    if [ ! -z "$autocons" ]; then
+        echo "Serial console detected from firmware: $autocons" > ${autocons%,*}
+    fi
 fi
 mkdir -p /etc/confluent
 chmod 700 /etc/confluent
 cd /sys/class/net
-echo -n "Discovering confluent..."
-touch /etc/confluent/confluent.info
-TRIES=0
-while ! awk -F'|' '{print $3}' /etc/confluent/confluent.info |grep 1 >& /dev/null && [ "$TRIES" -lt 60 ]; do
-	TRIES=$((TRIES + 1))
-	for nic in *; do
-		ip link set $nic up
-	done
-	/opt/confluent/bin/copernicus -t > /etc/confluent/confluent.info
+TRIES=5
+while [ ! -e /dev/disk/by-label ] && [ $TRIES -gt 0 ]; do
+    sleep 2
+    TRIES=$((TRIES - 1))
 done
-nodename=$(grep ^NODENAME: /etc/confluent/confluent.info | head -n 1 | sed -e 's/NODENAME: //')
-echo "done ($nodename)"
+idntdir=""
+if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
+    tmnt=$(mktemp -d)
+    mount /dev/disk/by-label/CNFLNT_IDNT $tmnt
+    if [ ! -e $tmnt/cnflnt.yml ]; then
+        echo "No cnflnt.yml found on CNFLNT_IDNT partition, ignoring"
+    else
+        idntdir=$(mktemp -d)
+        cp $tmnt/cnflnt.* $idntdir/
+    fi
+    umount $tmnt
+    rmdir $tmnt
+fi
+if [ ! -z "$idntdir" ]; then
+    tmpcfg=$(mktemp)
+    echo "Using confluent identity image configuration"
+    deploysrvs=$(sed -n '/^deploy_servers:/, /^[^-]/p' $idntdir/cnflnt.yml |grep ^-|sed -e 's/^- //'|grep -v :)
+    nodename=$(grep ^nodename: $idntdir/cnflnt.yml|awk '{print $2}')
+    sed -n '/^net_cfgs:/, /^[^- ]/{/^[^- ]/!p}' $idntdir/cnflnt.yml |sed -n '/^-/, /^-/{/^-/!p}'| sed -e 's/^[- ]*//'> $tmpcfg
+    autoconfigmethod=$(grep ^ipv4_method: $tmpcfg)
+    autoconfigmethod=${autoconfigmethod#ipv4_method: }
+    allnics=""
+    for i in /sys/class/net/*; do
+        ip link set $(basename $i) down
+        udevadm info $i | grep ID_NET_DRIVER=cdc_ether > /dev/null &&  continue
+        ip link set $(basename $i) up
+        ip link show dev $(basename $i) | grep -q "LOOPBACK" && continue
+        allnics="$allnics $(basename $i)"
+    done
+    TRIES=30
+    DETECTED=0
+    while [ "$DETECTED" = 0 ] && [ "$TRIES" -gt 0 ]; do
+        if [ "$autoconfigmethod" == "dhcp" ]; then
+             for nic in $allnics; do
+                dhcpcd $nic --timeout=10
+                for srv in $deploysrvs; do
+                    curl -m 10 -H "CONFLUENT_IDS: " https://$srv/confluent-api/self/whoami >/dev/null 2>&1
+                    curlret=$?
+                    if [ $curlret -eq 0 ] || [ $curlret -eq 22 ]; then
+                        DETECTED=1
+                        break
+                    fi
+                done
+                if [ "$DETECTED" = 1 ]; then
+                    break
+                fi
+                dhcpcd -k $nic
+            done
+        elif [ "$autoconfigmethod" == "static" ]; then
+            ipv4addr=$(grep ^ipv4_address: $tmpcfg| awk '{print $2}')
+            for nic in $allnics; do
+                ip addr add $ipv4addr dev $nic
+                ip link set $nic up
+                for srv in $deploysrvs; do
+                    curl -m 10 -H "CONFLUENT_IDS: " https://$srv/confluent-api/self/whoami >/dev/null 2>&1
+                    curlret=$?
+                    if [ $curlret -eq 0 ] || [ $curlret -eq 22 ]; then
+                        DETECTED=1
+                        break
+                    fi
+                done
+                if [ "$DETECTED" = 1 ]; then
+                    break
+                fi
+            done
+        fi
+        if [ "$DETECTED" = 0 ]; then
+             TRIES=$((TRIES - 1))
+             sleep 2
+        fi
+    done
+	if [ "$DETECTED" = 1 ]; then
+		echo "Confluent identity image configuration detected"
+		echo NODENAME: $nodename > /etc/confluent/confluent.info
+		echo MANAGER: $srv >> /etc/confluent/confluent.info
+		bootifidx=$(cat /sys/class/net/$nic/ifindex)
+		bootif=$(basename $nic)
+	fi
+else
+	echo -n "Discovering confluent..."
+	touch /etc/confluent/confluent.info
+	TRIES=0
+	while ! awk -F'|' '{print $3}' /etc/confluent/confluent.info |grep 1 >& /dev/null && [ "$TRIES" -lt 60 ]; do
+		TRIES=$((TRIES + 1))
+		for nic in *; do
+			ip link set $nic up
+		done
+		/opt/confluent/bin/copernicus -t > /etc/confluent/confluent.info
+	done
+	nodename=$(grep ^NODENAME: /etc/confluent/confluent.info | head -n 1 | sed -e 's/NODENAME: //')
+	echo "done ($nodename)"
+fi
 echo "Hostname: $nodename" >> /etc/linuxrc.d/01-confluent
 mgr=$(grep ^EXTMGRINFO: /etc/confluent/confluent.info |awk -F'|' '{print $1 " " $3}'|grep " 1$" | head -n 1 | awk '{print $2}')
 if [ -z "$mgr" ]; then
@@ -37,11 +122,13 @@ if [ -z "$mgr" ]; then
 fi
 mgtiface=$(grep $mgr /etc/confluent/confluent.info | grep EXTMGRINFO: | head -n 1 | awk -F'|' '{print $2}')
 echo -n "Acquiring configuration from $mgr..."
-bootifidx=${mgr#*%}
+if [ -z "$bootifidx" ]; then
+	bootifidx=${mgr#*%}
+fi
 for nic in *; do
 	if [ "$(cat $nic/ifindex)" = "$bootifidx" ]; then
-		bootif=$nic
-	fi
+	bootif=$nic
+fi
 done
 cd -
 echo "NetDevice: $bootif" >> /etc/linuxrc.d/01-confluent
@@ -59,25 +146,25 @@ curl https://$mgr/confluent-public/os/$profilename/profile.yaml > /tmp/profile.y
 dnsdomain=$(grep ^dnsdomain: /etc/confluent/confluent.deploycfg)
 dnsdomain=${dnsdomain#dnsdomain: }
 if [ ! -z "$dnsdomain" ] && [ "$dnsdomain" != "null" ]; then
-	echo "Domain: $dnsdomain" >> /etc/linuxrc.d/01-confluent
+    echo "Domain: $dnsdomain" >> /etc/linuxrc.d/01-confluent
 fi
 textconsole=$(grep ^textconsole: /etc/confluent/confluent.deploycfg)
 textconsole=${textconsole#textconsole: }
 if [ "$textconsole" = "true" ] && ! grep console= /proc/cmdline > /dev/null && [ ! -z "$autocons" ]; then
-	echo "Serial console has been autodected and enabled read-only for install" > ${autocons%,*}
-	echo "It will be read-write after install" > ${autocons%,*}
-	echo "If a fully functional console is desired over serial, add console=${autocons#/dev/} " > ${autocons%,*}
-	echo "to kernelargs in the profile.yaml file of the profile and run 'osdeploy updateboot <profile>" > ${autocons%,*}
-	#echo "Serial console autodetected and enabled, will be available upon install completion" > ${autocons%,*}
-	#echo "The installer will run in text mode on the graphics console. When ssh is available," > ${autocons%,*}
-	#echo "install progress may be checked by using ssh to access and run the screendump command" > ${autocons%,*}
-	#echo "Install time serial console would require the profile to have console=${autocons#/dev/}" > ${autocons%,*}
-	#echo "specified in the kernel command line arguments" > ${autocons%,*}
-	echo ${autocons%,*} > /tmp/autoconsdev
-	sed -e s'/$/ 'console=${autocons#*/dev/}/ /proc/cmdline > /etc/fakecmdline
-	mount -o bind /etc/fakecmdline /proc/cmdline
-	echo "ConsoleDevice: ${autocons%,*}" >> /etc/linuxrc.d/01-confluent
-	echo "Textmode: 1" >> /etc/linuxrc.d/01-confluent
+    echo "Serial console has been autodected and enabled read-only for install" > ${autocons%,*}
+    echo "It will be read-write after install" > ${autocons%,*}
+    echo "If a fully functional console is desired over serial, add console=${autocons#/dev/} " > ${autocons%,*}
+    echo "to kernelargs in the profile.yaml file of the profile and run 'osdeploy updateboot <profile>" > ${autocons%,*}
+    #echo "Serial console autodetected and enabled, will be available upon install completion" > ${autocons%,*}
+    #echo "The installer will run in text mode on the graphics console. When ssh is available," > ${autocons%,*}
+    #echo "install progress may be checked by using ssh to access and run the screendump command" > ${autocons%,*}
+    #echo "Install time serial console would require the profile to have console=${autocons#/dev/}" > ${autocons%,*}
+    #echo "specified in the kernel command line arguments" > ${autocons%,*}
+    echo ${autocons%,*} > /tmp/autoconsdev
+    sed -e s'/$/ 'console=${autocons#*/dev/}/ /proc/cmdline > /etc/fakecmdline
+    mount -o bind /etc/fakecmdline /proc/cmdline
+    echo "ConsoleDevice: ${autocons%,*}" >> /etc/linuxrc.d/01-confluent
+    echo "Textmode: 1" >> /etc/linuxrc.d/01-confluent
 fi
 
 tz=$(grep timezone: /etc/confluent/confluent.deploycfg | awk '{print $2}')
@@ -86,33 +173,33 @@ echo "${tz}" > /tmp/timezone.txt
 autoconfigmethod=$(grep ipv4_method /etc/confluent/confluent.deploycfg)
 autoconfigmethod=${autoconfigmethod#ipv4_method: }
 if [ "$autoconfigmethod" = "dhcp" ]; then
-	echo "DHCP: 1" >> /etc/linuxrc.d/01-confluent
+    echo "DHCP: 1" >> /etc/linuxrc.d/01-confluent
 else
-	v4addr=$(grep ^ipv4_address: /etc/confluent/confluent.deploycfg)
-	v4addr=${v4addr#ipv4_address: }
-	v4gw=$(grep ^ipv4_gateway: /etc/confluent/confluent.deploycfg)
-	v4gw=${v4gw#ipv4_gateway: }
-	v4nm=$(grep ipv4_netmask: /etc/confluent/confluent.deploycfg)
-	v4nm=${v4nm#ipv4_netmask: }
-	echo "HostIP: $v4addr" >> /etc/linuxrc.d/01-confluent
-	echo "Netmask: $v4nm" >> /etc/linuxrc.d/01-confluent
-	if [ "$v4gw" != "null" ]; then
-		echo "Gateway: $v4gw" >> /etc/linuxrc.d/01-confluent
-	fi
-	nameserversec=0
-	while read -r entry; do
-		if [ $nameserversec = 1 ]; then
-			if [[ $entry == "-"* ]]; then
-				echo Nameserver: ${entry#- } >> /etc/linuxrc.d/01-confluent
-				continue
-			fi
-		fi
-		nameserversec=0
-		if [ "${entry%:*}" = "nameservers" ]; then
-			nameserversec=1
-			continue
-		fi
-	done < /etc/confluent/confluent.deploycfg
+    v4addr=$(grep ^ipv4_address: /etc/confluent/confluent.deploycfg)
+    v4addr=${v4addr#ipv4_address: }
+    v4gw=$(grep ^ipv4_gateway: /etc/confluent/confluent.deploycfg)
+    v4gw=${v4gw#ipv4_gateway: }
+    v4nm=$(grep ipv4_netmask: /etc/confluent/confluent.deploycfg)
+    v4nm=${v4nm#ipv4_netmask: }
+    echo "HostIP: $v4addr" >> /etc/linuxrc.d/01-confluent
+    echo "Netmask: $v4nm" >> /etc/linuxrc.d/01-confluent
+    if [ "$v4gw" != "null" ]; then
+        echo "Gateway: $v4gw" >> /etc/linuxrc.d/01-confluent
+    fi
+    nameserversec=0
+    while read -r entry; do
+        if [ $nameserversec = 1 ]; then
+            if [[ $entry == "-"* ]]; then
+                echo Nameserver: ${entry#- } >> /etc/linuxrc.d/01-confluent
+                continue
+            fi
+        fi
+        nameserversec=0
+        if [ "${entry%:*}" = "nameservers" ]; then
+            nameserversec=1
+            continue
+        fi
+    done < /etc/confluent/confluent.deploycfg
 fi
 echo done
 mgr=$(grep ^deploy_server: /etc/confluent/confluent.deploycfg)
@@ -122,7 +209,7 @@ proto=${proto#protocol: }
 
 append=$(grep ^installedargs: /tmp/profile.yaml | sed -e 's/^installedargs: //' -e 's/#.*//')
 if grep console= /etc/fakecmdline >& /dev/null &&  [[ "$append" != *console=* ]]; then
-	append="$append console=${autocons#*/dev/}"
+    append="$append console=${autocons#*/dev/}"
 fi
 if [ -z "$append" ]; then
     echo "<bootloader/>" > /tmp/bootloader.xml
