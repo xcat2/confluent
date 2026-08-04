@@ -31,7 +31,7 @@ if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
         echo "No cnflnt.yml found on CNFLNT_IDNT partition, ignoring"
     else
         idntdir=$(mktemp -d)
-        cp $tmnt/cnflnt.* $idntdir/
+        /usr/bin/cp $tmnt/cnflnt.* $idntdir/
     fi
     umount $tmnt
     rmdir $tmnt
@@ -100,6 +100,17 @@ if [ ! -z "$idntdir" ]; then
 		echo MANAGER: $srv >> /etc/confluent/confluent.info
 		bootifidx=$(cat /sys/class/net/$nic/ifindex)
 		bootif=$(basename $nic)
+		hmackeyfile=/tmp/cnflnthmackeytmp
+		echo -n $(grep ^apitoken: $idntdir/cnflnt.yml|awk '{print $2}') > $hmackeyfile
+		passfile=/tmp/cnflnttmppassfile
+	    passcrypt=/tmp/cnflntcryptfile
+    	hmacfile=/tmp/cnflnthmacfile
+    	ln -s /opt/confluent/bin/clortho /opt/confluent/bin/genpasshmac
+		/opt/confluent/bin/genpasshmac $passfile $passcrypt $hmacfile $hmackeyfile
+		if curl --capath /tls/ -f -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_CRYPTHMAC: $(cat $hmacfile)" -d@$passcrypt https://$srv/confluent-api/self/registerapikey; then
+		    cp $passfile /etc/confluent/confluent.apikey
+		fi
+
 	fi
 else
 	echo -n "Discovering confluent..."
@@ -114,6 +125,11 @@ else
 	done
 	nodename=$(grep ^NODENAME: /etc/confluent/confluent.info | head -n 1 | sed -e 's/NODENAME: //')
 	echo "done ($nodename)"
+	mgr=$(grep ^EXTMGRINFO: /etc/confluent/confluent.info |awk -F'|' '{print $1 " " $3}'|grep " 1$" | head -n 1 | awk '{print $2}')
+	if [ -z "$mgr" ]; then
+	    mgr=$(grep ^MANAGER: /etc/confluent/confluent.info | head -n 1 | sed -e 's/MANAGER: //')
+	fi
+	/opt/confluent/bin/clortho $nodename $mgr > /etc/confluent/confluent.apikey
 fi
 echo "Hostname: $nodename" >> /etc/linuxrc.d/01-confluent
 mgr=$(grep ^EXTMGRINFO: /etc/confluent/confluent.info |awk -F'|' '{print $1 " " $3}'|grep " 1$" | head -n 1 | awk '{print $2}')
@@ -132,8 +148,9 @@ fi
 done
 cd -
 echo "NetDevice: $bootif" >> /etc/linuxrc.d/01-confluent
-/opt/confluent/bin/clortho $nodename $mgr > /etc/confluent/confluent.apikey
-mgr="[$mgr]"
+if [[ "$mgr" == *":"* ]]; then
+    mgr="[$mgr]"
+fi
 if [ -z "$mgtiface" ]; then
     curl -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $(cat /etc/confluent/confluent.apikey)" https://$mgr/confluent-api/self/deploycfg > /etc/confluent/confluent.deploycfg
 else
