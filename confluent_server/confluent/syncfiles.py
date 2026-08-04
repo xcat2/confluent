@@ -191,12 +191,33 @@ async def sync_list_to_node(sl, node, suffixes, peerip=None):
             for ent in sl.appendoncemap:
                 stage_ent(sl.appendoncemap, ent,
                           os.path.join(targdir, suffixes['appendonce']), True)
+        filelist = []
+        for root, dirs, files in os.walk(targdir):
+            if not dirs and not files and root != targdir:
+                # otherwise empty directories have to be named to be synced
+                filelist.append(os.path.relpath(root, targdir))
+            for filename in files:
+                filelist.append(
+                    os.path.relpath(os.path.join(root, filename), targdir))
         await sshutil.prep_ssh_key('/etc/confluent/ssh/automation')
         targip = node
         if peerip:
             targip = peerip
+        # Naming every file (--files-from implies --relative) together with
+        # --no-implied-dirs confines the preservation flags to the content
+        # actually being synchronized. Without it, the parent directories
+        # traversed on the way get the attributes of the staging copy, which
+        # is what forced preservation to be rolled back in the past.
         output, stderr = await util.check_output(
-            'rsync', '-rvLD', targdir + '/', 'root@[{}]:/'.format(targip))
+            'rsync', '-vLpgotDA', '--no-implied-dirs', '--files-from=-',
+            # content out of confluent's own storage is owned by the account
+            # the daemon runs as, which normally does not exist on the node
+            # and would arrive as a meaningless numeric id; every other owner
+            # is still matched by name as usual
+            '--usermap={}:root'.format(os.getuid()),
+            '--groupmap={}:root'.format(os.getgid()),
+            targdir + '/', 'root@[{}]:/'.format(targip),
+            input=''.join([x + '\n' for x in filelist]).encode('utf8'))
     except subprocess.CalledProcessError as e:
         unreadablefiles = []
         for root, dirnames, filenames in os.walk(targdir):
@@ -251,6 +272,15 @@ def stage_ent(currmap, ent, targdir, appendexist=False):
 def mkpathorlink(source, destination, appendexist=False):
     if os.path.isdir(source):
         mkdirp(destination)
+        # Files are staged as symlinks, so rsync reads their attributes
+        # through to the real file, but a directory is staged as a directory
+        # and has to be given the source attributes to pass them along.
+        srcstat = os.stat(source)
+        shutil.copystat(source, destination)
+        try:
+            os.chown(destination, srcstat.st_uid, srcstat.st_gid)
+        except OSError:  # lacking CAP_CHOWN, leave it owned by the daemon
+            pass
         for ent in os.listdir(source):
             currsrc = os.path.join(source, ent)
             currdst = os.path.join(destination, ent)
