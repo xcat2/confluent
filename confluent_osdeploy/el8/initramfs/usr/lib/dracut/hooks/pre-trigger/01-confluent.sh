@@ -125,7 +125,7 @@ if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
         echo 'MANAGER: '$deploysrv >> /etc/confluent/confluent.info
     done
     for deployer in $deploysrvs; do
-        if curl --capath /tls/ -f -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_CRYPTHMAC: $(cat $hmacfile)" -d@$passcrypt -k https://$deployer/confluent-api/self/registerapikey; then
+        if curl --capath /tls/ -f -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_CRYPTHMAC: $(cat $hmacfile)" -d@$passcrypt https://$deployer/confluent-api/self/registerapikey; then
             cp $passfile /etc/confluent/confluent.apikey
             confluent_apikey=$(cat /etc/confluent/confluent.apikey)
             curl --capath /tls/ -sf -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $confluent_apikey" https://$deployer/confluent-api/self/deploycfg2 > /etc/confluent/confluent.deploycfg
