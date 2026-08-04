@@ -301,6 +301,7 @@ def synchronize():
                 for fname in opts:
                     uid = -1
                     gid = -1
+                    perms = None
                     for opt in opts[fname]:
                         if opt == 'owner':
                             try:
@@ -309,16 +310,21 @@ def synchronize():
                                 try:
                                     uid = opts[fname][opt]['id']
                                 except KeyError:
-                                    raise Exception(f"Unable to map owner of {fname}") 
+                                    raise Exception(f"Unable to map owner of {fname}")
                         elif opt == 'group':
                             try:
                                 gid = grp.getgrnam(opts[fname][opt]['name']).gr_gid
                             except KeyError:
                                 gid = opts[fname][opt]['id']
                         elif opt == 'permissions':
-                            os.chmod(fname, int(opts[fname][opt], 8))
+                            perms = int(opts[fname][opt], 8)
                     if uid != -1 or gid != -1:
+                        # chown clears setuid (and setgid on a group-executable
+                        # file), even for root, so it must happen before the
+                        # chmod that applies them
                         os.chown(fname, uid, gid)
+                    if perms is not None:
+                        os.chmod(fname, perms)
         return status
     finally:
         shutil.rmtree(tmpdir)
