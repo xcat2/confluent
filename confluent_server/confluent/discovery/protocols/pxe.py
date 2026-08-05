@@ -279,7 +279,6 @@ def relay_proxydhcp(sock, pktq):
     elif disco.get('uuid', None) in uuidmap:
         node = uuidmap[disco['uuid']]
     myipn = myipbypeer.get(data[28:28+hwlen], None)
-    skiplogging = True
     pktq.put_nowait((disco, peer, myipn, idx, recv, node, opts, data))
 
 
@@ -296,6 +295,7 @@ async def proxydhcp(handler, nodeguess):
         try:
             disco, client, myipn, idx, recv, node, opts, data = await pktq.get()
             netaddr = disco['hwaddr']
+            skiplogging = True
             if time.time() > ignoredisco.get(netaddr, 0) + 90:
                 skiplogging = False
                 ignoredisco[netaddr] = time.time()
