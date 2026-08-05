@@ -317,11 +317,14 @@ async def proxydhcp(handler, nodeguess):
                 node, ('deployment.*', 'collective.managercandidates'))
             if disco['arch'] is None:
                 continue
+            if disco['arch'] == 'uefi-httpboot':
+                # HTTP boot is offered by the DHCP path, not proxyDHCP
+                continue
             insecuremode = cfd.get(node, {}).get('deployment.useinsecureprotocols',
                 {}).get('value', 'never')
             if not insecuremode:
                 insecuremode = 'never'
-            if insecuremode == 'never' and disco['arch'] != 'uefi-httpboot':
+            if insecuremode == 'never':
                 if not skiplogging:
                     log.log(
                         {'info': 'Boot attempt by {0} detected in insecure mode, but '
