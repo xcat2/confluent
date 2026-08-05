@@ -279,7 +279,6 @@ def relay_proxydhcp(sock, pktq):
     elif disco.get('uuid', None) in uuidmap:
         node = uuidmap[disco['uuid']]
     myipn = myipbypeer.get(data[28:28+hwlen], None)
-    skiplogging = True
     pktq.put_nowait((disco, peer, myipn, idx, recv, node, opts, data))
 
 
@@ -296,6 +295,7 @@ async def proxydhcp(handler, nodeguess):
         try:
             disco, client, myipn, idx, recv, node, opts, data = await pktq.get()
             netaddr = disco['hwaddr']
+            skiplogging = True
             if time.time() > ignoredisco.get(netaddr, 0) + 90:
                 skiplogging = False
                 ignoredisco[netaddr] = time.time()
@@ -313,10 +313,30 @@ async def proxydhcp(handler, nodeguess):
                                 disco.get('uuid', 'unknown'), disco.get('hwaddr', 'unknown')
                     )})
                 continue
+            cfd = cfg.get_node_attributes(
+                node, ('deployment.*', 'collective.managercandidates'))
+            if disco['arch'] is None:
+                continue
+            if disco['arch'] == 'uefi-httpboot':
+                # HTTP boot is offered by the DHCP path, not proxyDHCP
+                continue
+            insecuremode = cfd.get(node, {}).get('deployment.useinsecureprotocols',
+                {}).get('value', 'never')
+            if not insecuremode:
+                insecuremode = 'never'
+            if insecuremode == 'never':
+                if not skiplogging:
+                    log.log(
+                        {'info': 'Boot attempt by {0} detected in insecure mode, but '
+                                'insecure mode is disabled.  Set the attribute '
+                                '`deployment.useinsecureprotocols` to `firmware` or '
+                                '`always` to enable support, or use UEFI HTTP boot '
+                                'with HTTPS.'.format(node)})
+                continue
             profile = None
             if not myipn:
                 myipn = socket.inet_aton(recv)
-                profile, stgprofile = get_deployment_profile(node, cfg)
+                profile, stgprofile = get_deployment_profile(node, cfg, cfd)
                 if profile:
                     log.log({
                         'info': 'Offering proxyDHCP boot from {0} to {1} ({2})'.format(recv, node, client[0])})
@@ -326,7 +346,7 @@ async def proxydhcp(handler, nodeguess):
                     continue
             if opts.get(77, None) == b'iPXE':
                 if not profile:
-                    profile, stgprofile = get_deployment_profile(node, cfg)
+                    profile, stgprofile = get_deployment_profile(node, cfg, cfd)
                 if not profile:
                     log.log({'info': 'No pending profile for {0}, skipping proxyDHCP reply'.format(node)})
                     continue
@@ -695,7 +715,9 @@ async def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, 
         if not insecuremode:
             insecuremode = 'never'
         if insecuremode == 'never' and not httpboot:
-            if rqtype == 1 and info.get('architecture', None):
+            if (rqtype == 1 and info.get('architecture', None)
+                    and time.time() > ignoremacs.get(info['hwaddr'], 0) + 90):
+                ignoremacs[info['hwaddr']] = time.time()
                 log.log(
                     {'info': 'Boot attempt by {0} detected in insecure mode, but '
                             'insecure mode is disabled.  Set the attribute '
