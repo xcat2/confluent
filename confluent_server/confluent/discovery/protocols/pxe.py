@@ -715,7 +715,9 @@ async def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, 
         if not insecuremode:
             insecuremode = 'never'
         if insecuremode == 'never' and not httpboot:
-            if rqtype == 1 and info.get('architecture', None):
+            if (rqtype == 1 and info.get('architecture', None)
+                    and time.time() > ignoremacs.get(info['hwaddr'], 0) + 90):
+                ignoremacs[info['hwaddr']] = time.time()
                 log.log(
                     {'info': 'Boot attempt by {0} detected in insecure mode, but '
                             'insecure mode is disabled.  Set the attribute '
