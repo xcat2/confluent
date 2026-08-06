@@ -24,6 +24,10 @@ except ImportError:
     json = None
     hmac = None
 
+# Ignore proxy-based environment variables
+for proxy_var in ['http_proxy', 'https_proxy', 'HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'all_proxy', 'NO_PROXY', 'no_proxy']:
+    os.environ.pop(proxy_var, None)
+
 class InvalidApiKey(Exception):
     pass
 

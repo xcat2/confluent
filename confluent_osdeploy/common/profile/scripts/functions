@@ -4,7 +4,7 @@ function test_mgr() {
     if [[ "$whost" == *:* ]] && [[ "$whost" != *[* ]] ; then
         whost="[$whost]"
     fi
-    if curl -gs https://${whost}/confluent-api/ > /dev/null; then
+    if curl -gs -x "" https://${whost}/confluent-api/ > /dev/null; then
         return 0
     fi
     return 1
@@ -64,9 +64,9 @@ function set_confluent_vars() {
 }
 
 fetch_remote() {
-    curlargs=""
+    curlargs=(-x "")
     if [ -f /etc/confluent/ca.pem ]; then
-        curlargs=" --cacert /etc/confluent/ca.pem"
+        curlargs=(-x "" --cacert /etc/confluent/ca.pem)
     fi
     set_confluent_vars
     mkdir -p $(dirname $1)
@@ -74,7 +74,7 @@ fetch_remote() {
     if [[ "$whost" == *:* ]] && [[ "$whost" != *[* ]] ; then
         whost="[$whost]"
     fi
-    curl -gf -sS $curlargs https://$whost/confluent-public/os/$confluent_profile/scripts/$1 > $1
+    curl -gf -sS "${curlargs[@]}" https://$whost/confluent-public/os/$confluent_profile/scripts/$1 > $1
     if [ $? != 0 ]; then echo $1 failed to download; return 1; fi
 }
 
@@ -175,8 +175,9 @@ run_remote() {
 run_remote_python() {
     echo
     set_confluent_vars
+    curlargs=(-x "")
     if [ -f /etc/confluent/ca.pem ]; then
-        curlargs=" --cacert /etc/confluent/ca.pem"
+        curlargs=(-x "" --cacert /etc/confluent/ca.pem)
     fi
     echo '---------------------------------------------------------------------------'
     echo Running python script "'$*'" from https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/
@@ -189,7 +190,7 @@ run_remote_python() {
     if [[ "$whost" == *:* ]] && [[ "$whost" != *[* ]] ; then
         whost="[$whost]"
     fi
-    curl -gf -sS $curlargs https://$whost/confluent-public/os/$confluent_profile/scripts/$1 > $1
+    curl -gf -sS "${curlargs[@]}" https://$whost/confluent-public/os/$confluent_profile/scripts/$1 > $1
     if [ $? != 0 ]; then echo "'$*'" failed to download; return 1; fi
     confluentpython $*
     retcode=$?
