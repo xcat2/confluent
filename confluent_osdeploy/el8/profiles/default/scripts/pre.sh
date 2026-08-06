@@ -98,7 +98,11 @@ if [ "$cryptboot" == "tpm2" ]; then
     chmod 000 /etc/confluent/luks.key
     LUKSPARTY="--encrypted --passphrase=$lukspass"
     echo $cryptboot >> /tmp/cryptboot
-    echo clevis-dracut >> /tmp/cryptpkglist
+    if [ -e /bin/systemd-cryptenroll ]; then
+        echo tpm2-tools >> /tmp/cryptpkglist
+    else
+        echo clevis-dracut >> /tmp/cryptpkglist
+    fi
 fi
 
 
