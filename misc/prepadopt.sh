@@ -11,6 +11,8 @@ if [[ "$DEPLOYSRV" = *":"* ]]; then
 fi
 update-ca-trust
 mkdir -p /etc/confluent
+unset https_proxy
+unset http_proxy
 curl -sg https://$UDEPLOYSRV/confluent-public/os/$TARGPROF/boot/initramfs/addons.cpio > addons.cpio
 curl -sg https://$UDEPLOYSRV/confluent-public/os/$TARGPROF/scripts/functions > /etc/confluent/functions
 cpio -dumi < addons.cpio
