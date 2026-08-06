@@ -19,6 +19,7 @@
 # Things are defined here to 'encourage' developers to coordinate information
 # format.  This is also how different data formats are supported
 import base64
+from fnmatch import fnmatch
 import os
 import confluent.exceptions as exc
 import confluent.config.configmanager as cfm
@@ -874,11 +875,15 @@ class InputAttributes(ConfluentMessage):
                     # use that as cue to put it into config as an expr
                     nodeattr[attr] = {'expression': nodeattr[attr]}
             if validattrs and 'validvalues' in validattrs.get(attr, []):
-                if (nodeattr[attr] and
-                        nodeattr[attr] not in validattrs[attr]['validvalues']):
-                    raise exc.InvalidArgumentException(
-                        'Attribute {0} does not accept value {1} (valid values would be {2})'.format(
-                            attr, nodeattr[attr], ','.join(validattrs[attr]['validvalues'])))
+                if nodeattr[attr]:
+                    for validvalue in validattrs[attr]['validvalues']:
+                        if nodeattr[attr] == validvalue or fnmatch(
+                                nodeattr[attr], validvalue):        
+                            break
+                    else:
+                        raise exc.InvalidArgumentException(
+                            'Attribute {0} does not accept value {1} (valid values would be {2})'.format(
+                                attr, nodeattr[attr], ','.join(validattrs[attr]['validvalues'])))
             elif validattrs and 'validlist' in validattrs.get(attr, []) and nodeattr[attr]:
                 req = nodeattr[attr].split(',')
                 for v in req:

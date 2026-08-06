@@ -112,7 +112,16 @@ if [ -f /etc/confluent_lukspass ]; then
     chmod 000 /target/etc/confluent/luks.key
     lukspass=$(cat /etc/confluent_lukspass)
     chroot /target apt install libtss2-rc0
-    PASSWORD=$lukspass chroot /target  systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs="" $CRYPTTAB_SOURCE
+
+    tpm2pcrs=""
+    encryptboot=$(grep ^encryptboot: /target/etc/confluent/confluent.deploycfg | sed -e 's/^encryptboot://' -e 's/ //g')
+    case "$encryptboot" in
+        *pcrs=*)
+            tpm2pcrs=$(echo "$encryptboot" | sed -e 's/.*pcrs=//' -e 's/:.*//')
+            ;;
+    esac
+
+    PASSWORD=$lukspass chroot /target  systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs="$tpm2pcrs" $CRYPTTAB_SOURCE
     fetch_remote  systemdecrypt
     mv systemdecrypt /target/etc/initramfs-tools/scripts/local-top/systemdecrypt
     fetch_remote systemdecrypt-hook

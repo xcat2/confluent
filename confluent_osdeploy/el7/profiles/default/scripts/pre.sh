@@ -60,7 +60,7 @@ done
 cryptboot=$(grep ^encryptboot: /etc/confluent/confluent.deploycfg | awk '{print $2}')
 LUKSPARTY=''
 touch /tmp/addonpackages
-if [ "$cryptboot" == "tpm2" ]; then
+if [ "$cryptboot" == "tpm2" ] || [ "${cryptboot#tpm2:}" != "$cryptboot" ]; then
 	LUKSPARTY="--encrypted --passphrase=$(cat /etc/confluent/confluent.apikey)"
 	echo $cryptboot >> /tmp/cryptboot
 fi

@@ -89,7 +89,8 @@ LUKSPARTY=''
 touch /tmp/cryptpkglist
 touch /tmp/pkglist
 touch /tmp/addonpackages
-if [ "$cryptboot" == "tpm2" ]; then
+
+if [ "$cryptboot" == "tpm2" ] || [ "${cryptboot#tpm2:}" != "$cryptboot" ]; then
     lukspass=$(python3 /opt/confluent/bin/apiclient /confluent-api/self/profileprivate/pending/luks.key 2> /dev/null)
      if [ -z "$lukspass" ]; then
         lukspass=$(python3 -c 'import os;import base64;print(base64.b64encode(os.urandom(66)).decode())')

@@ -122,7 +122,7 @@ node = {
                         'Trusted Platform Module is available to decrypt the '
                         'volume. Note that versions earlier than 8.2 may malfunction '
                         'at boot time if this feature is attempted, depending on configuration.'),
-        'validvalues': ('tpm2', 'none', ''),
+        'validvalues': ('tpm2', 'tpm2:*', 'none', ''),
     },
     'deployment.apiarmed': {
         'description': ('Indicates whether the node authentication token interface '
