@@ -132,7 +132,9 @@ if grep installtodisk /proc/cmdline > /dev/null; then
 fi
 mv /lib/modules/$(uname -r) /lib/modules/$(uname -r)-ramfs
 ln -s /sysroot/lib/modules/$(uname -r) /lib/modules/
-mv /lib/firmware /lib/firmware-ramfs
+if [ -d /lib/firmware ]; then
+    mv /lib/firmware /lib/firmware-ramfs
+fi
 ln -s /sysroot/lib/firmware /lib/firmware
 kill $(grep -l ^/usr/lib/systemd/systemd-udevd  /proc/*/cmdline|cut -d/ -f 3)
 if [ $TETHERED -eq 1 ]; then

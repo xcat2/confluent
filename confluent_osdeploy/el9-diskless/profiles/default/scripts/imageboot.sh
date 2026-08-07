@@ -146,7 +146,9 @@ if grep installtodisk /proc/cmdline > /dev/null; then
 fi
 mv /lib/modules/$(uname -r) /lib/modules/$(uname -r)-ramfs
 ln -s /sysroot/lib/modules/$(uname -r) /lib/modules/
-mv /lib/firmware /lib/firmware-ramfs
+if [ -d /lib/firmware ]; then
+    mv /lib/firmware /lib/firmware-ramfs
+fi
 ln -s /sysroot/lib/firmware /lib/firmware
 rm -f /sysroot/etc/dracut.conf.d/diskless.conf # remove diskless dracut from runtime, to make kdump happier
 kill $(grep -l ^/usr/lib/systemd/systemd-udevd  /proc/*/cmdline|cut -d/ -f 3)

@@ -144,7 +144,9 @@ ln -s /etc/systemd/system/onboot.service /sysroot/etc/systemd/system/multi-user.
 cp /etc/confluent/functions /sysroot/etc/confluent/functions
 mv /lib/modules/$(uname -r) /lib/modules/$(uname -r)-ramfs
 ln -s /sysroot/lib/modules/$(uname -r) /lib/modules/
-mv /lib/firmware /lib/firmware-ramfs
+if [ -d /lib/firmware ]; then
+    mv /lib/firmware /lib/firmware-ramfs
+fi
 ln -s /sysroot/lib/firmware /lib/firmware
 rm /sysroot/etc/machine-id
 if [ -e /sys/devices/virtual/dmi/id/product_uuid ]; then
