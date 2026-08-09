@@ -714,7 +714,7 @@ async def _recheck_nodes_backend(nodeattribs, configmanager):
         info = pending_nodes[nodename]
         try:
             if info['handler'] is None:
-                next
+                continue
             handler = info['handler'].NodeHandler(info, configmanager)
             tasks.spawn(eval_node(configmanager, handler, info, nodename))
         except Exception:
