@@ -41,7 +41,6 @@
 # esc-( would interfere with normal esc use too much
 # ~ I will not use for now...
 
-import math
 import getpass
 import optparse
 import os

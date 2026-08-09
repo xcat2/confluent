@@ -229,8 +229,8 @@ def main():
             sc.write(f'install --drive={nd[0]} --overwritevmfs\n')
     else:
         with open('/tmp/storagecfg', 'w') as sc:
-            sc.write(f'clearpart --firstdisk --overwritevmfs\n')
-            sc.write(f'install --firstdisk --overwritevmfs\n')
+            sc.write('clearpart --firstdisk --overwritevmfs\n')
+            sc.write('install --firstdisk --overwritevmfs\n')
 
 
 if __name__ == '__main__':

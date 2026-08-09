@@ -894,7 +894,7 @@ async def do_screenshot():
                     imgdata = res['databynode'][node].get('image', {}).get('imgdata', None)
                     if imgdata:
                         if len(imgdata) < 32: # We were subjected to error
-                            errorstr = f'Unable to get screenshot'
+                            errorstr = 'Unable to get screenshot'
                     if errorstr or imgdata:
                         imgdata = base64.b64decode(imgdata)
                         draw_node(node, imgdata, errorstr, firstnodename, cwidth, cheight)

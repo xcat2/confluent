@@ -32,7 +32,6 @@ import confluent.main
 #p = cProfile.Profile(time.clock)
 #p.enable()
 #try:
-import multiprocessing
 
 def main():
     confluent.main.run(sys.argv)

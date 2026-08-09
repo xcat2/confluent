@@ -6,14 +6,12 @@ except ImportError:
 import base64
 import ctypes
 import ctypes.util
-import glob
 import os
 import select
 import socket
 import subprocess
 import ssl
 import sys
-import struct
 import time
 import re
 import hashlib

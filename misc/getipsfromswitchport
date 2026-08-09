@@ -171,11 +171,11 @@ async def main(switch, port):
                         portname = portcandidate
         if not portname:
             await ping_everywhere()
-            async for rsp in client.update(f'/networking/macs/rescan', {'rescan': 'start'}):
+            async for rsp in client.update('/networking/macs/rescan', {'rescan': 'start'}):
                 pass
             scanning = True
             while scanning:
-                async for rsp in client.read(f'/networking/macs/rescan'):
+                async for rsp in client.read('/networking/macs/rescan'):
                     if 'scanning' in rsp:
                         scanning = rsp['scanning']
                 if scanning:
