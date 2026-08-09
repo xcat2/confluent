@@ -637,28 +637,6 @@ class IpmiHandler:
             os.unlink(certname)
             await self.ipmicmd.install_bmc_certificate(cert)
 
-    async def handle_cert_authorities(self):
-        if len(self.element) == 3:
-            if self.op == 'read':
-                async for cert in self.ipmicmd.get_trusted_cas():
-                    await self.output.put(msg.ChildCollection(cert['id']))
-            elif self.op == 'update':
-                cert = self.inputdata.get_pem(self.node)
-                await self.ipmicmd.add_trusted_ca(cert)
-        elif len(self.element) == 4:
-            certid = self.element[-1]
-            if self.op == 'read':
-                async for certdata in self.ipmicmd.get_trusted_cas():
-                    if certdata['id'] == certid:
-                        await self.output.put(msg.CertificateAuthority(
-                            pem=certdata['pem'],
-                            node=self.node,
-                            subject=certdata['subject'],
-                            san=certdata.get('san', None)))
-            elif self.op == 'delete':
-                await self.ipmicmd.del_trusted_ca(certid)
-            return
-
     async def handle_alerts(self):
         if self.element[3] == 'destinations':
             if len(self.element) == 4:

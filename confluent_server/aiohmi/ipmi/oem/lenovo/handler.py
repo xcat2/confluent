@@ -409,6 +409,8 @@ class OEMHandler(generic.OEMHandler):
                         privilege_level):
         if await self.is_fpc() and self._fpc_variant != 6:
             await self.smmhandler.set_user_priv(uid, privilege_level)
+        if await self.has_xcc():
+            await self.immhandler.set_user_access(uid, privilege_level)
 
     async def is_fpc(self):
         """True if the target is a Lenovo nextscale fan power controller"""
@@ -1360,10 +1362,6 @@ class OEMHandler(generic.OEMHandler):
         if await self.has_xcc():
             return await self.immhandler.get_user_privilege_level(uid)
         return None
-
-    async def set_user_access(self, uid, channel, callback, link_auth, ipmi_msg, privilege_level):
-        if await self.has_xcc():
-            await self.immhandler.set_user_access(uid, privilege_level)
 
     async def process_zero_fru(self, zerofru):
         if (self.oemid['manufacturer_id'] == 19046
