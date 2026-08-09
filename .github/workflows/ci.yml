@@ -27,6 +27,25 @@ jobs:
             done
           } | sort -u | xargs -d '\n' shellcheck --severity=error --exclude=SC2148
 
+  ruff:
+    name: Ruff
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # Pinned to an exact release: unlike actions/checkout, ruff-action
+      # publishes no moving major tag past v3, so @v4 does not resolve.
+      - uses: astral-sh/ruff-action@v4.1.0
+        with:
+          # There is no pyproject.toml for the action to read a version from,
+          # so pin it here: an unpinned ruff would resolve to `latest` and a
+          # new release could turn a green branch red on its own. Bump this
+          # deliberately, together with the rule set in ruff.toml.
+          version: 0.15.21
+          # Rule selection, file discovery (the many extensionless Python
+          # executables) and exclusions all live in ruff.toml, so the whole
+          # workspace can be handed over as-is.
+          args: check --output-format=github
+
   python-compileall:
     name: Python compileall
     runs-on: ubuntu-latest
