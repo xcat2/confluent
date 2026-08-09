@@ -77,15 +77,45 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSIONS }}
+      - name: List the Python files without a .py name
+        # compileall only ever compiles *.py: handed anything else, even by
+        # name, it skips it and still exits 0. That leaves every extensionless
+        # CLI tool, deploy script and setup.py.tmpl unchecked, so collect them
+        # here and feed them to py_compile, which does compile what it is
+        # given. The first line is read with the shell builtin rather than
+        # forking head and grep per file.
+        run: |
+          shebang_re='^#!.*python'
+          {
+            git ls-files | while IFS= read -r f; do
+              [ -f "$f" ] || continue
+              case "$f" in *.py) continue ;; esac
+              firstline=
+              # An empty file makes read fail, which under -e would end the run.
+              IFS= read -r -n 200 firstline < "$f" 2>/dev/null || true
+              if [[ $firstline =~ $shebang_re ]]; then
+                printf '%s\n' "$f"
+              fi
+            done
+            # Python that carries no shebang at all, so nothing can detect it.
+            # Kept in step with extend-include in ruff.toml.
+            git ls-files '*/setup.py.tmpl' '*/scripts/configbmc' \
+                         '*/scripts/add_local_repositories' 'misc/filterpasswd'
+          } | sort -u > /tmp/pyfiles
+          # An empty list would leave py_compile with nothing to do and the
+          # job green, which is the very hole this step exists to close.
+          echo "$(wc -l < /tmp/pyfiles) files without a .py name"
+          [ -s /tmp/pyfiles ] || { echo '::error::No such files found'; exit 1; }
       - name: Compile all Python files
         run: |
           rc=0
           for v in $PYTHON_VERSIONS; do
             echo "::group::Python $v"
-            if "python$v" -W error -m compileall -q -x '/\.git/' .; then
-              echo "::endgroup::"
-            else
-              echo "::endgroup::"
+            ok=0
+            "python$v" -W error -m compileall -q -x '/\.git/' . || ok=1
+            xargs -d '\n' "python$v" -W error -m py_compile < /tmp/pyfiles || ok=1
+            echo "::endgroup::"
+            if [ "$ok" -ne 0 ]; then
               echo "::error::Python $v compileall failed"
               rc=1
             fi
