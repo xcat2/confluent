@@ -119,12 +119,12 @@ def handle_async(querydict, wshandler=None):
     # This may be one of two things, a request for a new async stream
     # or a request for next data from async stream
     # httpapi otherwise handles requests an injecting them to queue
-    if 'asyncid' not in querydict or not querydict['asyncid']:
+    if wshandler and ('asyncid' not in querydict or not querydict['asyncid']):
         # This is a new request, create a new multiplexer
-        currsess = AsyncSession(wshandler)
-        if wshandler:
-            yield currsess
-            return
+        yield AsyncSession(wshandler)
+        return
+    # Without a websocket handler there is nobody to hand a session to, so do
+    # not register one that would never be reaped.
     raise Exception("Long polling asynchttp is discontinued")
 
 

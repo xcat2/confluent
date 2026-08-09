@@ -133,11 +133,6 @@ def main(args):
                         curr = nodeinfo[attr].get('value', '')
                         if curr and node not in profilebynode:
                             profilebynode[node] = curr
-        for lockinfo in c.read('/noderange/{0}/deployment/lock'.format(args.noderange)):
-            for node in lockinfo.get('databynode', {}):
-                lockstate = lockinfo['databynode'][node]['lock']['value']
-                if lockstate == 'locked':
-                    lockednodes.append(node)     
     if args.profile and profilebynode:
         sys.stderr.write('The -r/--redeploy option cannot be used with a profile, it redeploys the current or pending profile\n')
         return 1

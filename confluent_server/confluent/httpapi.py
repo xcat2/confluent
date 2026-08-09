@@ -799,9 +799,7 @@ async def resourcehandler_backend(req, make_response):
         pagecontent = ""
         try:
             async for rsp in _assemble_json(
-                    confluent.asynchttp.handle_async(
-                            env, querydict,
-                            httpsessions[authorized['sessionid']]['inflight'])):
+                    confluent.asynchttp.handle_async(querydict)):
                 pagecontent += rsp
             rsp = await make_response(mimetype, 200, cookies=cookies)
             if not isinstance(pagecontent, bytes):

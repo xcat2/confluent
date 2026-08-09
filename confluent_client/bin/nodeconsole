@@ -790,6 +790,7 @@ numrows = 0
 cwidth = 0
 cheight = 0
 imagedatabynode = {}
+firstnodename = None
 
 def redraw():
     for node in imagedatabynode:
@@ -818,6 +819,7 @@ async def do_screenshot():
     global streaming
     global resized
     global numrows
+    global firstnodename
     sess = client.Command()
     if streaming:
         asyncio.create_task(watch_input())

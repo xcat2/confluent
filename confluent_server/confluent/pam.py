@@ -178,16 +178,8 @@ class pam():
             return 0
 
         # python3 ctypes prefers bytes
-        if sys.version_info >= (3,):
-            if isinstance(username, str): username = username.encode(encoding)
-            if isinstance(service, str):  service  = service.encode(encoding)
-        else:
-            if isinstance(username, unicode):
-                username = username.encode(encoding)
-            if isinstance(password, unicode):
-                password = password.encode(encoding)
-            if isinstance(service, unicode):
-                service  = service.encode(encoding)
+        if isinstance(username, str): username = username.encode(encoding)
+        if isinstance(service, str):  service  = service.encode(encoding)
 
         if b'\x00' in username or b'\x00' in service:
             self.code = 4  # PAM_SYSTEM_ERR in Linux-PAM
@@ -242,11 +234,7 @@ if __name__ == "__main__":
             readline.redisplay()
         readline.set_pre_input_hook(hook)
 
-        if sys.version_info >= (3,):
-            getinput = input
-        else:
-            getinput = raw_input
-        result = getinput(prompt)
+        result = input(prompt)
         readline.set_pre_input_hook()
         return result
 

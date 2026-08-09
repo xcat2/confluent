@@ -687,12 +687,8 @@ class InputFirmwareUpdate(ConfluentMessage):
             raise Exception('User requested substitutions, but code is '
                             'written against old api, code must be fixed or '
                             'skip {} expansion')
-        if self.filebynode[node].startswith('/etc/confluent'):
-            raise Exception(
-                'File transfer with /etc/confluent is not supported')
-        if self.filebynode[node].startswith('/var/log/confluent'):
-            raise Exception(
-                'File transfer with /var/log/confluent is not supported')
+        # The per-node paths were already checked in __init__, and nodefile()
+        # rechecks them when handing a path out for a specific node.
         return self._filename
 
     def nodefile(self, node):
