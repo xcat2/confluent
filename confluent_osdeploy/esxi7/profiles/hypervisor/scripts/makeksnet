@@ -2,7 +2,7 @@
 import re
 import subprocess
 import json
-uplinkmatch = re.compile('^\s*Uplinks:\s*(.*)')
+uplinkmatch = re.compile(r'^\s*Uplinks:\s*(.*)')
 nodename = None
 for inf in open('/etc/confluent/confluent.info', 'r').read().split('\n'):
     if inf.startswith('NODENAME: '):
