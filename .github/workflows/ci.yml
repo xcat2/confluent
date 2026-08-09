@@ -18,14 +18,24 @@ jobs:
         # files are sourced fragments or dracut hooks; ShellCheck then
         # falls back to checking them as bash.
         run: |
+          shebang_re='^#!.*[/ ](sh|bash|dash|ash|ksh)([[:blank:]]|$)'
           {
             git ls-files '*.sh'
             git ls-files | while IFS= read -r f; do
               [ -f "$f" ] || continue
-              head -c 200 "$f" | head -n 1 | \
-                grep -qE '^#!.*[/ ](sh|bash|dash|ash|ksh)([ \t]|$)' && echo "$f"
+              firstline=
+              # An empty file makes read fail, which under -e would end the run.
+              IFS= read -r -n 200 firstline < "$f" 2>/dev/null || true
+              if [[ $firstline =~ $shebang_re ]]; then
+                printf '%s\n' "$f"
+              fi
             done
-          } | sort -u | xargs -d '\n' shellcheck --severity=error --exclude=SC2148
+          } | sort -u > /tmp/shfiles
+          # A selection that quietly comes up empty would check nothing and
+          # still pass, so say how many files there are and insist on some.
+          echo "$(wc -l < /tmp/shfiles) shell files"
+          [ -s /tmp/shfiles ] || { echo '::error::No shell files found'; exit 1; }
+          xargs -d '\n' shellcheck --severity=error --exclude=SC2148 < /tmp/shfiles
 
   ruff:
     name: Ruff
