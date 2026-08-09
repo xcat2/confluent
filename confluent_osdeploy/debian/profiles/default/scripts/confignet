@@ -545,18 +545,18 @@ if __name__ == '__main__':
                     time.sleep(1)
                     continue
             dc = json.loads(dc)
-        iname = get_interface_name(idxmap[curridx], nc.get('default', {}))
-        if iname:
-            for iname in iname.split(','):
+        inames = get_interface_name(idxmap[curridx], nc.get('default', {}))
+        if inames:
+            for iname in inames.split(','):
                 if 'default' in netname_to_interfaces:
                     netname_to_interfaces['default']['interfaces'].add(iname)
                 else:
                     netname_to_interfaces['default'] = {'interfaces': set([iname]), 'settings': nc['default']}
         for netname in nc.get('extranets', {}):
             uname = '_' + netname
-            iname = get_interface_name(idxmap[curridx], nc['extranets'][netname])
-            if iname:
-                for iname in iname.split(','):
+            inames = get_interface_name(idxmap[curridx], nc['extranets'][netname])
+            if inames:
+                for iname in inames.split(','):
                     if uname in netname_to_interfaces:
                         netname_to_interfaces[uname]['interfaces'].add(iname)
                     else:

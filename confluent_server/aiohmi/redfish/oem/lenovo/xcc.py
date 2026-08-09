@@ -623,12 +623,12 @@ class OEMHandler(generic.OEMHandler):
     async def _get_agentless_firmware(self, components):
         skipkeys = set([])
         wc = await self.wc()
-        adata = await wc.grab_json_response(
+        adapterdata = await wc.grab_json_response(
             '/api/dataset/imm_adapters?params=pci_GetAdapters')
         fdata = await wc.grab_json_response(
             '/api/function/adapter_update?params=pci_GetAdapterListAndFW')
         anames = set()
-        for adata in adata.get('items', []):
+        for adata in adapterdata.get('items', []):
             baseaname = adata['adapterName']
             aname = baseaname
             idx = 1
