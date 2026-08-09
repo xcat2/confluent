@@ -178,8 +178,10 @@ class pam():
             return 0
 
         # python3 ctypes prefers bytes
-        if isinstance(username, str): username = username.encode(encoding)
-        if isinstance(service, str):  service  = service.encode(encoding)
+        if isinstance(username, str):
+            username = username.encode(encoding)
+        if isinstance(service, str):
+            service = service.encode(encoding)
 
         if b'\x00' in username or b'\x00' in service:
             self.code = 4  # PAM_SYSTEM_ERR in Linux-PAM
