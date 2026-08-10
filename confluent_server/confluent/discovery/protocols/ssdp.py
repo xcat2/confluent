@@ -135,6 +135,45 @@ async def check_fish_handler(handler, peerdata, known_peers, newmacs, peerbymaca
         machandlers[mac] = handler
 
 
+def _open_snoop_sockets(cloop, pktq):
+    net6 = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
+    net6.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
+    for ifidx in util.list_interface_indexes():
+        v6grp = ssdp6mcast + struct.pack('=I', ifidx)
+        net6.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_JOIN_GROUP, v6grp)
+    net6.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    net4 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    for i4 in util.list_ips():
+        ssdp4mcast = socket.inet_pton(socket.AF_INET, mcastv4addr) + \
+                     socket.inet_aton(i4['addr'])
+        try:
+            net4.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP,
+                            ssdp4mcast)
+        except socket.error as e:
+            if e.errno != 98:
+                # errno 98 can happen if aliased, skip for now
+                raise
+    net4.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    net4.bind(('', 1900))
+    net6.bind(('', 1900))
+    cloop.add_reader(net4, _relay_pkt, net4, pktq)
+    cloop.add_reader(net6, _relay_pkt, net6, pktq)
+    return net4, net6
+
+
+def _renew_snoop_sockets(cloop, pktq, net4, net6):
+    for oldsock in (net4, net6):
+        try:
+            cloop.remove_reader(oldsock)
+        except Exception:
+            pass
+        try:
+            oldsock.close()
+        except Exception:
+            pass
+    return _open_snoop_sockets(cloop, pktq)
+
+
 async def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
     """Watch for SSDP notify messages
 
@@ -160,30 +199,9 @@ async def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
                     event=log.Events.stacktrace)
     known_peers = set([])
     recent_peers = set([])
-    net6 = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
-    net6.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
-    for ifidx in util.list_interface_indexes():
-        v6grp = ssdp6mcast + struct.pack('=I', ifidx)
-        net6.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_JOIN_GROUP, v6grp)
-    net6.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    net4 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    for i4 in util.list_ips():
-        ssdp4mcast = socket.inet_pton(socket.AF_INET, mcastv4addr) + \
-                     socket.inet_aton(i4['addr'])
-        try:
-            net4.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP,
-                            ssdp4mcast)
-        except socket.error as e:
-            if e.errno != 98:
-                # errno 98 can happen if aliased, skip for now
-                raise
-    net4.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    net4.bind(('', 1900))
-    net6.bind(('', 1900))
     pktq = asyncio.Queue()
-    cloop = asyncio.get_running_loop()
-    cloop.add_reader(net4, _relay_pkt, net4, pktq)
-    cloop.add_reader(net6, _relay_pkt, net6, pktq)
+    net4, net6 = _open_snoop_sockets(cloop, pktq)
+    lastrenew = time.time()
     peerbymacaddress = {}
     newmacs = set([])
     deferrednotifies = []
@@ -194,7 +212,20 @@ async def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
             deferrednotifies.clear()
             machandlers.clear()
             timeout = None
-            srp = await pktq.get()
+            # Periodically close and reopen the sockets so that multicast
+            # group memberships are reasserted, working around switches with
+            # glitchy MLD/IGMP snooping that would otherwise stop forwarding.
+            renewwait = lastrenew + 60 - time.time()
+            if renewwait <= 0:
+                net4, net6 = _renew_snoop_sockets(cloop, pktq, net4, net6)
+                lastrenew = time.time()
+                continue
+            try:
+                srp = await asyncio.wait_for(pktq.get(), timeout=renewwait)
+            except asyncio.exceptions.TimeoutError:
+                net4, net6 = _renew_snoop_sockets(cloop, pktq, net4, net6)
+                lastrenew = time.time()
+                continue
             recent_peers.clear()
             while srp and len(deferrednotifies) < 256:
                 srp = None
