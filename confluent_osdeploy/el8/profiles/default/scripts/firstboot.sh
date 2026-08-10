@@ -47,7 +47,7 @@ while ! ping -c 1 $confluent_pingtarget >& /dev/null; do
 done
 
 if [ -e /etc/confluent/luks.key ]; then
-    pcrs=$(sed -n -e 's/.*tpm2:pcrs=\([0-9,]*\).*/\1/p' /tmp/cryptboot)
+    pcrs=$(grep ^encryptboot: /etc/confluent/confluent.deploycfg | awk '{print $2}' | grep -o 'pcrs=[^:]*' | cut -d= -f2)
     if [ -n "$pcrs" ]; then
         run_remote tpm_luks_reseal.sh
     fi
