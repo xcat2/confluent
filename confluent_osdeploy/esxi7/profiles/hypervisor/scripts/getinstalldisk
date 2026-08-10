@@ -176,27 +176,41 @@ def list_disks():
                 adp = ' '.join(line.split()[1:])
                 disks[dev]['adapter'] = adp
                 devbyadp.setdefault(adp, []).append(dev)
-    adapterlist = subprocess.check_output(['localcli', 'storage', 'core', 'adapter', 'listdetailed'])
+    adapterlist = subprocess.check_output(['localcli', 'storage', 'core', 'adapter', 'list'])
     if not isinstance(adapterlist, str):
         adapterlist = adapterlist.decode('utf8')
     adapters = {}
     curradpinfo = {}
+    headline = None
+    headerdone = False
+    descidx = 0
     for line in adapterlist.split('\n'):
-        line = line.rstrip()
         if not line.strip():
-            curradpinfo = {}
             continue
-        if not line.startswith(' '):
-            curradpname = line.split(':', 1)[0].strip()
-            curradpinfo['name'] = curradpname
-            adapters[curradpname] = curradpinfo
-        else:
-            if '   Driver:' in line:
-                curradpinfo['driver'] = line.split(maxsplit=1)[1]
-            elif '   Description:' in line:
-                curradpinfo['description'] = line.split(maxsplit=1)[1]
-                if curradpinfo['description'].startswith('('):
-                    curradpinfo['pcieaddress'] = curradpinfo['description'].split('(')[1].split(')')[0]
+        if not headline:
+            headline = line
+            descidx = headline.find('Description')
+            if descidx < 0:
+                raise Exception("Unexpected adapter list format: {0}".format(headline))
+        elif not headerdone:
+            if line.startswith('-'):
+                headerdone = True
+            continue
+        fields = line.split(maxsplit=2)
+        if len(fields) < 2:
+            raise Exception("Unexpected adapter list format: {0}".format(line))
+        currname, currdriver = fields[0], fields[1]
+        currdesc = line[descidx:].strip()
+        pcieaddr = None
+        if currdesc.startswith('('):
+            pcieaddr = currdesc.split('(')[1].split(')')[0]
+        curradpinfo = {
+            'name': currname,
+            'driver': currdriver,
+            'description': currdesc,
+            'pcieaddress': pcieaddr
+        }
+        adapters[currname] = curradpinfo
     for adp in devbyadp:
         driver = adapters.get(adp, {}).get('driver', 'Unknown')
         pcieaddr = adapters.get(adp, {}).get('pcieaddress', None)
