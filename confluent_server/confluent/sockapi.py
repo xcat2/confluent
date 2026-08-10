@@ -288,7 +288,7 @@ async def start_term(authname, cfm, connection, params, path, authdata, skipauth
             sessionid = elems[5]
         else:
             sessionid = None
-        consession = shellserver.ShellSession(
+        consession = await shellserver.ShellSession.create(
             node=node, configmanager=cfm, username=authname,
             datacallback=ccons.sendall, skipreplay=skipreplay,
             sessionid=sessionid, width=params.get('width', 80),
