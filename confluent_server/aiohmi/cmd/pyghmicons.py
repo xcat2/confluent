@@ -14,6 +14,7 @@
 
 """ A simple little script to exemplify/test ipmi.console module """
 
+import asyncio
 import fcntl
 import os
 import select
@@ -50,7 +51,7 @@ def _print(data):
         raise Exception(data)
 
 
-def main():
+async def main():
     tcattr = termios.tcgetattr(sys.stdin)
     newtcattr = tcattr
     # TODO(jbjohnso): add our exit handler
@@ -75,7 +76,7 @@ def main():
         inputthread = threading.Thread(target=_doinput, args=(sol,))
         inputthread.daemon = True
         inputthread.start()
-        sol.main_loop()
+        await sol.main_loop()
 
     except Exception:
         currfl = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFL)
@@ -85,4 +86,4 @@ def main():
 
 
 if __name__ == '__main__':
-    sys.exit(main())
+    sys.exit(asyncio.run(main()))

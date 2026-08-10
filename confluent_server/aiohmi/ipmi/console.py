@@ -418,7 +418,7 @@ class Console(object):
             # sooner than timeout suggests is evidently a big deal
             await self.send_payload(payload=self.lastpayload, retry=False)
 
-    def main_loop(self):
+    async def main_loop(self):
         """Process all events until no more sessions exist.
 
         If a caller is a simple little utility, provide a function to
@@ -431,7 +431,7 @@ class Console(object):
         # TODO(jbjohnso): wait_for_rsp is not returning a true value for our
         # own session
         while (1):
-            session.Session.wait_for_rsp(timeout=600)
+            await session.Session.wait_for_rsp(timeout=600)
 
 
 class ServerConsole(Console):

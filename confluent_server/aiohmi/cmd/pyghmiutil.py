@@ -17,6 +17,7 @@ it isn't conceived as a general utility to actually use, just help developers
 understand how the ipmi_command class workes.
 """
 
+import asyncio
 import functools
 import os
 import sys
@@ -64,7 +65,7 @@ def docommand(args, result, ipmisession):
               data=map(lambda x: int(x, 16), args[2:])))
 
 
-def main():
+async def main():
     if (len(sys.argv) < 3) or 'IPMIPASSWORD' not in os.environ:
         print("Usage:")
         print(" IPMIPASSWORD=password %s bmc username <cmd> <optarg>" %
@@ -85,8 +86,8 @@ def main():
             onlogon=functools.partial(docommand, sys.argv[3:]))
 
     if ipmicmd:
-        ipmicmd.eventloop()
+        await ipmicmd.eventloop()
 
 
 if __name__ == '__main__':
-    sys.exit(main())
+    sys.exit(asyncio.run(main()))
