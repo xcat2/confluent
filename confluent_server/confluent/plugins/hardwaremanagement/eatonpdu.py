@@ -12,12 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#TODO: ASYNC asyncio conversion
 import asyncio
 import base64
 import confluent.util as util
 import confluent.messages as msg
 import aiohmi.util.webclient as wc
+import http.client as httplib
+import http.cookies as Cookie
 import re
 import hashlib
 import json
@@ -55,86 +56,93 @@ def answer_challenge(username, password, data):
     return {'sessionKey': skey.decode('utf8'), 'szResponse': rsp.decode('utf8'), 'szResponseValue': s2rsp.decode('utf8')}
 
 
-import http.client as httplib
-import http.cookies as Cookie
+# carried over verbatim from the transport these replace
+_fixedheaders = {
+    'Host': 'pdu.cluster.net',
+    'Accept': '*/*',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Connection': 'close',
+    'Referer': 'http://pdu.cluster.net/setting_admin.htm',
+}
 
-# Delta PDU webserver always closes connection,
-# replace conditionals with always close
+
+class SecureWebConnection(wc.WebConnection):
+    """The https transport, on the loop: the cert verifier needs it"""
+
+    def __init__(self, host, verifycallback):
+        wc.WebConnection.__init__(self, host, 443,
+                                  verifycallback=verifycallback)
+        for header in _fixedheaders:
+            self.set_header(header, _fixedheaders[header])
+
+    async def grab_response(self, url, body=None, method=None):
+        # unfollowed, as http.client left them
+        rsp, status, _ = await self.grab_response_with_status(
+            url, body, method=method, allow_redirects=False)
+        return rsp, status
+
+
+# the device closes the connection whatever it said it would do
 class WebResponse(httplib.HTTPResponse):
     def _check_close(self):
         return True
 
-class WebConnection(wc.WebConnection):
+
+class PlainWebConnection(httplib.HTTPConnection):
+    """The http transport, for a PDU with TLS not turned on
+
+    http.client, because the socket wants a smaller segment size set before
+    connect and aiohttp only takes a socket factory from 3.12 on, which is
+    newer than most distros ship. Requests run in a thread, which is safe
+    here: no cert to verify, and the credentials arrive already read.
+    """
+
     response_class = WebResponse
-    def __init__(self, host, secure, verifycallback):
-        if secure:
-            port = 443
-        else:
-            port = 80
-        wc.WebConnection.__init__(self, host, port, verifycallback=verifycallback)
-        self.secure = secure
+
+    def __init__(self, host):
+        # http.client would otherwise wait forever
+        httplib.HTTPConnection.__init__(self, host, 80, timeout=60)
+        self.stdheaders = dict(_fixedheaders)
         self.cookies = {}
 
-    async def connect(self):
-        if self.secure:
-            return super(WebConnection, self).connect()
-        addrinfo = (await asyncio.get_running_loop().getaddrinfo(self.host, self.port))[0]
-        # workaround problems of too large mtu, moderately frequent occurance
-        # in this space
+    def connect(self):
+        addrinfo = socket.getaddrinfo(self.host, self.port, 0,
+                                      socket.SOCK_STREAM)[0]
         plainsock = socket.socket(addrinfo[0])
-        plainsock.settimeout(self.mytimeout)
+        plainsock.settimeout(self.timeout)
         try:
+            # workaround problems of too large mtu, moderately frequent
+            # occurance in this space
             plainsock.setsockopt(socket.IPPROTO_TCP, socket.TCP_MAXSEG, 1456)
         except socket.error:
             pass
         plainsock.connect(addrinfo[4])
         self.sock = plainsock
-    
-    def getresponse(self):
-        try:
-            rsp = super(WebConnection, self).getresponse()
-            try:
-                hdrs = [x.split(':', 1) for x in rsp.msg.headers]
-            except AttributeError:
-                hdrs = rsp.msg.items()
-            for hdr in hdrs:
-                if hdr[0] == 'Set-Cookie':
-                    c = Cookie.BaseCookie(hdr[1])
-                    for k in c:
-                        self.cookies[k] = c[k].value
-        except httplib.BadStatusLine:
-            self.broken = True
-            raise
-        return rsp
 
-    def request(self, method, url, body=None):
-        headers = {}
+    def _blocking_grab(self, url, body, method):
+        headers = dict(self.stdheaders)
         if body:
             headers['Content-Length'] = len(body)
-        cookies = []
-        for cookie in self.cookies:
-            cookies.append('{0}={1}'.format(cookie, self.cookies[cookie]))
-        headers['Cookie'] = ';'.join(cookies)
-        headers['Host'] = 'pdu.cluster.net'
-        headers['Accept'] = '*/*'
-        headers['Accept-Language'] = 'en-US,en;q=0.9'
-        headers['Connection'] = 'close'
-        headers['Referer'] = 'http://pdu.cluster.net/setting_admin.htm'
-        return super(WebConnection, self).request(method, url, body, headers)
+        if self.cookies:
+            headers['Cookie'] = ';'.join(
+                ['{0}={1}'.format(k, self.cookies[k]) for k in self.cookies])
+        self.request(method, url, body, headers)
+        rsp = self.getresponse()
+        for hdr, value in rsp.getheaders():
+            if hdr.lower() == 'set-cookie':
+                cookie = Cookie.BaseCookie(value)
+                for key in cookie:
+                    self.cookies[key] = cookie[key].value
+        return rsp.read(), rsp.status
 
-    def grab_response(self, url, body=None, method=None):
+    async def grab_response(self, url, body=None, method=None):
         if method is None:
             method = 'GET' if body is None else 'POST'
-        if body:
-            self.request(method, url, body)
-        else:
-            self.request(method, url)
-        rsp = self.getresponse()
-        body = rsp.read()
-        return body, rsp.status
+        return await asyncio.to_thread(self._blocking_grab, url, body, method)
+
 
 _sensors_by_node = {}
-def get_sensor_data(element, node, configmanager):
+async def get_sensor_data(element, node, configmanager):
     category, name = element[-2:]
     justnames = False
     readings = []
@@ -149,9 +157,9 @@ def get_sensor_data(element, node, configmanager):
     if not sn or sn[1] < time.time():
         gc = PDUClient(node, configmanager)
         try:
-            sdata = gc.get_sensor_data()
+            sdata = await gc.get_sensor_data()
         finally:
-            gc.logout()
+            await gc.logout()
         _sensors_by_node[node] = [sdata, time.time() + 1]
         sn = _sensors_by_node.get(node, None)
     for outlet in sn[0]:
@@ -183,6 +191,11 @@ class PDUClient(object):
 
     @property
     def wc(self):
+        # set by connect(); only login() reads it without connecting first
+        return self._wc
+
+    async def connect(self):
+        # logging in is a coroutine, so this cannot be the wc property
         if self._wc:
             return self._wc
         targcfg = self.configmanager.get_node_attributes(self.node,
@@ -197,18 +210,18 @@ class PDUClient(object):
         verifier = util.TLSCertVerifier(
             self.configmanager, self.node, 'pubkeys.tls_hardwaremanager')
         try:
-            self._wc = WebConnection(target, secure=True, verifycallback=verifier.verify_cert)
-            self.login(self.configmanager)
+            self._wc = SecureWebConnection(target, verifier.verify_cert)
+            await self.login(self.configmanager)
         except socket.error:
             pkey = self.configmanager.get_node_attributes(self.node, 'pubkeys.tls_hardwaremanager')
             pkey = pkey.get(self.node, {}).get('pubkeys.tls_hardwaremanager', {}).get('value', None)
             if pkey:
                 raise
-            self._wc = WebConnection(target, secure=False, verifycallback=verifier.verify_cert)
-            self.login(self.configmanager)
+            self._wc = PlainWebConnection(target)
+            await self.login(self.configmanager)
         return self._wc
 
-    def login(self, configmanager):
+    async def login(self, configmanager):
         credcfg = configmanager.get_node_attributes(self.node,
                                             ['secret.hardwaremanagementuser',
                                              'secret.hardwaremanagementpassword'],
@@ -226,7 +239,7 @@ class PDUClient(object):
             raise Exception('Missing username or password')
         b64user = base64.b64encode(username.encode('utf8')).decode('utf8')
         b64pass = base64.b64encode(passwd.encode('utf8')).decode('utf8')
-        rsp = self.wc.grab_response('/config/gateway?page=cgi_authentication&login={}&_dc={}'.format(b64user, int(time.time())))
+        rsp = await self.wc.grab_response('/config/gateway?page=cgi_authentication&login={}&_dc={}'.format(b64user, int(time.time())))
         rsp = json.loads(sanitize_json(rsp[0]))
         self.sessid = rsp['data'][0]
         if rsp['data'][-1] == 'password':
@@ -246,22 +259,24 @@ class PDUClient(object):
                 parms['szResponseValue'],
                 int(time.time()),
             )
-        rsp = self.wc.grab_response(url)
+        rsp = await self.wc.grab_response(url)
         rsp = json.loads(sanitize_json(rsp[0]))
         if not rsp['success']:
             raise Exception('Failed to login to device')
-        rsp = self.wc.grab_response('/config/gateway?page=cgi_checkUserSession&sessionId={}&_dc={}'.format(self.sessid, int(time.time())))
+        rsp = await self.wc.grab_response('/config/gateway?page=cgi_checkUserSession&sessionId={}&_dc={}'.format(self.sessid, int(time.time())))
 
-    def do_request(self, suburl):
-        wc = self.wc
+    async def do_request(self, suburl):
+        wc = await self.connect()
         url = '/config/gateway?page={}&sessionId={}&_dc={}'.format(suburl, self.sessid, int(time.time()))
-        return wc.grab_response(url)
+        return await wc.grab_response(url)
 
-    def logout(self):
-        self.do_request('cgi_logout')
+    async def logout(self):
+        if self.sessid:
+            await self.do_request('cgi_logout')
+            self.sessid = None
 
-    def get_outlet(self, outlet):
-        rsp = self.do_request('cgi_pdu_outlets')
+    async def get_outlet(self, outlet):
+        rsp = await self.do_request('cgi_pdu_outlets')
         data = sanitize_json(rsp[0])
         data = json.loads(data)
         data = data['data'][0]
@@ -271,8 +286,8 @@ class PDUClient(object):
                 return 'on' if outdata[3] else 'off'
         return
     
-    def get_sensor_data(self):
-        rsp = self.do_request('cgi_pdu_outlets')
+    async def get_sensor_data(self):
+        rsp = await self.do_request('cgi_pdu_outlets')
         data = sanitize_json(rsp[0])
         data = json.loads(data)
         data = data['data'][0]
@@ -293,8 +308,9 @@ class PDUClient(object):
             sdata[outletname] = outsense
         return sdata
 
-    def set_outlet(self, outlet, state):
-        rsp = self.do_request('cgi_pdu_outlets')
+    async def set_outlet(self, outlet, state):
+        wc = await self.connect()
+        rsp = await self.do_request('cgi_pdu_outlets')
         data = sanitize_json(rsp[0])
         data = json.loads(data)
         data = data['data'][0]
@@ -303,14 +319,14 @@ class PDUClient(object):
             outdata = outdata[0]
             if outdata[0] == outlet:
                 payload = "<SET_OBJECT><OBJECT name='PDU.OutletSystem.Outlet[{}].DelayBefore{}'>0</OBJECT>".format(idx, 'Startup' if state == 'on' else 'Shutdown')
-                rsp = self.wc.grab_response('/config/set_object_mass.xml?sessionId={}'.format(self.sessid), payload)
+                rsp = await wc.grab_response('/config/set_object_mass.xml?sessionId={}'.format(self.sessid), payload)
                 return
             idx += 1
 
 async def retrieve(nodes, element, configmanager, inputdata):
     if element[0] == 'sensors':
         for node in nodes:
-            for res in get_sensor_data(element, node, configmanager):
+            async for res in get_sensor_data(element, node, configmanager):
                 yield res
         return
     elif 'outlets' not in element:
