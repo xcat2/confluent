@@ -209,7 +209,12 @@ class Command(object):
     @classmethod
     async def eventloop(cls):
         while True:
-            await session.Session.wait_for_rsp()
+            # A ceiling rather than no timeout at all: with nothing waiting or
+            # being kept alive, wait_for_rsp has nothing to wait on and returns
+            # at once, which would make this a busy loop. Sessions still shorten
+            # it to their own deadlines, and an arriving packet still ends the
+            # wait early.
+            await session.Session.wait_for_rsp(timeout=session.MAX_IDLE)
 
     @classmethod
     async def wait_for_rsp(cls, timeout):
