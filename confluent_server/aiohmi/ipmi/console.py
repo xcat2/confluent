@@ -197,12 +197,12 @@ class Console(object):
                 else:
                     self.pendingoutput[-1] += data
 
-    def _got_cons_input(self, handle):
+    async def _got_cons_input(self, handle):
         """Callback for handle events detected by ipmi session"""
 
         self._addpendingdata(handle.read())
         if not self.awaitingack:
-            self._sendpendingoutput()
+            await self._sendpendingoutput()
 
     async def close(self):
         """Shut down an SOL session"""
@@ -527,7 +527,7 @@ class ServerConsole(Console):
                     else:
                         self.pendingoutput = [newtext] + self.pendingoutput
             # self._sendpendingoutput() checks len(self._sendpendingoutput)
-            self._sendpendingoutput()
+            await self._sendpendingoutput()
         elif ackseq != 0 and self.awaitingack:
             # if an ack packet came in, but did not match what we
             # expected, retry our payload now.
