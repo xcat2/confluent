@@ -15,32 +15,39 @@
 """ A simple little script to exemplify/test ipmi.console module """
 
 import asyncio
+import errno
 import fcntl
 import os
-import select
 import sys
 import termios
-import threading
 import tty
 
 
 from aiohmi.ipmi import console
 
 
-def _doinput(sol):
-    while True:
-        select.select((sys.stdin,), (), (), 600)
-        try:
-            data = sys.stdin.read()
-        except (IOError, OSError) as e:
-            if e.errno == 11:
-                continue
-            raise
-
-        sol.send_data(data)
+# Tasks are kept alive here: the event loop only holds weak references to
+# them, so a task that nothing else refers to can be collected mid flight.
+_pending = set()
 
 
-def _print(data):
+def _got_input(sol):
+    """Called by the event loop whenever stdin has something to read"""
+
+    try:
+        data = sys.stdin.read()
+    except (IOError, OSError) as e:
+        if e.errno == errno.EAGAIN:
+            return
+        raise
+    if not data:
+        return
+    task = asyncio.get_running_loop().create_task(sol.send_data(data))
+    _pending.add(task)
+    task.add_done_callback(_pending.discard)
+
+
+async def _print(data):
     bailout = False
     if not isinstance(data, str):
         bailout = True
@@ -73,10 +80,12 @@ async def main():
 
         sol = console.Console(bmc=sys.argv[1], userid=sys.argv[2],
                               password=passwd, iohandler=_print, force=True)
-        inputthread = threading.Thread(target=_doinput, args=(sol,))
-        inputthread.daemon = True
-        inputthread.start()
-        await sol.main_loop()
+        await sol.connect()
+        asyncio.get_running_loop().add_reader(sys.stdin, _got_input, sol)
+        try:
+            await sol.main_loop()
+        finally:
+            asyncio.get_running_loop().remove_reader(sys.stdin)
 
     except Exception:
         currfl = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFL)
