@@ -1,0 +1,138 @@
+# Pyrefly configuration for confluent.
+#
+# The whole policy is the two error kinds enabled at the bottom of this file:
+# a coroutine that is never awaited, where the call silently does nothing, and
+# an await on something that is not awaitable, which raises TypeError as soon
+# as the line runs. Those are the mistakes the asyncio port can make that no
+# other check in CI can see. Everything else is off, because a full check
+# reports several thousand errors on this largely unannotated tree, mostly
+# attribute lookups it cannot verify.
+#
+# The policy lives here rather than in a --only flag on the command line, so
+# that CI, a local run and the editor integration all behave the same way.
+#
+# A baseline file is deliberately not used. Pyrefly matches baselined findings
+# by file, error kind and column, so a new mistake that happens to land at the
+# same indentation as an existing one in the same file is silently accepted.
+
+project-includes = [
+    # Every *.py in the tree, so this matches what ruff and compileall see.
+    ".",
+    # Pyrefly walks *.py only, and a glob in this list does not lift that
+    # restriction: it expands the glob and then drops everything without the
+    # extension. So every extensionless tool has to be named. This list is
+    # the one ruff.toml arrives at through extend-include, and is kept in
+    # step with it; anything missing here is skipped without a word.
+    "confluent_client/bin/collate",
+    "confluent_client/bin/confetty",
+    "confluent_client/bin/confluent2ansible",
+    "confluent_client/bin/confluent2dnsmasq",
+    "confluent_client/bin/confluent2hosts",
+    "confluent_client/bin/confluent2lxca",
+    "confluent_client/bin/confluent2xcat",
+    "confluent_client/bin/dir2img",
+    "confluent_client/bin/nodeapply",
+    "confluent_client/bin/nodeattrib",
+    "confluent_client/bin/nodebmcpassword",
+    "confluent_client/bin/nodebmcreset",
+    "confluent_client/bin/nodeboot",
+    "confluent_client/bin/nodecertutil",
+    "confluent_client/bin/nodeconfig",
+    "confluent_client/bin/nodeconsole",
+    "confluent_client/bin/nodedefine",
+    "confluent_client/bin/nodedeploy",
+    "confluent_client/bin/nodediscover",
+    "confluent_client/bin/nodeeventlog",
+    "confluent_client/bin/nodefirmware",
+    "confluent_client/bin/nodegroupattrib",
+    "confluent_client/bin/nodegroupdefine",
+    "confluent_client/bin/nodegrouplist",
+    "confluent_client/bin/nodegroupremove",
+    "confluent_client/bin/nodegrouprename",
+    "confluent_client/bin/nodehealth",
+    "confluent_client/bin/nodeidentify",
+    "confluent_client/bin/nodeinventory",
+    "confluent_client/bin/nodel2traceroute",
+    "confluent_client/bin/nodelicense",
+    "confluent_client/bin/nodelist",
+    "confluent_client/bin/nodemedia",
+    "confluent_client/bin/nodeping",
+    "confluent_client/bin/nodepower",
+    "confluent_client/bin/noderemove",
+    "confluent_client/bin/noderename",
+    "confluent_client/bin/nodereseat",
+    "confluent_client/bin/nodersync",
+    "confluent_client/bin/noderun",
+    "confluent_client/bin/nodesensors",
+    "confluent_client/bin/nodesetboot",
+    "confluent_client/bin/nodeshell",
+    "confluent_client/bin/nodestorage",
+    "confluent_client/bin/nodesupport",
+    "confluent_client/bin/stats",
+    "confluent_client/setup.py.tmpl",
+    "confluent_common/setup.py.tmpl",
+    "confluent_osdeploy/bluefield/bfb-autoinstall",
+    "confluent_osdeploy/bluefield/hostscripts/bfb-autoinstall",
+    "confluent_osdeploy/bluefield/profiles/default/nodedeploy-bfb",
+    "confluent_osdeploy/common/initramfs/opt/confluent/bin/apiclient",
+    "confluent_osdeploy/common/profile/scripts/autoconsole",
+    "confluent_osdeploy/common/profile/scripts/confignet",
+    "confluent_osdeploy/common/profile/scripts/getinstalldisk",
+    "confluent_osdeploy/common/profile/scripts/syncfileclient",
+    "confluent_osdeploy/debian/profiles/default/scripts/confignet",
+    "confluent_osdeploy/el10-diskless/profiles/default/scripts/add_local_repositories",
+    "confluent_osdeploy/el7-diskless/profiles/default/scripts/syncfileclient",
+    "confluent_osdeploy/el7/profiles/default/scripts/add_local_repositories",
+    "confluent_osdeploy/el7/profiles/default/scripts/configbmc",
+    "confluent_osdeploy/el7/profiles/default/scripts/syncfileclient",
+    "confluent_osdeploy/el8-diskless/profiles/default/scripts/add_local_repositories",
+    "confluent_osdeploy/el8/profiles/default/scripts/add_local_repositories",
+    "confluent_osdeploy/el8/profiles/default/scripts/configbmc",
+    "confluent_osdeploy/el9-diskless/profiles/default/scripts/add_local_repositories",
+    "confluent_osdeploy/esxi7/profiles/hypervisor/scripts/getinstalldisk",
+    "confluent_osdeploy/esxi7/profiles/hypervisor/scripts/makeksnet",
+    "confluent_osdeploy/genesis/profiles/default/scripts/configbmc",
+    "confluent_osdeploy/ubuntu22.04/profiles/default/scripts/mergetime",
+    "confluent_server/bin/collective",
+    "confluent_server/bin/confluent",
+    "confluent_server/bin/confluentdbutil",
+    "confluent_server/bin/confluent_selfcheck",
+    "confluent_server/bin/osdeploy",
+    "confluent_server/setup.py.tmpl",
+    "imgutil/imgutil",
+    "misc/filterpasswd",
+    "misc/getipsfromswitchport",
+    "misc/getusbnicaddr",
+]
+
+project-excludes = [
+    # A symlink to a unit file that only exists on a deployed system.
+    # Pyrefly refuses to walk the tree at all when it meets this.
+    "confluent_osdeploy/coreos/initramfs/etc/systemd/system/initrd-root-fs.target.requires/confluent-rootfs.service",
+]
+
+# project-includes only picks the files to check. Imports are resolved against
+# search-path, and without these roots pyrefly cannot tell that, for instance,
+# aiohmi.util.webclient.request is async, and a large share of the findings,
+# among them everything in the SMM discovery handler, goes unreported. The two
+# trees both hold a package named confluent but share no module names, so one
+# search path for each works; that would need revisiting if they ever overlap.
+search-path = [
+    "confluent_server",
+    "confluent_client",
+]
+
+# The oldest interpreter parts of this tree still run on (el8, sles15).
+python-version = "3.6"
+
+preset = "off"
+# Both of these are load bearing rather than decoration. With unannotated
+# bodies unchecked the check reports nothing at all, since almost nothing here
+# is annotated, and without inferred return types it misses a good part of the
+# rest.
+check-unannotated-defs = true
+infer-return-types = "checked"
+
+[errors]
+unused-coroutine = "error"
+not-async = "error"
