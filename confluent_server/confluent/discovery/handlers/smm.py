@@ -38,6 +38,10 @@ def fromstring(inputdata):
     # The measures above should filter out the risky facets of xml
     # We don't need sophisticated feature support
     parser = etree.XMLParser(resolve_entities=False, no_network=True, huge_tree=False)
+    if not isinstance(inputdata, bytes):
+        # lxml refuses a str that declares an encoding, and the SMM declares
+        # one when answering a login
+        inputdata = inputdata.encode('utf8')
     return etree.fromstring(inputdata, parser=parser)
 
 def fixuuid(baduuid):
