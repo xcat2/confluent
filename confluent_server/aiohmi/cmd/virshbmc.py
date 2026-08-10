@@ -114,6 +114,13 @@ class LibvirtBmc(bmc.Bmc):
     async def activate_payload(self, request, session):
         # captured for stream_callback, which runs on a libvirt thread
         self.asyncloop = asyncio.get_running_loop()
+        if self.sol_thread is not None and self.sol_thread.is_alive():
+            # The thread from the previous console has not come back out of
+            # virEventRunDefaultImpl. A second one would run a second event
+            # loop against the same stream, and setting run_console below
+            # would revive the first one when it finally wakes.
+            return await session.send_ipmi_response(code=0x80)
+        self.sol_thread = None
         wasactive = self.activated
         await super(LibvirtBmc, self).activate_payload(request, session)
         if wasactive or not self.activated:
@@ -132,14 +139,16 @@ class LibvirtBmc(bmc.Bmc):
     async def deactivate_payload(self, request, session):
         if self.activated and self.sol_thread:
             self.run_console = False
-            # Joining here would run on the event loop, and the thread sits in
-            # virEventRunDefaultImpl, which is documented as able to wait
-            # indefinitely: clearing run_console does not wake it. So wait off
-            # the loop, and not forever, rather than stall every other session
-            # and never send the response below.
+            # The thread only notices that after virEventRunDefaultImpl
+            # returns, which is documented as possibly never. Waiting on the
+            # event loop would stall every other session, so wait off it, and
+            # briefly: this is only to clear the state promptly in the normal
+            # case. A thread that outlives the wait stays owned here, and
+            # activate_payload refuses to start another until it is gone.
             await asyncio.get_running_loop().run_in_executor(
-                None, self.sol_thread.join, 5)
-            self.sol_thread = None
+                None, self.sol_thread.join, 1)
+            if not self.sol_thread.is_alive():
+                self.sol_thread = None
         await super(LibvirtBmc, self).deactivate_payload(request, session)
 
     async def iohandler(self, data):
