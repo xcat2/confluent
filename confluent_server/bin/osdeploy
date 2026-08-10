@@ -164,7 +164,7 @@ def init_confluent_myname():
 
 async def local_node_trust_setup():
     init_confluent_myname()
-    allnodes, domain = selfservice.get_cluster_list()
+    allnodes, domain = await selfservice.get_cluster_list()
     myname = collective.get_myname()
     myprincipals = set([myname])
     restorecon = os.path.exists('/usr/sbin/restorecon')
@@ -180,7 +180,7 @@ async def local_node_trust_setup():
         myprincipals.add(addr)
     for pubkey in glob.glob('/etc/ssh/ssh_host_*_key.pub'):
         currpubkey = open(pubkey, 'rb').read()
-        cert = sshutil.sign_host_key(currpubkey, myname, myprincipals)
+        cert = await sshutil.sign_host_key(currpubkey, myname, myprincipals)
         certfile = pubkey.replace('key.pub', 'key-cert.pub')
         neededlines.add('HostCertificate {0}'.format(certfile))
         if os.path.exists(certfile):
