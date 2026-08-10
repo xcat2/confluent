@@ -66,6 +66,7 @@ class AsyncSession(object):
         self.wshandler = wshandler
         self.termrelations = []
         self.consoles = set([])
+        self.handlertasks = set()
 
     async def add(self, requestid, rsp):
         await self.wshandler(messages.AsyncMessage((requestid, rsp)))
@@ -107,7 +108,11 @@ async def run_handler(hdlr, req):
         raise exc.InvalidArgumentException(
                 'Invalid Session ID or missing request id')
     cloop = asyncio.get_running_loop()
-    cloop.create_task(asyncsession.run_handler(hdlr, requestid))
+    # The loop only keeps a weak reference, so the session holds the task until
+    # it finishes, otherwise the request can be collected while still pending
+    hdlrtask = cloop.create_task(asyncsession.run_handler(hdlr, requestid))
+    asyncsession.handlertasks.add(hdlrtask)
+    hdlrtask.add_done_callback(asyncsession.handlertasks.discard)
     return requestid
 
 
