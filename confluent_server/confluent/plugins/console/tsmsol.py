@@ -108,16 +108,17 @@ class TsmConsole(conapi.Console):
         kv = util.TLSCertVerifier(
             self.nodeconfig, self.node, 'pubkeys.tls_hardwaremanager').verify_cert
         try:
-            rc = rcmd.Command(self.origbmc, self.username,
-                              self.password,
-                              verifycallback=kv)
-            await rc.await_redirect()
+            rc = await rcmd.Command.create(self.origbmc, self.username,
+                                           self.password,
+                                           verifycallback=kv)
+            rcoem = await rc.oem()
+            wc = await rcoem.get_wc()
         except Exception as e:
             raise cexc.TargetEndpointUnreachable(str(e))
         self.ssl = CustomVerifier(kv)
-        self.clisess = aiohttp.ClientSession(cookie_jar=rc.oem.wc.cookies)
+        self.clisess = aiohttp.ClientSession(cookie_jar=wc.cookies)
         self.ws = await self.clisess.ws_connect(
-            'wss://{0}/sol?CSRFTOKEN={1}'.format(self.bmc, rc.oem.csrftok),
+            'wss://{0}/sol?CSRFTOKEN={1}'.format(self.bmc, rcoem.csrftok),
             ssl=self.ssl)
         self.connected = True
         self.recvr = tasks.spawn_task(self.recvdata())
