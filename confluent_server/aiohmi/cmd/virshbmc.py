@@ -156,8 +156,18 @@ class LibvirtBmc(bmc.Bmc):
             self.stream.send(data)
 
     def loop(self):
-        while self.check_console():
-            libvirt.virEventRunDefaultImpl()
+        # virEventRunDefaultImpl waits for an event, and an idle domain can go
+        # a long time without producing one. Give it a reason to return, or
+        # the loop never reconsiders check_console and the thread cannot be
+        # stopped at all: measured as never waking without this, and returning
+        # at once with it.
+        timer = libvirt.virEventAddTimeout(500, lambda *args: None, None)
+        try:
+            while self.check_console():
+                libvirt.virEventRunDefaultImpl()
+        finally:
+            if timer >= 0:
+                libvirt.virEventRemoveTimeout(timer)
 
 
 def main():
