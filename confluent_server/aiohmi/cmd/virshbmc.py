@@ -114,14 +114,32 @@ class LibvirtBmc(bmc.Bmc):
     async def activate_payload(self, request, session):
         # captured for stream_callback, which runs on a libvirt thread
         self.asyncloop = asyncio.get_running_loop()
+        wasactive = self.activated
         await super(LibvirtBmc, self).activate_payload(request, session)
+        if wasactive or not self.activated:
+            # the base handler refused: no io handler, or the domain is not
+            # running, so activated stayed false; or a console was already up,
+            # in which case activated was true before we asked and the thread
+            # for it is already running. Either way there is nothing to start.
+            return
         self.run_console = True
         self.sol_thread = threading.Thread(target=self.loop)
+        # virEventRunDefaultImpl can wait for an event that never comes, so
+        # this thread has no reliable end of its own
+        self.sol_thread.daemon = True
         self.sol_thread.start()
 
     async def deactivate_payload(self, request, session):
-        self.run_console = False
-        self.sol_thread.join()
+        if self.activated and self.sol_thread:
+            self.run_console = False
+            # Joining here would run on the event loop, and the thread sits in
+            # virEventRunDefaultImpl, which is documented as able to wait
+            # indefinitely: clearing run_console does not wake it. So wait off
+            # the loop, and not forever, rather than stall every other session
+            # and never send the response below.
+            await asyncio.get_running_loop().run_in_executor(
+                None, self.sol_thread.join, 5)
+            self.sol_thread = None
         await super(LibvirtBmc, self).deactivate_payload(request, session)
 
     async def iohandler(self, data):
