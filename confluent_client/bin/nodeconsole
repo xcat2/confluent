@@ -254,14 +254,23 @@ class InputHandler:
         currloop = asyncio.get_running_loop()
         self.fd = sys.stdin.fileno()
         self.seqtimeout = None
+        self.pendinginput = asyncio.Queue()
+        self.inputconsumer = asyncio.create_task(self.consume_input())
         currloop.add_reader(self.fd, self.handle_input)
         return self
-    
+
     def handle_input(self):
         data = os.read(self.fd, 1)
         if not data:
             return
-        asyncio.create_task(self.process_input(data))
+        self.pendinginput.put_nowait(data)
+
+    async def consume_input(self):
+        # One consumer, so a keystroke that blocks relaying cannot be overtaken
+        # by the next one, and the sequence buffer is only touched by one task
+        while True:
+            data = await self.pendinginput.get()
+            await self.process_input(data)
 
     async def timeout_sequence(self, timeout=3, flushbuffer=False):
         await asyncio.sleep(timeout)
@@ -814,15 +823,17 @@ def redraw():
             sys.stdout.write('\n')
         sys.stdout.flush()
 resized = False
+inputwatcher = None
 
 async def do_screenshot():
     global streaming
     global resized
     global numrows
     global firstnodename
+    global inputwatcher
     sess = client.Command()
     if streaming:
-        asyncio.create_task(watch_input())
+        inputwatcher = asyncio.create_task(watch_input())
     if options.tile:
         imageformat = os.environ.get('CONFLUENT_IMAGE_PROTOCOL', 'kitty')
         if imageformat not in ('kitty', 'iterm'):
