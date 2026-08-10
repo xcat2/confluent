@@ -53,6 +53,20 @@ def fixuuid(baduuid):
     uuid = (a[:8], a[8:12], a[12:16], baduuid[16:20], baduuid[20:])
     return '-'.join(uuid).lower()
 
+
+async def _post(wc, url, data, headers=None):
+    if headers is None:
+        headers = wc.stdheaders.copy()
+        if data:
+            # What WebConnection.request used to fill in, and what the SMM
+            # expects of its /data endpoints. grab_response_with_status adds
+            # nothing, so aiohttp would label a str body text/plain instead.
+            headers['Content-Type'] = 'application/x-www-form-urlencoded'
+    body, _, _ = await wc.grab_response_with_status(
+        url, data, headers=headers, method='POST', allow_redirects=False)
+    return body
+
+
 class NodeHandler(bmchandler.NodeHandler):
     is_enclosure = True
     devname = 'SMM'
@@ -66,7 +80,7 @@ class NodeHandler(bmchandler.NodeHandler):
             uuid = fixuuid(uuid[0])
             self.info['uuid'] = uuid
 
-    def _webconfigrules(self, wc):
+    async def _webconfigrules(self, wc):
         rules = []
         for rule in self.ruleset.split(','):
             if '=' not in rule:
@@ -84,19 +98,16 @@ class NodeHandler(bmchandler.NodeHandler):
                 rules.append('passwordReuseCheckNum:' + value)
         if rules:
             apirequest = 'set={0}'.format(','.join(rules))
-            wc.request('POST', '/data', apirequest)
-            wc.getresponse().read()
+            await _post(wc, '/data', apirequest)
 
     async def _webconfignet(self, wc, nodename):
         cfg = self.configmanager
         if 'service:lenovo-smm2' in self.info.get('services', []):
             # need to enable ipmi for now..
-            wc.request('POST', '/data', 'set=DoCmd(0x06,0x40,0x01,0x82,0x84)')
-            rsp = wc.getresponse()
-            rsp.read()
-            wc.request('POST', '/data', 'set=DoCmd(0x06,0x40,0x01,0x42,0x44)')
-            rsp = wc.getresponse()
-            rsp.read()
+            await _post(wc, '/data',
+                        'set=DoCmd(0x06,0x40,0x01,0x82,0x84)')
+            await _post(wc, '/data',
+                        'set=DoCmd(0x06,0x40,0x01,0x42,0x44)')
         cd = cfg.get_node_attributes(
             nodename, ['hardwaremanagement.manager'])
         smmip = cd.get(nodename, {}).get('hardwaremanagement.manager', {}).get('value', None)
@@ -107,9 +118,8 @@ class NodeHandler(bmchandler.NodeHandler):
             smmip = smmip[-1][0]
             if smmip and ':' in smmip:
                 raise exc.NotImplementedException('IPv6 not supported')
-            wc.request('POST', '/data', 'get=hostname')
-            rsp = wc.getresponse()
-            rspdata = fromstring(util.stringify(rsp.read()))
+            rspdata = fromstring(util.stringify(
+                await _post(wc, '/data', 'get=hostname')))
             currip = rspdata.find('netConfig').find('ifConfigEntries').find(
                 'ifConfig').find('v4IPAddr').text
             if currip == smmip:
@@ -120,9 +130,7 @@ class NodeHandler(bmchandler.NodeHandler):
             gateway = netconfig.get('ipv4_gateway', None)
             if gateway:
                 setdata += ',v4Gateway:{0}'.format(gateway)
-            wc.request('POST', '/data', setdata)
-            rsp = wc.getresponse()
-            rspdata = util.stringify(rsp.read())
+            rspdata = util.stringify(await _post(wc, '/data', setdata))
             if '<statusCode>0' not in rspdata:
                 raise Exception("Error configuring SMM Network")
             return
@@ -132,48 +140,45 @@ class NodeHandler(bmchandler.NodeHandler):
             await cfg.set_node_attributes(
                     {nodename: {'hardwaremanagement.manager': self.ipaddr}})
 
-    def _webconfigcreds(self, username, password):
-        ip, port = self.get_web_port_and_ip()
+    async def _webconfigcreds(self, username, password):
+        ip, port = await self.get_web_port_and_ip()
         wc = webclient.WebConnection(ip, port, verifycallback=self.validate_cert)
-        wc.connect()
         authdata = {  # start by trying factory defaults
             'user': 'USERID',
             'password': 'PASSW0RD',
         }
         headers = {'Connection': 'keep-alive', 'Content-Type': 'application/x-www-form-urlencoded'}
-        wc.request('POST', '/data/login', urlencode(authdata), headers)
-        rsp = wc.getresponse()
-        rspdata = util.stringify(rsp.read())
+        rspdata = util.stringify(
+            await _post(wc, '/data/login', urlencode(authdata), headers))
         if 'authResult>0' not in rspdata:
             # default credentials are refused, try with the actual
             authdata['user'] = username
             authdata['password'] = password
-            wc.request('POST', '/data/login', urlencode(authdata), headers)
-            rsp = wc.getresponse()
-            rspdata = util.stringify(rsp.read())
+            rspdata = util.stringify(
+                await _post(wc, '/data/login', urlencode(authdata), headers))
             if 'renew_account' in rspdata:
                 tmppassword = 'Tmp42' + password[5:]
                 tokens = fromstring(rspdata)
                 st2 = tokens.findall('st2')[0].text
                 wc.set_header('ST2', st2)
-                wc.request('POST', '/data/changepwd', 'oripwd={0}&newpwd={1}'.format(password, tmppassword))
-                rsp = wc.getresponse()
-                rspdata = rsp.read().decode('utf8')
+                rspdata = await _post(
+                    wc, '/data/changepwd',
+                    'oripwd={0}&newpwd={1}'.format(password, tmppassword))
+                rspdata = rspdata.decode('utf8')
                 bdata = 'user={0}&password={1}'.format(username, tmppassword)
-                wc.request('POST', '/data/login', bdata, headers)
-                rsp = wc.getresponse()
-                rspdata = rsp.read().decode('utf8')
+                rspdata = await _post(wc, '/data/login', bdata, headers)
+                rspdata = rspdata.decode('utf8')
                 tokens = fromstring(rspdata)
                 st2 = tokens.findall('st2')[0].text
                 wc.set_header('ST2', st2)
                 rules = 'set=passwordChangeInterval:0,passwordReuseCheckNum:0'
-                wc.request('POST', '/data', rules)
-                wc.getresponse().read()
-                wc.request('POST', '/data/changepwd', 'oripwd={0}&newpwd={1}'.format(tmppassword, password))
-                wc.getresponse().read()
-                wc.request('POST', '/data/login', urlencode(authdata), headers)
-                rsp = wc.getresponse()
-                rspdata = util.stringify(rsp.read())
+                await _post(wc, '/data', rules)
+                await _post(
+                    wc, '/data/changepwd',
+                    'oripwd={0}&newpwd={1}'.format(tmppassword, password))
+                rspdata = util.stringify(
+                    await _post(wc, '/data/login', urlencode(authdata),
+                                headers))
             if 'authResult>0' not in rspdata:
                 raise Exception('Unknown username/password on SMM')
             tokens = fromstring(rspdata)
@@ -185,29 +190,24 @@ class NodeHandler(bmchandler.NodeHandler):
             tokens = fromstring(rspdata)
             st2 = tokens.findall('st2')[0].text
             wc.set_header('ST2', st2)
-            wc.request('POST', '/data/changepwd', urlencode(passwdchange))
-            rsp = wc.getresponse()
-            rspdata = rsp.read()
+            rspdata = await _post(
+                wc, '/data/changepwd', urlencode(passwdchange))
             authdata['password'] = password
-            wc.request('POST', '/data/login', urlencode(authdata), headers)
-            rsp = wc.getresponse()
-            rspdata = util.stringify(rsp.read())
+            rspdata = util.stringify(
+                await _post(wc, '/data/login', urlencode(authdata), headers))
         if 'authResult>0' in rspdata:
             tokens = fromstring(rspdata)
             st2 = tokens.findall('st2')[0].text
             wc.set_header('ST2', st2)
             if username == 'USERID':
                 return wc
-            wc.request('POST', '/data', 'set=user(2,1,{0},511,,4,15,0)'.format(username))
-            rsp = wc.getresponse()
-            rspdata = rsp.read()
-            wc.request('POST', '/data/logout')
-            rsp = wc.getresponse()
-            rspdata = rsp.read()
+            rspdata = await _post(
+                wc, '/data',
+                'set=user(2,1,{0},511,,4,15,0)'.format(username))
+            rspdata = await _post(wc, '/data/logout', None)
             authdata['user'] = username
-            wc.request('POST', '/data/login', urlencode(authdata, headers))
-            rsp = wc.getresponse()
-            rspdata = rsp.read()
+            rspdata = await _post(
+                wc, '/data/login', urlencode(authdata), headers)
             tokens = fromstring(rspdata)
             st2 = tokens.findall('st2')[0].text
             wc.set_header('ST2', st2)
@@ -249,8 +249,8 @@ class NodeHandler(bmchandler.NodeHandler):
             raise Exception('Using the default password is no longer supported')
         else:
             # Switch to full web based configuration, to mitigate risks with the SMM
-            wc = self._webconfigcreds(username, passwd)
-            self._webconfigrules(wc)
+            wc = await self._webconfigcreds(username, passwd)
+            await self._webconfigrules(wc)
             await self._webconfignet(wc, nodename)
 
 

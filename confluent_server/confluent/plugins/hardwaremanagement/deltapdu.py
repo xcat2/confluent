@@ -158,7 +158,7 @@ class PDUClient(object):
             raise exc.TargetEndpointBadCredentials()
 
 
-    def logout(self):
+    async def logout(self):
         self.wc.grab_response('/logout_wait.htm')
 
     async def get_outlet(self, outlet):
