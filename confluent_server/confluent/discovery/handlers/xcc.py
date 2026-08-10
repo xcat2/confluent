@@ -64,7 +64,7 @@ class NodeHandler(immhandler.NodeHandler):
             if lla:
                 for idx in util.list_interface_indexes():
                     tmplla = '{0}%{1}'.format(lla, idx)
-                    addr = (await cloop.getaddrinfo(tmplla, 443, 0, socket.SOCK_STREAM))[0][4]
+                    addr = (await cloop.getaddrinfo(tmplla, 443, type=socket.SOCK_STREAM))[0][4]
                     try:
                         tsock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
                         tsock.setblocking(0)

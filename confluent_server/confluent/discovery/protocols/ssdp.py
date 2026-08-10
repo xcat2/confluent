@@ -329,7 +329,8 @@ async def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
                                     if await netutil.ip_on_same_subnet(theip, 'fe80::', 64):
                                         if '%' in peer[0]:
                                             ifidx = peer[0].split('%', 1)[1]
-                                            iface = (await cloop.getaddrinfo(peer[0], 0, socket.AF_INET6, socket.SOCK_DGRAM))[0][-1][-1]
+                                            iface = (await cloop.getaddrinfo(peer[0], 0, family=socket.AF_INET6,
+                                                                             type=socket.SOCK_DGRAM))[0][-1][-1]
                                         else:
                                             ifidx = '{}'.format(peer[-1])
                                             iface = peer[-1]
@@ -390,7 +391,7 @@ async def _find_service(service, target):
     cloop.add_reader(net4, _relay_pkt, net4, pktq)
     cloop.add_reader(net6, _relay_pkt, net6, pktq)
     if target:
-        addrs = await cloop.getaddrinfo(target, 1900, 0, socket.SOCK_DGRAM)
+        addrs = await cloop.getaddrinfo(target, 1900, type=socket.SOCK_DGRAM)
         for addr in addrs:
             host = addr[4][0]
             if addr[0] == socket.AF_INET:
