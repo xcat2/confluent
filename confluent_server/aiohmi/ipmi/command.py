@@ -19,7 +19,6 @@ from itertools import chain
 import os
 import socket
 import struct
-import threading
 
 import asyncio
 import aiohmi.constants as const
@@ -107,19 +106,20 @@ def _cidr_to_mask(prefix):
     return struct.pack('>I', 2 ** prefix - 1 << (32 - prefix))
 
 
-class Housekeeper(threading.Thread):
-    """A Maintenance thread for housekeeping
+def start_housekeeping():
+    """Run aiohmi's recurring work on the current event loop
 
-    Long lived use of aiohmi may warrant some recurring asynchronous behavior.
-    This stock thread provides a simple minimal context for these housekeeping
-    tasks to run in.  To use, do 'aiohmi.ipmi.command.Maintenance().start()'
-    and from that point forward, aiohmi should execute any needed ongoing
-    tasks automatically as needed.  This is an alternative to calling
-    wait_for_rsp or eventloop in a thread of the callers design.
+    Long lived use of aiohmi may warrant some recurring asynchronous
+    behaviour.  Call this once, from the loop the sessions belong to, and
+    aiohmi will service them as needed.  Cancel the returned task to stop.
+    This is an alternative to calling wait_for_rsp or eventloop from the
+    caller's own code.
     """
 
-    def run(self):
-        Command.eventloop()
+    # The loop is fetched first so that calling this without one raises
+    # before the coroutine exists, rather than leaving it unawaited.
+    loop = asyncio.get_running_loop()
+    return loop.create_task(Command.eventloop())
 
 
 class Command(object):
