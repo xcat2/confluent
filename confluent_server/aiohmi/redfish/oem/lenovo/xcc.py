@@ -1371,7 +1371,7 @@ class OEMHandler(generic.OEMHandler):
             while not complete and retry > 0:
                 try:
                     pgress = await self._do_web_request(monitorurl, cache=False)
-                except socket.socket:
+                except socket.error:
                     pgress = None
                 if not pgress:
                     retry -= 1
