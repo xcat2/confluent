@@ -26,12 +26,14 @@ import tty
 from aiohmi.ipmi import console
 
 
-# Tasks are kept alive here: the event loop only holds weak references to
-# them, so a task that nothing else refers to can be collected mid flight.
-_pending = set()
+async def _feed_input(sol, inqueue):
+    """Sends what the reader below collected, one chunk at a time"""
+
+    while True:
+        await sol.send_data(await inqueue.get())
 
 
-def _got_input(sol):
+def _got_input(inqueue):
     """Called by the event loop whenever stdin has something to read"""
 
     try:
@@ -41,10 +43,11 @@ def _got_input(sol):
             return
         raise
     if not data:
+        # End of input. The reader is level triggered, so leaving it in place
+        # would have the loop call this again and again for the same EOF.
+        asyncio.get_running_loop().remove_reader(sys.stdin)
         return
-    task = asyncio.get_running_loop().create_task(sol.send_data(data))
-    _pending.add(task)
-    task.add_done_callback(_pending.discard)
+    inqueue.put_nowait(data)
 
 
 async def _print(data):
@@ -81,11 +84,15 @@ async def main():
         sol = console.Console(bmc=sys.argv[1], userid=sys.argv[2],
                               password=passwd, iohandler=_print, force=True)
         await sol.connect()
-        asyncio.get_running_loop().add_reader(sys.stdin, _got_input, sol)
+        inqueue = asyncio.Queue()
+        loop = asyncio.get_running_loop()
+        loop.add_reader(sys.stdin, _got_input, inqueue)
         try:
-            await sol.main_loop()
+            # gather rather than a detached task: a send that fails has to
+            # reach the caller instead of being collected in silence.
+            await asyncio.gather(sol.main_loop(), _feed_input(sol, inqueue))
         finally:
-            asyncio.get_running_loop().remove_reader(sys.stdin)
+            loop.remove_reader(sys.stdin)
 
     except Exception:
         currfl = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFL)
