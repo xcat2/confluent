@@ -132,7 +132,9 @@ class Bmc(serversession.IpmiServer):
             try:
                 bootdevice = self.get_boot_device()
             except NotImplementedError:
-                await session.send_ipmi_response(data=[1, 5, 0, 0, 0, 0, 0])
+                # nothing more to say, and bootdevice below would be unbound
+                return await session.send_ipmi_response(
+                    data=[1, 5, 0, 0, 0, 0, 0])
             if (type(bootdevice) != int
                     and bootdevice in ipmicommand.boot_devices):
                 bootdevice = ipmicommand.boot_devices[bootdevice]

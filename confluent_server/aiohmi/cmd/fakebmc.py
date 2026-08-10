@@ -73,10 +73,10 @@ class FakeBmc(bmc.Bmc):
     def is_active(self):
         return self.powerstate == 'on'
 
-    def iohandler(self, data):
+    async def iohandler(self, data):
         print(data)
         if self.sol:
-            self.sol.send_data(data)
+            await self.sol.send_data(data)
 
 
 def main():

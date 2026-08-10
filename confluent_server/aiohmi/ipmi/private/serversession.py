@@ -412,5 +412,5 @@ class IpmiServer(object):
         # per table 5-2, completion code 0xc1 is 'unrecognized'
         await session.send_ipmi_response(code=0xc1)
 
-    def logout(self):
+    async def logout(self, sessionok=True):
         pass

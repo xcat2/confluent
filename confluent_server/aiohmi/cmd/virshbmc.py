@@ -39,8 +39,11 @@ def stream_callback(stream, events, console):
         data = console.stream.recv(1024)
     except Exception:
         return
-    if console.sol:
-        console.sol.send_data(data)
+    if console.sol and console.asyncloop:
+        # libvirt calls this from its own event thread, and asyncio objects
+        # are not thread safe, so hand the send to the loop that owns them.
+        asyncio.run_coroutine_threadsafe(console.sol.send_data(data),
+                                         console.asyncloop)
 
 
 class LibvirtBmc(bmc.Bmc):
@@ -54,6 +57,7 @@ class LibvirtBmc(bmc.Bmc):
         self.domain = self.conn.lookupByName(domain)
         self.state = self.domain.state(0)
         self.stream = None
+        self.asyncloop = None
         self.run_console = False
         self.conn.domainEventRegister(lifecycle_callback, self)
         self.sol_thread = None
@@ -108,6 +112,8 @@ class LibvirtBmc(bmc.Bmc):
         return self.run_console
 
     async def activate_payload(self, request, session):
+        # captured for stream_callback, which runs on a libvirt thread
+        self.asyncloop = asyncio.get_running_loop()
         await super(LibvirtBmc, self).activate_payload(request, session)
         self.run_console = True
         self.sol_thread = threading.Thread(target=self.loop)
@@ -118,7 +124,7 @@ class LibvirtBmc(bmc.Bmc):
         self.sol_thread.join()
         await super(LibvirtBmc, self).deactivate_payload(request, session)
 
-    def iohandler(self, data):
+    async def iohandler(self, data):
         if self.stream:
             self.stream.send(data)
 

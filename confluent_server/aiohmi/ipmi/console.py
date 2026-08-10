@@ -541,9 +541,12 @@ class ServerConsole(Console):
                            needskeepalive=False):
         while not (self.connected or self.broken):
             await session.Session.wait_for_rsp(timeout=10)
+        # retry is not passed on: a ServerSession has no retry timer, it
+        # never runs Session.__init__ and its _timedout does nothing, so
+        # asking for one only reaches for a timeout attribute it lacks.
         await self.ipmi_session.send_payload(payload,
                                              payload_type=payload_type,
-                                             retry=retry,
+                                             retry=False,
                                              needskeepalive=needskeepalive)
 
     def close(self):
