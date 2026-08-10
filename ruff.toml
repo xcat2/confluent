@@ -76,6 +76,9 @@ select = [
     "B023",     # closure captures a loop variable, so every closure sees the
                 # last value rather than the one from its iteration
     "B035",     # dict comprehension with a static key
+    "RUF006",   # asyncio.create_task result discarded.  The loop keeps only a
+                # weak reference, so an unreferenced task can be collected
+                # while it is still pending, and the work is silently dropped
 ]
 
 # Deliberately not selected, though currently at zero: B905 (zip without an
