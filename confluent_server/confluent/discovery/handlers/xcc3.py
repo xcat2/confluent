@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
 import codecs
 import confluent.discovery.handlers.redfishbmc as redfishbmc
 import confluent.util as util
@@ -90,7 +91,7 @@ class NodeHandler(redfishbmc.NodeHandler):
 
 
 
-def remote_nodecfg(nodename, cfm):
+async def remote_nodecfg(nodename, cfm):
     cfg = cfm.get_node_attributes(
             nodename, 'hardwaremanagement.manager')
     ipaddr = cfg.get(nodename, {}).get('hardwaremanagement.manager', {}).get(
@@ -102,7 +103,7 @@ def remote_nodecfg(nodename, cfm):
                         'address')
     info = {'addresses': [ipaddr]}
     nh = NodeHandler(info, cfm)
-    nh.config(nodename)
+    await nh.config(nodename)
 
 
 if __name__ == '__main__':
@@ -112,5 +113,5 @@ if __name__ == '__main__':
     info = {'addresses': [[sys.argv[1]]]}
     print(repr(info))
     testr = NodeHandler(info, c)
-    testr.config(sys.argv[2])
+    asyncio.run(testr.config(sys.argv[2]))
 

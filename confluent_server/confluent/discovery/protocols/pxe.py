@@ -1004,4 +1004,4 @@ async def consider_discover(info, packet, sock, cfg, reqview, nodeguess, addr=No
 if __name__ == '__main__':
     def testsnoop(info):
         print(repr(info))
-    snoop(testsnoop)
+    asyncio.run(snoop(testsnoop))

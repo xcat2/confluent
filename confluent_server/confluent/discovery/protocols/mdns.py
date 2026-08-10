@@ -480,4 +480,4 @@ from pprint import pprint
 if __name__ == '__main__':
     def printit(rsp):
         print(repr(rsp))
-    snoop(pprint)
+    asyncio.run(snoop(pprint))

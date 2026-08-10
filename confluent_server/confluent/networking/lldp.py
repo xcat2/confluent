@@ -411,7 +411,6 @@ if __name__ == '__main__':
     # a quick one-shot test, args are switch and snmpv1 string for now
     # (should do three argument form for snmpv3 test
     import sys
-    _extract_neighbor_data((sys.argv[1], sys.argv[2], None, True))
     asyncio.run(_extract_neighbor_data((sys.argv[1], sys.argv[2], None, True)))
     print(repr(_neighdata))
 

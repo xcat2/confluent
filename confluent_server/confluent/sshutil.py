@@ -271,8 +271,13 @@ def ca_exists():
     return os.path.exists('/etc/confluent/ssh/ca')
 
 
-if __name__ == '__main__':
-    initialize_root_key(True)
+async def _selftest():
+    await initialize_root_key(True)
     if not ca_exists():
-        initialize_ca()
-    print(repr(sign_host_key(open('/etc/ssh/ssh_host_ed25519_key.pub').read(), collective.get_myname())))
+        await initialize_ca()
+    print(repr(await sign_host_key(
+        open('/etc/ssh/ssh_host_ed25519_key.pub').read(), collective.get_myname())))
+
+
+if __name__ == '__main__':
+    asyncio.run(_selftest())

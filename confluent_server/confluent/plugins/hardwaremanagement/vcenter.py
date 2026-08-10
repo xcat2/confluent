@@ -411,7 +411,7 @@ async def create(nodes, element, configmanager, inputdata):
 
 
 
-if __name__ == '__main__':
+async def _selftest():
     import sys
     import os
     myuser = os.environ['VMWUSER']
@@ -419,12 +419,16 @@ if __name__ == '__main__':
     vc = VmwApiClient(sys.argv[1], myuser, mypass, None)
     vm = sys.argv[2]
     if sys.argv[3] == 'setboot':
-        vc.set_vm_bootdev(vm, sys.argv[4])
-        vc.get_vm_bootdev(vm)
+        await vc.set_vm_bootdev(vm, sys.argv[4])
+        await vc.get_vm_bootdev(vm)
     elif sys.argv[3] == 'power':
-        vc.set_vm_power(vm, sys.argv[4])
+        await vc.set_vm_power(vm, sys.argv[4])
     elif sys.argv[3] == 'getinfo':
-        vc.get_vm(vm)
-        print("Bootdev: " + vc.get_vm_bootdev(vm))
-        print("Power: " + vc.get_vm_power(vm))
-        print("Serial: " + repr(vc.get_vm_serial(vm)))
+        await vc.get_vm(vm)
+        print("Bootdev: " + await vc.get_vm_bootdev(vm))
+        print("Power: " + await vc.get_vm_power(vm))
+        print("Serial: " + repr(await vc.get_vm_serial(vm)))
+
+
+if __name__ == '__main__':
+    asyncio.run(_selftest())
