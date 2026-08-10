@@ -255,7 +255,7 @@ fpc_sensors = {
 }
 
 
-def get_sensor_names(ipmicmd, size):
+async def get_sensor_names(ipmicmd, size):
     global fpc_sensors
     for name in fpc_sensors:
         if size != 6 and name in ('Fan Power', 'Total Power Capacity',
@@ -272,7 +272,7 @@ def get_sensor_names(ipmicmd, size):
                 elemidx += 1
                 yield '{0} {1}'.format(name, elemidx)
         elif 'elementsfun' in sensor:
-            for elemidx in range(sensor['elementsfun'](ipmicmd, size)):
+            for elemidx in range(await sensor['elementsfun'](ipmicmd, size)):
                 elemidx += 1
                 yield '{0} {1}'.format(name, elemidx)
         elif 'elements' in sensor:
@@ -283,7 +283,7 @@ def get_sensor_names(ipmicmd, size):
             yield name
 
 
-def get_sensor_descriptions(ipmicmd, size):
+async def get_sensor_descriptions(ipmicmd, size):
     global fpc_sensors
     for name in fpc_sensors:
         if size != 6 and name in ('Fan Power', 'Total Power Capacity',
@@ -300,7 +300,7 @@ def get_sensor_descriptions(ipmicmd, size):
                 yield {'name': '{0} {1}'.format(name, elemidx),
                        'type': sensor['type']}
         elif 'elementsfun' in sensor:
-            for elemidx in range(sensor['elementsfun'](ipmicmd, size)):
+            for elemidx in range(await sensor['elementsfun'](ipmicmd, size)):
                 elemidx += 1
                 yield {'name': '{0} {1}'.format(name, elemidx),
                        'type': sensor['type']}

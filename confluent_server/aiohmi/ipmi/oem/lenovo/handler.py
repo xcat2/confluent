@@ -526,8 +526,8 @@ class OEMHandler(generic.OEMHandler):
                 yield await self.immhandler.get_oem_sensor_reading(name,
                                                                    self.ipmicmd)
         elif await self.is_fpc():
-            for name in nextscale.get_sensor_names(self.ipmicmd,
-                                                   self._fpc_variant):
+            async for name in nextscale.get_sensor_names(
+                    self.ipmicmd, self._fpc_variant):
                 yield await nextscale.get_sensor_reading(name, self.ipmicmd,
                                                          self._fpc_variant)
         elif await self.has_ami():
