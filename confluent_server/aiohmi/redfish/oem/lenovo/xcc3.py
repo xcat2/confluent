@@ -684,8 +684,8 @@ class OEMHandler(generic.OEMHandler):
                     "Drives":[
                         {'@odata.id': f'/redfish/v1/Systems/1/Storage/{cid}/Drives/{did}'} for did in spec_disks]}}
             if spec_hotspares:
-                request_data["Links"]["DedicatedSpareDrives"] = {[
-                    {'@odata.id': f'/redfish/v1/Systems/1/Storage/{cid}/Drives/{hid}' for hid in spec_hotspares}]}
+                request_data["Links"]["DedicatedSpareDrives"] = [
+                    {'@odata.id': f'/redfish/v1/Systems/1/Storage/{cid}/Drives/{hid}'} for hid in spec_hotspares]
             if volsize:
                 request_data["CapacityBytes"] = volsize
             if stripsize:

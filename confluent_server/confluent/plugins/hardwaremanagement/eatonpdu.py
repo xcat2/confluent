@@ -327,7 +327,8 @@ async def retrieve(nodes, element, configmanager, inputdata):
 
 async def update(nodes, element, configmanager, inputdata):
     if 'outlets' not in element:
-        yield msg.ConfluentResourceUnavailable(node, 'Not implemented')
+        for node in nodes:
+            yield msg.ConfluentResourceUnavailable(node, 'Not implemented')
         return
     for node in nodes:
         gc = PDUClient(node, configmanager)

@@ -790,6 +790,7 @@ numrows = 0
 cwidth = 0
 cheight = 0
 imagedatabynode = {}
+firstnodename = None
 
 def redraw():
     for node in imagedatabynode:
@@ -818,6 +819,7 @@ async def do_screenshot():
     global streaming
     global resized
     global numrows
+    global firstnodename
     sess = client.Command()
     if streaming:
         asyncio.create_task(watch_input())
@@ -892,7 +894,7 @@ async def do_screenshot():
                     imgdata = res['databynode'][node].get('image', {}).get('imgdata', None)
                     if imgdata:
                         if len(imgdata) < 32: # We were subjected to error
-                            errorstr = f'Unable to get screenshot'
+                            errorstr = 'Unable to get screenshot'
                     if errorstr or imgdata:
                         imgdata = base64.b64decode(imgdata)
                         draw_node(node, imgdata, errorstr, firstnodename, cwidth, cheight)

@@ -232,10 +232,6 @@ def dotwait():
     sys.stderr.flush()
     time.sleep(0.5)
 
-def disable_host_interface():
-    s = Session('/dev/ipmi0')
-    s.raw_command(netfn=0xc, command=1, data=(1, 0xc1, 0))
-
 def get_redfish_creds():
     os.makedirs('/run/redfish', exist_ok=True, mode=0o700)
     try:

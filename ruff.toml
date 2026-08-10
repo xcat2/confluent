@@ -1,0 +1,87 @@
+# Ruff configuration for confluent.
+#
+# py37 is the oldest version ruff can target. The oldest interpreter parts of
+# this tree still run on is 3.6 (el8, sles15)
+target-version = "py37"
+
+line-length = 120
+
+# Ruff discovers *.py only: it does not read shebangs when walking a tree, so
+# without the patterns below it silently skips every CLI tool in
+# confluent_client/bin and confluent_server/bin, the osdeploy deploy scripts,
+# and the loose misc/ utilities.
+# Some of the osdeploy scripts carry no shebang at all.
+extend-include = [
+    "confluent_client/bin/*",
+    "confluent_server/bin/*",
+    # Generated into setup.py at build time by makesetup; #VERSION# only ever
+    # appears inside a string literal, so the template itself is valid Python.
+    "**/setup.py.tmpl",
+    "imgutil/imgutil",
+    "misc/filterpasswd",
+    "misc/getipsfromswitchport",
+    "misc/getusbnicaddr",
+    # confluent_osdeploy: per-profile deploy scripts, matched by name because
+    # each profile directory mixes Python and shell.
+    "**/bfb-autoinstall",
+    "**/nodedeploy-bfb",
+    "**/opt/confluent/bin/apiclient",
+    "**/scripts/add_local_repositories",
+    "**/scripts/autoconsole",
+    "**/scripts/configbmc",
+    "**/scripts/confignet",
+    "**/scripts/getinstalldisk",
+    "**/scripts/makeksnet",
+    "**/scripts/mergetime",
+    "**/scripts/syncfileclient",
+]
+
+extend-exclude = [
+    # Shell scripts that live in the directories included wholesale above.
+    "*.sh",
+]
+
+# Honour exclusions even when CI passes an explicit file list.
+force-exclude = true
+
+# `ruff format` is deliberately not adopted: the tree uses single quotes almost
+# everywhere and reformatting it would bury real changes. Preserve quotes so an
+# accidental run does less damage.
+[format]
+quote-style = "preserve"
+
+[lint]
+select = [
+    "E9",       # unparseable file
+    "F63",      # `is` against a literal, assert on a tuple, bad print/if-tuple
+    "F7",       # statements in impossible positions: return/yield outside a
+                # function, break/continue outside a loop, except clause not last
+    "F81",      # redefinition of an unused name (shadowed def/class)
+    "F82",      # undefined name, undefined name in __all__, use before assignment
+    "F401",     # unused import
+    "F402",     # import shadowed by a loop variable
+    "F541",     # f-string with no placeholders
+    "E401",     # several imports on one line
+    "E701",     # several statements on one line
+    "E711",     # comparison to None with == rather than is
+    "E712",     # comparison to True/False with == rather than truthiness
+    "E713",     # `not x in y` rather than `x not in y`
+    "PLC0414",  # import alias that renames nothing
+    "PLE",      # pylint errors: bad string format, invalid returns, ...
+    "T100",     # forgotten pdb/breakpoint call
+    "W6",       # invalid escape sequence in a non-raw string, and any future
+                # deprecated-construct warning pycodestyle adds
+    "B015",     # comparison whose result is discarded
+    "B020",     # loop control variable overrides the iterable it iterates
+    "B023",     # closure captures a loop variable, so every closure sees the
+                # last value rather than the one from its iteration
+    "B035",     # dict comprehension with a static key
+]
+
+# Deliberately not selected, though currently at zero: B905 (zip without an
+# explicit strict=).  It only reports on py310+, so it reads as clean here, and
+# "fixing" it would mean adding a keyword the oldest supported interpreters
+# cannot parse.
+
+# No ignores and no per-file exemptions: every rule selected above is expected
+# to stay at zero on its own.

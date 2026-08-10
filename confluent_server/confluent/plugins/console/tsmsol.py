@@ -26,7 +26,6 @@ import confluent.tasks as tasks
 import confluent.util as util
 import aiohmi.exceptions as pygexc
 import aiohmi.redfish.command as rcmd
-import aiohmi.util.webclient as webclient
 import aiohttp
 
 class CustomVerifier(aiohttp.Fingerprint):

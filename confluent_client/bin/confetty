@@ -41,7 +41,6 @@
 # esc-( would interfere with normal esc use too much
 # ~ I will not use for now...
 
-import math
 import getpass
 import optparse
 import os
@@ -1043,7 +1042,7 @@ def main():
                     except IOError:
                         pass
             if powerstate is None or powertime < time.time() - 10:  # Check powerstate every 10 seconds
-                if powerstate == None:
+                if powerstate is None:
                     powerstate = True
                 powertime = time.time()
                 check_power_state()

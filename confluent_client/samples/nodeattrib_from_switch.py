@@ -13,6 +13,7 @@
 import confluent.client as cl
 import socket
 import struct
+import sys
 c = cl.Command()
 macs = []
 interface = sys.argv[1]

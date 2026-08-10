@@ -121,8 +121,8 @@ if len(args) > 1:
         os.execlp('nodefirmware', 'nodefirmware', noderange)
     else:
         url = '/noderange/{0}/inventory/hardware/all/system'
-        for arg in args:
-            for arg in arg.split(','):
+        for rawarg in args:
+            for arg in rawarg.split(','):
                 if arg == 'serial':
                     filters.append(re.compile('serial number'))
                 elif arg == 'model':

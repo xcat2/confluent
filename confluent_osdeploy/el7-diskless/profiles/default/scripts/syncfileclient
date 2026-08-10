@@ -1,6 +1,5 @@
 #!/usr/bin/python
 import time
-import importlib
 import tempfile
 import json
 import os

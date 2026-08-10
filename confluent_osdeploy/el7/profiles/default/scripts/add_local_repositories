@@ -4,7 +4,6 @@ except ImportError:
     import ConfigParser as configparser
     import cStringIO
 import imp
-import sys
 apiclient = imp.load_source('apiclient', '/etc/confluent/apiclient')
 repo = None
 server = None

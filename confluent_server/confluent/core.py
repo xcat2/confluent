@@ -131,24 +131,24 @@ def load_plugins():
             continue
         sys.path.insert(1, plugindir)
         # two passes, to avoid adding both py and pyc files
-        for plugin in os.listdir(plugindir):
-            if plugin.startswith('.'):
+        for pluginname in os.listdir(plugindir):
+            if pluginname.startswith('.'):
                 continue
-            if '__pycache__' in plugin:
+            if '__pycache__' in pluginname:
                 continue
-            (plugin, plugtype) = os.path.splitext(plugin)
+            (pluginname, plugtype) = os.path.splitext(pluginname)
             if plugtype == '.sh':
-                pluginmap[plugin] = shellmodule.Plugin(
-                    os.path.join(plugindir, plugin + '.sh'))
-            elif "__init__" not in plugin:
-                plugins.add(plugin)
-        for plugin in plugins:
-            tmpmod = __import__(plugin)
+                pluginmap[pluginname] = shellmodule.Plugin(
+                    os.path.join(plugindir, pluginname + '.sh'))
+            elif "__init__" not in pluginname:
+                plugins.add(pluginname)
+        for pluginname in plugins:
+            tmpmod = __import__(pluginname)
             if 'plugin_names' in tmpmod.__dict__:
                 for name in tmpmod.plugin_names:
                     pluginmap[name] = tmpmod
             else:
-                pluginmap[plugin] = tmpmod
+                pluginmap[pluginname] = tmpmod
                 _register_resource(tmpmod)
         plugins.clear()
         # restore path to not include the plugindir

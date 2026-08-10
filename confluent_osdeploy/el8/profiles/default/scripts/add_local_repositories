@@ -5,7 +5,6 @@ except ImportError:
     import cStringIO
 import importlib.util
 import importlib.machinery
-import sys
 import glob
 modloader = importlib.machinery.SourceFileLoader('apiclient', '/opt/confluent/bin/apiclient')
 modspec = importlib.util.spec_from_file_location('apiclient', '/opt/confluent/bin/apiclient', loader=modloader)

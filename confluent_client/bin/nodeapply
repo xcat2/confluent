@@ -37,6 +37,7 @@ import confluent.sortutil as sortutil
 devnull = None
 
 def run_automation(noderange, category, c):
+    exitcode = 0
     automationbynode = {}
     for res in c.update('/noderange/{0}/deployment/remote_config/run'.format(noderange), {
             'category': category,
@@ -64,7 +65,8 @@ def run_automation(noderange, category, c):
                 if res.get('complete', False):
                     del automationbynode[node]
                     sys.stdout.write('{0}: Automation complete\n'.format(node))
-                    
+    return exitcode
+
 
 def run():
     global devnull
@@ -104,10 +106,13 @@ def run():
     pipedesc = {}
     pendingexecs = deque()
     exitcode = 0
+    # Kept apart from exitcode: a failed automation run must not trip the
+    # early exit below, which would abandon ssh children already spawned.
+    autoexitcode = 0
 
     c.stop_if_noderange_over(args[0], options.maxnodes)
     if options.automation:
-        run_automation(args[0], options.automation, c)
+        autoexitcode = run_automation(args[0], options.automation, c)
         
     nodemap = {}
     cmdparms = []
@@ -124,7 +129,7 @@ def run():
             cmdstorun.append(['run_remote', script])
     if not cmdstorun:
         if options.automation:
-            sys.exit(0)
+            sys.exit(autoexitcode)
         argparser.print_help()
         sys.exit(1)
     for res in c.read('/noderange/{0}/nodes/'.format(args[0])):
@@ -145,7 +150,7 @@ def run():
         else:
             pendingexecs.append((sshnode, cmdv))
     if not all or exitcode:
-        sys.exit(exitcode)
+        sys.exit(exitcode | autoexitcode)
     rdy = poller.poll(10)
     while all:
         pernodeout = {}
@@ -193,7 +198,7 @@ def run():
         sys.stdout.flush()
         if all:
             rdy = poller.poll(10)
-    sys.exit(exitcode)
+    sys.exit(exitcode | autoexitcode)
 
 
 def run_cmdv(node, cmdv, all, poller, pipedesc):

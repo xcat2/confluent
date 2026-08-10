@@ -151,12 +151,9 @@ _sensors_by_node = {}
 async def read_sensors(element, node, configmanager):
     category, name = element[-2:]
     if len(element) == 3:
-        # just get names
+        # the request is for the names under a category, so that is the last
+        # element rather than the one before it
         category = name
-        name = 'all'
-        for sensor in sensors:
-            yield msg.ChildCollection(simplify_name(sensors[sensor][0]))
-        return     
     if category in ('leds, fans'):
         return
     sn = _sensors_by_node.get(node, None)
@@ -166,6 +163,12 @@ async def read_sensors(element, node, configmanager):
         statinfo = xml2stateinfo(statdata)
         _sensors_by_node[node] = (statinfo, time.time() + 1)
         sn = _sensors_by_node.get(node, None)
+    if len(element) == 3:
+        # the names are only known after reading the device, as the sensor
+        # set depends on the model
+        for sensor in sn[0] if sn else ():
+            yield msg.ChildCollection(simplify_name(sensor['name']))
+        return
     if sn:
         yield msg.SensorReadings(sn[0], name=node)
 

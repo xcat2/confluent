@@ -12,9 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import codecs
 import confluent.discovery.handlers.redfishbmc as redfishbmc
+import confluent.util as util
 import socket
+import struct
 import aiohmi.util.webclient as webclient
+
+
+# Duplicated from the xcc handler rather than imported: xcc imports this
+# module, so importing it back would be circular.  smm carries its own copy of
+# this for the same reason.
+def fixuuid(baduuid):
+    # SMM dumps it out in hex
+    uuidprefix = (baduuid[:8], baduuid[9:13], baduuid[14:18])
+    a = codecs.encode(struct.pack('<IHH', *[int(x, 16) for x in uuidprefix]),
+        'hex')
+    a = util.stringify(a)
+    uuid = (a[:8], a[8:12], a[12:16], baduuid[19:23], baduuid[24:])
+    return '-'.join(uuid).lower()
 
 
 class NodeHandler(redfishbmc.NodeHandler):

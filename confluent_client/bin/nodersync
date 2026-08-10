@@ -35,7 +35,6 @@ if path.startswith('/opt'):
 
 import confluent.client as client
 import confluent.screensqueeze as sq
-import confluent.sortutil as sortutil
 
 
 def run():

@@ -20,7 +20,7 @@ import readline
 import socket
 
 connection = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-self.connection.connect('/var/run/confluent/dbg.sock')
+connection.connect('/var/run/confluent/dbg.sock')
 
 readline.parse_and_bind("tab: complete")
 readline.parse_and_bind("set bell-style none")
