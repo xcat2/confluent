@@ -463,8 +463,6 @@ class ServerConsole(Console):
         self.maxoutcount = 256
         self.poweredon = True
 
-        session.Session.wait_for_rsp(0)
-
     async def _got_sol_payload(self, payload):
         """SOL payload callback"""
 
@@ -509,7 +507,7 @@ class ServerConsole(Console):
             # and might be hard to decide what to do in the context of
             # retry situation
             try:
-                self.send_payload(ackpayload, retry=False)
+                await self.send_payload(ackpayload, retry=False)
             except exc.IpmiException:
                 # if the session is broken, then close the SOL session
                 self.close()
@@ -537,16 +535,16 @@ class ServerConsole(Console):
             # try to mitigate by avoiding overeager retries
             # occasional retry of a packet
             # sooner than timeout suggests is evidently a big deal
-            self.send_payload(payload=self.lastpayload)
+            await self.send_payload(payload=self.lastpayload)
 
-    def send_payload(self, payload, payload_type=1, retry=True,
-                     needskeepalive=False):
+    async def send_payload(self, payload, payload_type=1, retry=True,
+                           needskeepalive=False):
         while not (self.connected or self.broken):
-            session.Session.wait_for_rsp(timeout=10)
-        self.ipmi_session.send_payload(payload,
-                                       payload_type=payload_type,
-                                       retry=retry,
-                                       needskeepalive=needskeepalive)
+            await session.Session.wait_for_rsp(timeout=10)
+        await self.ipmi_session.send_payload(payload,
+                                             payload_type=payload_type,
+                                             retry=retry,
+                                             needskeepalive=needskeepalive)
 
     def close(self):
         """Shut down an SOL session"""

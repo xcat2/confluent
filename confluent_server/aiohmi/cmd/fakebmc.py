@@ -27,6 +27,7 @@ Sent cold reset command to MC
 """
 
 import argparse
+import asyncio
 import sys
 
 import aiohmi.ipmi.bmc as bmc
@@ -90,7 +91,7 @@ def main():
                         help='Port to listen on; defaults to 623')
     args = parser.parse_args()
     mybmc = FakeBmc({'admin': 'password'}, port=args.port)
-    mybmc.listen()
+    asyncio.run(mybmc.listen())
 
 
 if __name__ == '__main__':

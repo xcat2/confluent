@@ -15,6 +15,7 @@ control a VM
 """
 
 import argparse
+import asyncio
 import sys
 import threading
 
@@ -106,16 +107,16 @@ class LibvirtBmc(bmc.Bmc):
 
         return self.run_console
 
-    def activate_payload(self, request, session):
-        super(LibvirtBmc, self).activate_payload(request, session)
+    async def activate_payload(self, request, session):
+        await super(LibvirtBmc, self).activate_payload(request, session)
         self.run_console = True
         self.sol_thread = threading.Thread(target=self.loop)
         self.sol_thread.start()
 
-    def deactivate_payload(self, request, session):
+    async def deactivate_payload(self, request, session):
         self.run_console = False
         self.sol_thread.join()
-        super(LibvirtBmc, self).deactivate_payload(request, session)
+        await super(LibvirtBmc, self).deactivate_payload(request, session)
 
     def iohandler(self, data):
         if self.stream:
@@ -154,7 +155,7 @@ def main():
                        hypervisor=args.hypervisor,
                        domain=args.domain,
                        port=args.port)
-    mybmc.listen()
+    asyncio.run(mybmc.listen())
 
 
 if __name__ == '__main__':
