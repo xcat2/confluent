@@ -55,11 +55,6 @@ jobs:
   pyrefly:
     name: Pyrefly (async correctness)
     runs-on: ubuntu-latest
-    # Advisory for now: the tree still has findings, a good number of them
-    # real bugs, so this reports without failing the run. It also means an
-    # install failure or a checker crash passes silently. Remove the line once
-    # the findings are dealt with, which is the point of having it.
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v7
       - uses: facebook/pyrefly@main
