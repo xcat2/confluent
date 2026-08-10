@@ -156,7 +156,7 @@ async def sessionhdl(connection, authname, skipauth=False, cert=None):
                 return await collective.handle_connection(
                     connection, None, request['collective'], local=True)
             else:
-                tlvdata.send(
+                await tlvdata.send(
                     connection,
                     {'collective': {
                         'error': 'collective management commands '

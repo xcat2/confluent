@@ -73,6 +73,9 @@ class Console(object):
         password = self.password
         port = self.port
         kg = self.kg
+        # Session defines an async __new__, so the constructor call is a
+        # coroutine, which pyrefly does not model.
+        # pyrefly: ignore[not-async]
         self.ipmi_session = await session.Session(
             bmc=bmc, userid=userid, password=password, port=port, kg=kg)
         # induce one iteration of the loop, now that we would be
@@ -301,7 +304,7 @@ class Console(object):
     async def send_payload(self, payload, payload_type=1, retry=True,
                      needskeepalive=False):
         while not (self.connected or self.broken):
-            session.Session.wait_for_rsp(timeout=10)
+            await session.Session.wait_for_rsp(timeout=10)
         if self.ipmi_session is None or not self.ipmi_session.logged:
             await self._print_error('Session no longer connected')
             raise exc.IpmiException('Session no longer connected')
