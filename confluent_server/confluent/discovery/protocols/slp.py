@@ -698,4 +698,4 @@ async def scan(srvtypes=_slp_services, addresses=None, localonly=False):
 if __name__ == '__main__':
     def testsnoop(a):
         print(repr(a))
-    snoop(testsnoop)
+    asyncio.run(snoop(testsnoop))

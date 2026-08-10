@@ -14,32 +14,43 @@
 
 """ A simple little script to exemplify/test ipmi.console module """
 
+import asyncio
+import errno
 import fcntl
 import os
-import select
 import sys
 import termios
-import threading
 import tty
 
 
 from aiohmi.ipmi import console
 
 
-def _doinput(sol):
+async def _feed_input(sol, inqueue):
+    """Sends what the reader below collected, one chunk at a time"""
+
     while True:
-        select.select((sys.stdin,), (), (), 600)
-        try:
-            data = sys.stdin.read()
-        except (IOError, OSError) as e:
-            if e.errno == 11:
-                continue
-            raise
-
-        sol.send_data(data)
+        await sol.send_data(await inqueue.get())
 
 
-def _print(data):
+def _got_input(inqueue):
+    """Called by the event loop whenever stdin has something to read"""
+
+    try:
+        data = sys.stdin.read()
+    except (IOError, OSError) as e:
+        if e.errno == errno.EAGAIN:
+            return
+        raise
+    if not data:
+        # End of input. The reader is level triggered, so leaving it in place
+        # would have the loop call this again and again for the same EOF.
+        asyncio.get_running_loop().remove_reader(sys.stdin)
+        return
+    inqueue.put_nowait(data)
+
+
+async def _print(data):
     bailout = False
     if not isinstance(data, str):
         bailout = True
@@ -50,7 +61,7 @@ def _print(data):
         raise Exception(data)
 
 
-def main():
+async def main():
     tcattr = termios.tcgetattr(sys.stdin)
     newtcattr = tcattr
     # TODO(jbjohnso): add our exit handler
@@ -72,10 +83,16 @@ def main():
 
         sol = console.Console(bmc=sys.argv[1], userid=sys.argv[2],
                               password=passwd, iohandler=_print, force=True)
-        inputthread = threading.Thread(target=_doinput, args=(sol,))
-        inputthread.daemon = True
-        inputthread.start()
-        sol.main_loop()
+        await sol.connect()
+        inqueue = asyncio.Queue()
+        loop = asyncio.get_running_loop()
+        loop.add_reader(sys.stdin, _got_input, inqueue)
+        try:
+            # gather rather than a detached task: a send that fails has to
+            # reach the caller instead of being collected in silence.
+            await asyncio.gather(sol.main_loop(), _feed_input(sol, inqueue))
+        finally:
+            loop.remove_reader(sys.stdin)
 
     except Exception:
         currfl = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFL)
@@ -85,4 +102,4 @@ def main():
 
 
 if __name__ == '__main__':
-    sys.exit(main())
+    sys.exit(asyncio.run(main()))

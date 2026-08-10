@@ -246,4 +246,4 @@ if __name__ == '__main__':
     info = {'addresses': [[sys.argv[1]]] }
     print(repr(info))
     testr = NodeHandler(info, c)
-    testr.config(sys.argv[2])
+    asyncio.run(testr.config(sys.argv[2]))

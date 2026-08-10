@@ -19,7 +19,6 @@ from itertools import chain
 import os
 import socket
 import struct
-import threading
 
 import asyncio
 import aiohmi.constants as const
@@ -107,19 +106,20 @@ def _cidr_to_mask(prefix):
     return struct.pack('>I', 2 ** prefix - 1 << (32 - prefix))
 
 
-class Housekeeper(threading.Thread):
-    """A Maintenance thread for housekeeping
+def start_housekeeping():
+    """Run aiohmi's recurring work on the current event loop
 
-    Long lived use of aiohmi may warrant some recurring asynchronous behavior.
-    This stock thread provides a simple minimal context for these housekeeping
-    tasks to run in.  To use, do 'aiohmi.ipmi.command.Maintenance().start()'
-    and from that point forward, aiohmi should execute any needed ongoing
-    tasks automatically as needed.  This is an alternative to calling
-    wait_for_rsp or eventloop in a thread of the callers design.
+    Long lived use of aiohmi may warrant some recurring asynchronous
+    behaviour.  Call this once, from the loop the sessions belong to, and
+    aiohmi will service them as needed.  Cancel the returned task to stop.
+    This is an alternative to calling wait_for_rsp or eventloop from the
+    caller's own code.
     """
 
-    def run(self):
-        Command.eventloop()
+    # The loop is fetched first so that calling this without one raises
+    # before the coroutine exists, rather than leaving it unawaited.
+    loop = asyncio.get_running_loop()
+    return loop.create_task(Command.eventloop())
 
 
 class Command(object):
@@ -209,7 +209,12 @@ class Command(object):
     @classmethod
     async def eventloop(cls):
         while True:
-            await session.Session.wait_for_rsp()
+            # A ceiling rather than no timeout at all: with nothing waiting or
+            # being kept alive, wait_for_rsp has nothing to wait on and returns
+            # at once, which would make this a busy loop. Sessions still shorten
+            # it to their own deadlines, and an arriving packet still ends the
+            # wait early.
+            await session.Session.wait_for_rsp(timeout=session.MAX_IDLE)
 
     @classmethod
     async def wait_for_rsp(cls, timeout):

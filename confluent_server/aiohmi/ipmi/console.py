@@ -73,6 +73,9 @@ class Console(object):
         password = self.password
         port = self.port
         kg = self.kg
+        # Session defines an async __new__, so the constructor call is a
+        # coroutine, which pyrefly does not model.
+        # pyrefly: ignore[not-async]
         self.ipmi_session = await session.Session(
             bmc=bmc, userid=userid, password=password, port=port, kg=kg)
         # induce one iteration of the loop, now that we would be
@@ -194,12 +197,12 @@ class Console(object):
                 else:
                     self.pendingoutput[-1] += data
 
-    def _got_cons_input(self, handle):
+    async def _got_cons_input(self, handle):
         """Callback for handle events detected by ipmi session"""
 
         self._addpendingdata(handle.read())
         if not self.awaitingack:
-            self._sendpendingoutput()
+            await self._sendpendingoutput()
 
     async def close(self):
         """Shut down an SOL session"""
@@ -301,7 +304,7 @@ class Console(object):
     async def send_payload(self, payload, payload_type=1, retry=True,
                      needskeepalive=False):
         while not (self.connected or self.broken):
-            session.Session.wait_for_rsp(timeout=10)
+            await session.Session.wait_for_rsp(timeout=10)
         if self.ipmi_session is None or not self.ipmi_session.logged:
             await self._print_error('Session no longer connected')
             raise exc.IpmiException('Session no longer connected')
@@ -415,7 +418,7 @@ class Console(object):
             # sooner than timeout suggests is evidently a big deal
             await self.send_payload(payload=self.lastpayload, retry=False)
 
-    def main_loop(self):
+    async def main_loop(self):
         """Process all events until no more sessions exist.
 
         If a caller is a simple little utility, provide a function to
@@ -428,7 +431,7 @@ class Console(object):
         # TODO(jbjohnso): wait_for_rsp is not returning a true value for our
         # own session
         while (1):
-            session.Session.wait_for_rsp(timeout=600)
+            await session.Session.wait_for_rsp(timeout=600)
 
 
 class ServerConsole(Console):
@@ -459,8 +462,6 @@ class ServerConsole(Console):
         self.ipmi_session.sol_handler = self._got_sol_payload
         self.maxoutcount = 256
         self.poweredon = True
-
-        session.Session.wait_for_rsp(0)
 
     async def _got_sol_payload(self, payload):
         """SOL payload callback"""
@@ -506,7 +507,7 @@ class ServerConsole(Console):
             # and might be hard to decide what to do in the context of
             # retry situation
             try:
-                self.send_payload(ackpayload, retry=False)
+                await self.send_payload(ackpayload, retry=False)
             except exc.IpmiException:
                 # if the session is broken, then close the SOL session
                 self.close()
@@ -524,7 +525,7 @@ class ServerConsole(Console):
                     else:
                         self.pendingoutput = [newtext] + self.pendingoutput
             # self._sendpendingoutput() checks len(self._sendpendingoutput)
-            self._sendpendingoutput()
+            await self._sendpendingoutput()
         elif ackseq != 0 and self.awaitingack:
             # if an ack packet came in, but did not match what we
             # expected, retry our payload now.
@@ -534,16 +535,19 @@ class ServerConsole(Console):
             # try to mitigate by avoiding overeager retries
             # occasional retry of a packet
             # sooner than timeout suggests is evidently a big deal
-            self.send_payload(payload=self.lastpayload)
+            await self.send_payload(payload=self.lastpayload)
 
-    def send_payload(self, payload, payload_type=1, retry=True,
-                     needskeepalive=False):
+    async def send_payload(self, payload, payload_type=1, retry=True,
+                           needskeepalive=False):
         while not (self.connected or self.broken):
-            session.Session.wait_for_rsp(timeout=10)
-        self.ipmi_session.send_payload(payload,
-                                       payload_type=payload_type,
-                                       retry=retry,
-                                       needskeepalive=needskeepalive)
+            await session.Session.wait_for_rsp(timeout=10)
+        # retry is not passed on: a ServerSession has no retry timer, it
+        # never runs Session.__init__ and its _timedout does nothing, so
+        # asking for one only reaches for a timeout attribute it lacks.
+        await self.ipmi_session.send_payload(payload,
+                                             payload_type=payload_type,
+                                             retry=False,
+                                             needskeepalive=needskeepalive)
 
     def close(self):
         """Shut down an SOL session"""

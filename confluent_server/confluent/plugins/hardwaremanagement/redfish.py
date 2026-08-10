@@ -1133,23 +1133,23 @@ class IpmiHandler:
             return await self._show_all_storage()
 
 
-    def handle_sensors(self):
+    async def handle_sensors(self):
         if self.element[-1] == '':
             self.element = self.element[:-1]
         if len(self.element) < 3:
             return
         self.sensorcategory = self.element[2]
         if self.sensorcategory == 'normalized':
-            return self.read_normalized(self.element[-1])
+            return await self.read_normalized(self.element[-1])
         # list sensors per category
         if len(self.element) == 3 and self.element[-2] == 'hardware':
             if self.sensorcategory == 'leds':
-                return self.list_leds()
-            return self.list_sensors()
+                return await self.list_leds()
+            return await self.list_sensors()
         elif len(self.element) == 4:  # resource requested
             if self.sensorcategory == 'leds':
-                return self.read_leds(self.element[-1])
-            return self.read_sensors(self.element[-1])
+                return await self.read_leds(self.element[-1])
+            return await self.read_sensors(self.element[-1])
 
     def match_sensor(self, sensor):
         if self.sensorcategory == 'all':

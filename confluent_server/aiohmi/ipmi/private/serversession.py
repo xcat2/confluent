@@ -86,19 +86,28 @@ class ServerSession(ipmisession.Session):
             ipmisession.Session.bmc_handlers[clientaddr] = {bmc.port: self}
         else:
             ipmisession.Session.bmc_handlers[clientaddr][bmc.port] = self
-        response = self.create_open_session_response(bytearray(request))
-        self.send_payload(response,
-                          constants.payload_types['rmcpplusopenresponse'],
-                          retry=False)
+        self.initrequest = request
 
-    def _got_rmcp_openrequest(self, data):
+    async def send_open_session_response(self):
+        """Answer the open session request this was created for
+
+        Sending is a coroutine now, so it cannot happen in __init__ where the
+        conversation used to begin.
+        """
+        response = self.create_open_session_response(
+            bytearray(self.initrequest))
+        await self.send_payload(response,
+                                constants.payload_types['rmcpplusopenresponse'],
+                                retry=False)
+
+    async def _got_rmcp_openrequest(self, data):
         response = self.create_open_session_response(
             struct.pack('B' * len(data), *data))
-        self.send_payload(response,
-                          constants.payload_types['rmcpplusopenresponse'],
-                          retry=False)
+        await self.send_payload(response,
+                                constants.payload_types['rmcpplusopenresponse'],
+                                retry=False)
 
-    def _got_rakp1(self, data):
+    async def _got_rakp1(self, data):
         clienttag = data[0]
         self.Rm = data[8:24]
         self.rolem = data[24]
@@ -130,14 +139,14 @@ class ServerSession(ipmisession.Session):
         # a human
         newmessage = (bytearray([clienttag, 0, 0, 0]) + self.clientsessionid
                       + self.Rc + uuidbytes + authcode)
-        self.send_payload(newmessage, constants.payload_types['rakp2'],
-                          retry=False)
+        await self.send_payload(newmessage, constants.payload_types['rakp2'],
+                                retry=False)
 
-    def _got_rakp2(self, data):
+    async def _got_rakp2(self, data):
         # stub, server should not think about rakp2
         pass
 
-    def _got_rakp3(self, data):
+    async def _got_rakp3(self, data):
         # for now drop rakp3 with bad authcode
         # respond correctly a TODO(jjohnson2), since Kg being used
         # yet incorrect is a scenario why rakp3 could be bad
@@ -165,9 +174,9 @@ class ServerSession(ipmisession.Session):
             return
         self.localsid = struct.unpack('<I', self.managedsessionid)[0]
         self.ipmicallback = self.handle_client_request
-        self._send_rakp4(clienttag, 0)
+        await self._send_rakp4(clienttag, 0)
 
-    def handle_client_request(self, request):
+    async def handle_client_request(self, request):
         if request['netfn'] == 6 and request['command'] == 0x3b:
             pendingpriv = request['data'][0]
             returncode = 0
@@ -176,37 +185,37 @@ class ServerSession(ipmisession.Session):
                     returncode = 0x81
                 else:
                     self.clientpriv = request['data'][0]
-            self._send_ipmi_net_payload(code=returncode,
-                                        data=[self.clientpriv])
+            await self._send_ipmi_net_payload(code=returncode,
+                                              data=[self.clientpriv])
         elif request['netfn'] == 6 and request['command'] == 0x3c:
-            self.send_ipmi_response()
+            await self.send_ipmi_response()
             self.close_server_session()
         else:
-            self.bmc.handle_raw_request(request, self)
+            await self.bmc.handle_raw_request(request, self)
 
     def close_server_session(self):
         pass
 
-    def _send_rakp4(self, tagvalue, statuscode):
+    async def _send_rakp4(self, tagvalue, statuscode):
         payload = bytearray(
             [tagvalue, statuscode, 0, 0]) + self.clientsessionid
         hmacdata = self.Rm + self.managedsessionid + self.uuiddata
         hmacdata = struct.pack('%dB' % len(hmacdata), *hmacdata)
         authdata = hmac.new(self.sik, hmacdata, hashlib.sha1).digest()[:12]
         payload += authdata
-        self.send_payload(payload, constants.payload_types['rakp4'],
-                          retry=False)
+        await self.send_payload(payload, constants.payload_types['rakp4'],
+                                retry=False)
         self.confalgo = 'aes'
         self.integrityalgo = 'sha1'
         self.sequencenumber = 1
         self.sessionid = struct.unpack(
             '<I', struct.pack('4B', *self.clientsessionid))[0]
 
-    def _got_rakp4(self, data):
+    async def _got_rakp4(self, data):
         # stub, server should not think about rakp4
         pass
 
-    def _timedout(self):
+    async def _timedout(self):
         """Expire a client session after a period of inactivity
 
         After the session inactivity timeout, this invalidate the client
@@ -223,10 +232,10 @@ class ServerSession(ipmisession.Session):
         """
         pass
 
-    def send_ipmi_response(self, data=[], code=0):
-        self._send_ipmi_net_payload(data=data, code=code)
+    async def send_ipmi_response(self, data=[], code=0):
+        await self._send_ipmi_net_payload(data=data, code=code)
 
-    def logout(self):
+    async def logout(self, sessionok=True):
         pass
 
 
@@ -272,9 +281,20 @@ class IpmiServer(object):
         self.kg = None
         self.timeout = 60
         self.port = port
-        addrinfo = socket.getaddrinfo(address, port, 0,
-                                      socket.SOCK_DGRAM)[0]
-        self.serversocket = ipmisession.Session._assignsocket(addrinfo)
+        self.addrinfo = socket.getaddrinfo(address, port, 0,
+                                           socket.SOCK_DGRAM)[0]
+        self.serversocket = None
+
+    async def bind(self):
+        """Open the socket this server listens on
+
+        Deferred from __init__ because assigning a socket is a coroutine.
+        listen() does it, so a caller that uses listen() need not care.
+        """
+        if self.serversocket is not None:
+            return
+        self.serversocket = await ipmisession.Session._assignsocket(
+            self.addrinfo)
         ipmisession.Session.bmc_handlers[self.serversocket] = {0: self}
 
     def send_auth_cap(self, myaddr, mylun, clientaddr, clientlun, clientseq,
@@ -290,10 +310,10 @@ class IpmiServer(object):
         header.append(ipmisession._checksum(*bodydata))
         ipmisession._io_sendto(self.serversocket, header, sockaddr)
 
-    def process_pktqueue(self):
+    async def process_pktqueue(self):
         while self.pktqueue:
             pkt = self.pktqueue.popleft()
-            self.sessionless_data(pkt[0], pkt[1])
+            await self.sessionless_data(pkt[0], pkt[1])
 
     def send_cipher_suites(self, myaddr, mylun, clientaddr, clientlun,
                            clientseq, data, sockaddr):
@@ -316,7 +336,7 @@ class IpmiServer(object):
         pkt = header + ipmihdr + rq
         ipmisession._io_sendto(self.serversocket, pkt, sockaddr)
 
-    def sessionless_data(self, data, sockaddr):
+    async def sessionless_data(self, data, sockaddr):
         """Examines unsolocited packet and decides appropriate action.
 
         For a listening IpmiServer, a packet without an active session
@@ -335,9 +355,10 @@ class IpmiServer(object):
             if payloadtype not in (0, 16):
                 return
             if payloadtype == 16:  # new session to handle conversation
-                ServerSession(self.authdata, self.kg, sockaddr,
-                              self.serversocket, data[16:], self.uuid,
-                              bmc=self)
+                newsession = ServerSession(self.authdata, self.kg, sockaddr,
+                                           self.serversocket, data[16:],
+                                           self.uuid, bmc=self)
+                await newsession.send_open_session_response()
                 return
             # ditch two byte, because ipmi2 header is two
             # bytes longer than ipmi1 (payload type added, payload length 2).
@@ -379,17 +400,17 @@ class IpmiServer(object):
         except AttributeError:
             self.kg = kg
 
-    def send_device_id(self, session):
+    async def send_device_id(self, session):
         response = [self.deviceid, self.revision, self.firmwaremajor,
                     self.firmwareminor, self.ipmiversion,
                     self.additionaldevices]
         response += struct.unpack('4B', struct.pack('<I', self.mfgid))
         response += struct.unpack('4B', struct.pack('<I', self.prodid))
-        session.send_ipmi_response(data=response)
+        await session.send_ipmi_response(data=response)
 
-    def handle_raw_request(self, request, session):
+    async def handle_raw_request(self, request, session):
         # per table 5-2, completion code 0xc1 is 'unrecognized'
-        session.send_ipmi_response(code=0xc1)
+        await session.send_ipmi_response(code=0xc1)
 
-    def logout(self):
+    async def logout(self, sessionok=True):
         pass

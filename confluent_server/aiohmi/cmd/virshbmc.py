@@ -15,6 +15,7 @@ control a VM
 """
 
 import argparse
+import asyncio
 import sys
 import threading
 
@@ -38,8 +39,11 @@ def stream_callback(stream, events, console):
         data = console.stream.recv(1024)
     except Exception:
         return
-    if console.sol:
-        console.sol.send_data(data)
+    if console.sol and console.asyncloop:
+        # libvirt calls this from its own event thread, and asyncio objects
+        # are not thread safe, so hand the send to the loop that owns them.
+        asyncio.run_coroutine_threadsafe(console.sol.send_data(data),
+                                         console.asyncloop)
 
 
 class LibvirtBmc(bmc.Bmc):
@@ -53,6 +57,7 @@ class LibvirtBmc(bmc.Bmc):
         self.domain = self.conn.lookupByName(domain)
         self.state = self.domain.state(0)
         self.stream = None
+        self.asyncloop = None
         self.run_console = False
         self.conn.domainEventRegister(lifecycle_callback, self)
         self.sol_thread = None
@@ -106,24 +111,63 @@ class LibvirtBmc(bmc.Bmc):
 
         return self.run_console
 
-    def activate_payload(self, request, session):
-        super(LibvirtBmc, self).activate_payload(request, session)
+    async def activate_payload(self, request, session):
+        # captured for stream_callback, which runs on a libvirt thread
+        self.asyncloop = asyncio.get_running_loop()
+        if self.sol_thread is not None and self.sol_thread.is_alive():
+            # The thread from the previous console has not come back out of
+            # virEventRunDefaultImpl. A second one would run a second event
+            # loop against the same stream, and setting run_console below
+            # would revive the first one when it finally wakes.
+            return await session.send_ipmi_response(code=0x80)
+        self.sol_thread = None
+        wasactive = self.activated
+        await super(LibvirtBmc, self).activate_payload(request, session)
+        if wasactive or not self.activated:
+            # the base handler refused: no io handler, or the domain is not
+            # running, so activated stayed false; or a console was already up,
+            # in which case activated was true before we asked and the thread
+            # for it is already running. Either way there is nothing to start.
+            return
         self.run_console = True
         self.sol_thread = threading.Thread(target=self.loop)
+        # virEventRunDefaultImpl can wait for an event that never comes, so
+        # this thread has no reliable end of its own
+        self.sol_thread.daemon = True
         self.sol_thread.start()
 
-    def deactivate_payload(self, request, session):
-        self.run_console = False
-        self.sol_thread.join()
-        super(LibvirtBmc, self).deactivate_payload(request, session)
+    async def deactivate_payload(self, request, session):
+        if self.activated and self.sol_thread:
+            self.run_console = False
+            # The thread only notices that after virEventRunDefaultImpl
+            # returns, which is documented as possibly never. Waiting on the
+            # event loop would stall every other session, so wait off it, and
+            # briefly: this is only to clear the state promptly in the normal
+            # case. A thread that outlives the wait stays owned here, and
+            # activate_payload refuses to start another until it is gone.
+            await asyncio.get_running_loop().run_in_executor(
+                None, self.sol_thread.join, 1)
+            if not self.sol_thread.is_alive():
+                self.sol_thread = None
+        await super(LibvirtBmc, self).deactivate_payload(request, session)
 
-    def iohandler(self, data):
+    async def iohandler(self, data):
         if self.stream:
             self.stream.send(data)
 
     def loop(self):
-        while self.check_console():
-            libvirt.virEventRunDefaultImpl()
+        # virEventRunDefaultImpl waits for an event, and an idle domain can go
+        # a long time without producing one. Give it a reason to return, or
+        # the loop never reconsiders check_console and the thread cannot be
+        # stopped at all: measured as never waking without this, and returning
+        # at once with it.
+        timer = libvirt.virEventAddTimeout(500, lambda *args: None, None)
+        try:
+            while self.check_console():
+                libvirt.virEventRunDefaultImpl()
+        finally:
+            if timer >= 0:
+                libvirt.virEventRemoveTimeout(timer)
 
 
 def main():
@@ -154,7 +198,7 @@ def main():
                        hypervisor=args.hypervisor,
                        domain=args.domain,
                        port=args.port)
-    mybmc.listen()
+    asyncio.run(mybmc.listen())
 
 
 if __name__ == '__main__':

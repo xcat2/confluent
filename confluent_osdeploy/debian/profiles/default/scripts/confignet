@@ -151,7 +151,7 @@ class NetplanManager(object):
                     nicinfo[devname]['routes'] = routeinfo
                 self.cfgbydev[devname] = nicinfo[devname]
     
-    def apply_configuration(self, cfg):
+    def apply_configuration(self, cfg, lastchance=False):
         devnames = cfg['interfaces']
         if len(devnames) != 1:
             raise Exception('Multi-nic team/bonds not yet supported')
@@ -266,7 +266,7 @@ class WickedManager(object):
                 v = v.strip()
                 currcfg[k] = v
 
-    def apply_configuration(self, cfg):
+    def apply_configuration(self, cfg, lastchance=False):
         stgs = cfg['settings']
         ipcfg = 'STARTMODE=auto\n'
         routecfg = ''

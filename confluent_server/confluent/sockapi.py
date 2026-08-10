@@ -156,7 +156,7 @@ async def sessionhdl(connection, authname, skipauth=False, cert=None):
                 return await collective.handle_connection(
                     connection, None, request['collective'], local=True)
             else:
-                tlvdata.send(
+                await tlvdata.send(
                     connection,
                     {'collective': {
                         'error': 'collective management commands '
@@ -288,7 +288,7 @@ async def start_term(authname, cfm, connection, params, path, authdata, skipauth
             sessionid = elems[5]
         else:
             sessionid = None
-        consession = shellserver.ShellSession(
+        consession = await shellserver.ShellSession.create(
             node=node, configmanager=cfm, username=authname,
             datacallback=ccons.sendall, skipreplay=skipreplay,
             sessionid=sessionid, width=params.get('width', 80),

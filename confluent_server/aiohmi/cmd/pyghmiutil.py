@@ -17,54 +17,51 @@ it isn't conceived as a general utility to actually use, just help developers
 understand how the ipmi_command class workes.
 """
 
-import functools
+import asyncio
 import os
 import sys
 
 from aiohmi.ipmi import command
 
 
-def docommand(args, result, ipmisession):
+async def docommand(args, ipmicmd):
     command = args[0]
     args = args[1:]
-    print("Logged into %s" % ipmisession.bmc)
-    if 'error' in result:
-        print(result['error'])
-        return
+    print("Logged into %s" % ipmicmd.bmc)
     if command == 'power':
         if args:
-            print(ipmisession.set_power(args[0], wait=True))
+            print(await ipmicmd.set_power(args[0], wait=True))
         else:
-            value = ipmisession.get_power()
-            print("%s: %s" % (ipmisession.bmc, value['powerstate']))
+            value = await ipmicmd.get_power()
+            print("%s: %s" % (ipmicmd.bmc, value['powerstate']))
     elif command == 'bootdev':
         if args:
-            print(ipmisession.set_bootdev(args[0]))
+            print(await ipmicmd.set_bootdev(args[0]))
         else:
-            print(ipmisession.get_bootdev())
+            print(await ipmicmd.get_bootdev())
     elif command == 'sensors':
-        for reading in ipmisession.get_sensor_data():
+        async for reading in ipmicmd.get_sensor_data():
             print(reading)
     elif command == 'health':
-        print(ipmisession.get_health())
+        print(await ipmicmd.get_health())
     elif command == 'inventory':
-        for item in ipmisession.get_inventory():
+        async for item in ipmicmd.get_inventory():
             print(item)
     elif command == 'leds':
-        for led in ipmisession.get_leds():
+        async for led in ipmicmd.get_leds():
             print(led)
     elif command == 'graphical':
-        print(ipmisession.get_graphical_console())
+        print(await ipmicmd.get_graphical_console())
     elif command == 'net':
-        print(ipmisession.get_net_configuration())
+        print(await ipmicmd.get_net_configuration())
     elif command == 'raw':
-        print(ipmisession.raw_command(
+        print(await ipmicmd.raw_command(
               netfn=int(args[0]),
               command=int(args[1]),
-              data=map(lambda x: int(x, 16), args[2:])))
+              data=[int(x, 16) for x in args[2:]]))
 
 
-def main():
+async def main():
     if (len(sys.argv) < 3) or 'IPMIPASSWORD' not in os.environ:
         print("Usage:")
         print(" IPMIPASSWORD=password %s bmc username <cmd> <optarg>" %
@@ -73,20 +70,14 @@ def main():
 
     password = os.environ['IPMIPASSWORD']
     os.environ['IPMIPASSWORD'] = ""
-    bmc = sys.argv[1]
+    bmcs = sys.argv[1].split(',')
     userid = sys.argv[2]
 
-    bmcs = bmc.split(',')
-    ipmicmd = None
     for bmc in bmcs:
-        # NOTE(etingof): is it right to have `ipmicmd` overridden?
-        ipmicmd = command.Command(
-            bmc=bmc, userid=userid, password=password,
-            onlogon=functools.partial(docommand, sys.argv[3:]))
-
-    if ipmicmd:
-        ipmicmd.eventloop()
+        ipmicmd = await command.Command.create(
+            bmc=bmc, userid=userid, password=password)
+        await docommand(sys.argv[3:], ipmicmd)
 
 
 if __name__ == '__main__':
-    sys.exit(main())
+    sys.exit(asyncio.run(main()))

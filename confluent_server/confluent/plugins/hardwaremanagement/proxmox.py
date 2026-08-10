@@ -481,7 +481,7 @@ async def create(nodes, element, configmanager, inputdata):
         return
 
 
-if __name__ == '__main__':
+async def _selftest():
     import sys
     import os
     myuser = os.environ['PMXUSER']
@@ -489,12 +489,16 @@ if __name__ == '__main__':
     vc = PmxApiClient(sys.argv[1], myuser, mypass, None)
     vm = sys.argv[2]
     if sys.argv[3] == 'setboot':
-        vc.set_vm_bootdev(vm, sys.argv[4])
-        vc.get_vm_bootdev(vm)
+        await vc.set_vm_bootdev(vm, sys.argv[4])
+        await vc.get_vm_bootdev(vm)
     elif sys.argv[3] == 'power':
-        vc.set_vm_power(vm, sys.argv[4])
+        await vc.set_vm_power(vm, sys.argv[4])
     elif sys.argv[3] == 'getinfo':
-        print(repr(list(vc.get_vm_inventory(vm))))
-        print("Bootdev: " + vc.get_vm_bootdev(vm))
-        print("Power: " + vc.get_vm_power(vm))
+        print(repr([datum async for datum in vc.get_vm_inventory(vm)]))
+        print("Bootdev: " + await vc.get_vm_bootdev(vm))
+        print("Power: " + await vc.get_vm_power(vm))
         #print("Serial: " + repr(vc.get_vm_serial(vm)))
+
+
+if __name__ == '__main__':
+    asyncio.run(_selftest())

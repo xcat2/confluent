@@ -357,7 +357,7 @@ class WebConnection:
         return rsp, status
 
     async def grab_response_with_status(self, url, data=None, referer=None,
-                                        headers=None, method=None, expect_type=None):
+                                        headers=None, method=None, expect_type=None, allow_redirects=True):
         if not headers:
             headers = self.stdheaders.copy()
         else:
@@ -378,6 +378,7 @@ class WebConnection:
                     headers['Content-Type'] = 'application/json'
             elif data is not None:
                 kwargs['data'] = data
+            kwargs['allow_redirects'] = allow_redirects
             async with thefunc(url, headers=headers, ssl=self.ssl, **kwargs) as rsp:
                 if rsp.status >= 200 and rsp.status < 300:
                     if expect_type == 'json':

@@ -1354,6 +1354,9 @@ class Session(object):
                         # deregister
                         continue
                     if callable(cmd):
+                        # registered callables are coroutine functions,
+                        # but the registry itself is untyped
+                        # pyrefly: ignore[not-async]
                         await cmd()
                         continue
                     keptalive = True

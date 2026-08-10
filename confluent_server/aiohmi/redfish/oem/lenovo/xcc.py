@@ -206,15 +206,15 @@ class OEMHandler(generic.OEMHandler):
             retcfg[opt]['sortid'] = self.fwo[opt]['sortid']
         return retcfg
 
-    def set_system_configuration(self, changeset, fishclient):
+    async def set_system_configuration(self, changeset, fishclient):
         if not self.fwc:
             self.fwc = config.LenovoFirmwareConfig(self, useipmi=False)
         fetchimm = False
         if not self.fwo or util._monotonic_time() - self.fwovintage > 30:
             try:
-                self.fwo = self.fwc.get_fw_options(fetchimm=fetchimm)
+                self.fwo = await self.fwc.get_fw_options(fetchimm=fetchimm)
             except config.Unsupported:
-                return super(OEMHandler, self).set_system_configuration(
+                return await super(OEMHandler, self).set_system_configuration(
                     changeset, fishclient)
             self.fwovintage = util._monotonic_time()
         for key in list(changeset):
@@ -231,7 +231,7 @@ class OEMHandler(generic.OEMHandler):
                             found = True
                 if not found and not fetchimm:
                     fetchimm = True
-                    self.fwo = self.fwc.get_fw_options(fetchimm=fetchimm)
+                    self.fwo = await self.fwc.get_fw_options(fetchimm=fetchimm)
                     if key in self.fwo:
                         continue
                     else:
@@ -254,7 +254,7 @@ class OEMHandler(generic.OEMHandler):
         self.merge_changeset(changeset)
         if changeset:
             try:
-                self.fwc.set_fw_options(self.fwo)
+                await self.fwc.set_fw_options(self.fwo)
             finally:
                 self.fwo = None
                 self.fwovintage = 0
