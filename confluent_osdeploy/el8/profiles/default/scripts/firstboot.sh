@@ -46,6 +46,12 @@ while ! ping -c 1 $confluent_pingtarget >& /dev/null; do
 	sleep 1
 done
 
+if [ -e /etc/confluent/luks.key ]; then
+    pcrs=$(sed -n -e 's/.*tpm2:pcrs=\([0-9,]*\).*/\1/p' /tmp/cryptboot)
+    if [ -n "$pcrs" ]; then
+        run_remote tpm_luks_reseal.sh
+    fi
+fi
 
 if [ ! -f /etc/confluent/firstboot.ran ]; then
     touch /etc/confluent/firstboot.ran
