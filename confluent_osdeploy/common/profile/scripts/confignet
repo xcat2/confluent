@@ -159,7 +159,7 @@ class NetplanManager(object):
                         currinfo[devname]['routes'] = routeinfo
                     currcfg[devname] = currinfo[devname]
     
-    def apply_configuration(self, cfg):
+    def apply_configuration(self, cfg, lastchance=False):
         devnames = cfg['interfaces']
         if len(devnames) > 1:
             teammode = cfg['settings'].get('team_mode', None)
@@ -342,7 +342,7 @@ class WickedManager(object):
                 v = v.strip()
                 currcfg[k] = v
 
-    def apply_configuration(self, cfg):
+    def apply_configuration(self, cfg, lastchance=False):
         stgs = cfg['settings']
         ipcfg = 'STARTMODE=auto\n'
         routecfg = ''
