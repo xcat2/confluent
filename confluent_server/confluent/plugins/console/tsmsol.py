@@ -83,6 +83,7 @@ class TsmConsole(conapi.Console):
         self.nodeconfig = config
         self.connected = False
         self.recvr = None
+        self.clisess = None
 
 
     async def recvdata(self):
@@ -117,9 +118,14 @@ class TsmConsole(conapi.Console):
             raise cexc.TargetEndpointUnreachable(str(e))
         self.ssl = CustomVerifier(kv)
         self.clisess = aiohttp.ClientSession(cookie_jar=wc.cookies)
-        self.ws = await self.clisess.ws_connect(
-            'wss://{0}/sol?CSRFTOKEN={1}'.format(self.bmc, rcoem.csrftok),
-            ssl=self.ssl)
+        try:
+            self.ws = await self.clisess.ws_connect(
+                'wss://{0}/sol?CSRFTOKEN={1}'.format(self.bmc, rcoem.csrftok),
+                ssl=self.ssl)
+        except Exception:
+            await self.clisess.close()
+            self.clisess = None
+            raise
         self.connected = True
         self.recvr = tasks.spawn_task(self.recvdata())
         return
@@ -137,6 +143,10 @@ class TsmConsole(conapi.Console):
             self.recvr = None
         if self.ws:
             await self.ws.close()
+            self.ws = None
+        if self.clisess:
+            await self.clisess.close()
+            self.clisess = None
         self.connected = False
         self.datacallback = None
 
