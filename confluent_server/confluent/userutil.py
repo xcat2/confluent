@@ -1,4 +1,4 @@
-from ctypes import *
+from ctypes import POINTER, byref, c_char_p, c_int, c_int32, c_uint, cdll
 from ctypes.util import find_library
 import confluent.util as util
 import grp

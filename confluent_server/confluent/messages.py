@@ -1665,7 +1665,7 @@ class InputAlertDestination(ConfluentMessage):
         'acknowledge': lambda x: False if type(x) in (unicode, bytes) and x.lower() == 'false' else bool(x),
         'acknowledge_timeout': lambda x: int(x) if x and x.isdigit() else None,
         'ip': lambda x: x,
-        'retries': lambda x: int(x)
+        'retries': int
     }
 
     def __init__(self, path, nodes, inputdata, multinode=False):
