@@ -53,32 +53,68 @@ quote-style = "preserve"
 [lint]
 select = [
     "E9",       # unparseable file
-    "F63",      # `is` against a literal, assert on a tuple, bad print/if-tuple
-    "F7",       # statements in impossible positions: return/yield outside a
-                # function, break/continue outside a loop, except clause not last
+    "F4",       # imports: unused, shadowed by a loop, star import or a name from one, __future__ misuse
+    "F5",       # %-format and str.format checked against their arguments: bad conversions, wrong counts
+    "F6",       # duplicate dict and set keys, bad starred assignment, `is` against a literal, assert on a tuple
+    "F7",       # return outside a function, break outside a loop, an except clause that is not last
     "F81",      # redefinition of an unused name (shadowed def/class)
     "F82",      # undefined name, undefined name in __all__, use before assignment
-    "F401",     # unused import
-    "F402",     # import shadowed by a loop variable
     "F541",     # f-string with no placeholders
+    "F842",     # local that is annotated but never assigned
+    "F901",     # `raise NotImplemented`, which raises TypeError rather than NotImplementedError
+    "YTT",      # version checks that break on 3.10 and later, such as sys.version[2] or version_info[1] < 7
     "E401",     # several imports on one line
     "E701",     # several statements on one line
-    "E711",     # comparison to None with == rather than is
-    "E712",     # comparison to True/False with == rather than truthiness
-    "E713",     # `not x in y` rather than `x not in y`
+    "E71",      # == against None or True/False, and `not x in y` / `not x is y` written the long way round
     "PLC0414",  # import alias that renames nothing
     "PLE",      # pylint errors: bad string format, invalid returns, ...
+    "PLR0124",  # a value compared with itself
+    "PLR1722",  # exit() or quit(), which only exist when site.py has run
+    "PLW01",    # self-assignment, assert on a literal, unraised exception, NaN compare, else on a breakless loop
+    "PLW0211",  # staticmethod whose first argument is named self or cls
+    "PLW0245",  # super called without brackets, which yields the class
+    "PLW0406",  # a module importing itself
+    "PLW0642",  # assignment to self or cls
+    "PLW0711",  # `except A + B`, which catches whatever the addition returns
+    "PLW150",   # bad open() mode, copy.copy(os.environ), non-string os.environ.get default, Popen preexec_fn
+    "PLW2101",  # `with lock:` on a lock created in place, which locks nothing
     "T100",     # forgotten pdb/breakpoint call
-    "W6",       # invalid escape sequence in a non-raw string, and any future
-                # deprecated-construct warning pycodestyle adds
+    "W6",       # invalid escape sequence in a non-raw string, and future deprecated-construct warnings
+    "B002",     # `++x`, which is two unary plus signs, not an increment
+    "B003",     # assignment to os.environ, which never reaches the environment
+    "B004",     # hasattr(x, '__call__') rather than callable(x)
+    "B005",     # .strip() with several characters, which strips a set of them
+    "B008",     # function call in a default argument, evaluated once at import
+    "B011",     # `assert False`, which disappears under python -O
+    "B012",     # break/continue/return in a finally, silently discarding the exception
+    "B013",     # single-element tuple in an except clause
+    "B014",     # the same exception listed twice in one except clause
     "B015",     # comparison whose result is discarded
-    "B020",     # loop control variable overrides the iterable it iterates
-    "B023",     # closure captures a loop variable, so every closure sees the
-                # last value rather than the one from its iteration
-    "B035",     # dict comprehension with a static key
-    "RUF006",   # asyncio.create_task result discarded.  The loop keeps only a
-                # weak reference, so an unreferenced task can be collected
-                # while it is still pending, and the work is silently dropped
+    "B016",     # raising something that is not an exception
+    "B017",     # assertRaises(Exception), which passes on the wrong error
+    "B019",     # lru_cache on a method, which keeps every instance alive
+    "B02",      # all of B02x: loop variable overriding its iterable, closure over a loop variable
+    "B03",      # all of B03x: non-exception except, groupby reuse, `x: y` for `x = y`, dup set item
+    "ASYNC210", # blocking HTTP call (requests, urllib) inside a coroutine
+    "ASYNC222", # blocking wait on a child process inside a coroutine
+    "ASYNC250", # input() inside a coroutine
+    "ASYNC251", # time.sleep() inside a coroutine
+    "RUF006",   # asyncio.create_task result discarded, so the task can be collected while still pending
+    "RUF016",   # subscript with a type that cannot index the container
+    "RUF017",   # sum() over lists, which is quadratic in the result length
+    "RUF018",   # assignment inside an assert, so the side effect disappears under python -O
+    "RUF024",   # dict.fromkeys with a mutable value, shared by every key
+    "RUF034",   # if-else whose two branches are the same expression
+    "RUF060",   # membership test against a collection that is always empty
+    "RUF100",   # noqa that suppresses nothing
+    "ISC001",   # implicitly concatenated strings on one line, usually a comma missing from a list
+    "LOG",      # logging misuse: hand-built Logger, exception() outside a handler, logging.warn, root logger
+    "PGH",      # blanket `# noqa` and `# type: ignore`, and assertions on mock attributes that always pass
+    "PIE794",   # a class field defined twice, so the first is dead
+    "PIE796",   # enum with duplicate values, which silently aliases members
+    "EXE003",   # shebang that does not name python
+    "EXE004",   # whitespace before the shebang, which stops it working
+    "EXE005",   # shebang after the first line, where it does nothing
 ]
 
 # Deliberately not selected, though currently at zero: B905 (zip without an

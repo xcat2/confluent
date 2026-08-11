@@ -42,8 +42,7 @@ async def get_oem_handler(oemid, ipmicmd, *args):
     ):
         if item in oemmap:
             return (await oemmap[item].OEMHandler.create(oemid, ipmicmd, *args), True)
-    else:
-        return await generic.OEMHandler.create(oemid, ipmicmd, *args), False
+    return await generic.OEMHandler.create(oemid, ipmicmd, *args), False
 
 
 def load_plugins():

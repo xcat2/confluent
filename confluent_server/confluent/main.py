@@ -359,7 +359,7 @@ async def asyncrun(args):
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
         sock.connect(notifysock)
         sock.send(b'READY=1')
-    watchdogsecs = int(os.environ.get('WATCHDOG_USEC', 0)) / 1000000
+    watchdogsecs = int(os.environ.get('WATCHDOG_USEC', '0')) / 1000000
     if not watchdogsecs:
         watchdogsecs = 200
     watchdogsecs = watchdogsecs / 2
