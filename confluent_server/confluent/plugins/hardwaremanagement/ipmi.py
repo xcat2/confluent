@@ -1053,7 +1053,9 @@ class IpmiHandler:
                 await self.make_inventory_map()
                 compname = self.invmap.get(component, None)
                 if compname is None:
-                    await self.output.put(msg.ConfluentTargetNotFound())
+                    await self.output.put(msg.ConfluentTargetNotFound(
+                        self.node,
+                        "No component named '{0}' found".format(component)))
                     return
                 invdata = await self.ipmicmd.get_inventory_of_component(compname)
                 if invdata is None:
