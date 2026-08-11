@@ -22,6 +22,18 @@ hostnamectl set-hostname $(grep ^NODENAME: /etc/confluent/confluent.info | awk '
 touch /etc/cloud/cloud-init.disabled
 source /etc/confluent/functions
 confluent_profile=$(grep ^profile: /etc/confluent/confluent.deploycfg|awk '{print $2}')
+if [ -e /etc/confluent/luks.key ]; then
+	tpm2pcrs=""
+	encryptboot=$(grep ^encryptboot: /target/etc/confluent/confluent.deploycfg | sed -e 's/^encryptboot://' -e 's/ //g')
+	case "$encryptboot" in
+		*pcrs=*)
+			tpm2pcrs=$(echo "$encryptboot" | sed -e 's/.*pcrs=//' -e 's/:.*//')
+			;;
+	esac
+	if [ -n "$tpm2pcrs" ]; then
+		run_remote tpm_luks_reseal.sh
+	fi
+fi
 export confluent_mgr confluent_profile
 run_remote_python confignet
 run_remote_parts firstboot.d
