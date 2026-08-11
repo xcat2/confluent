@@ -8,7 +8,8 @@ permissions:
   contents: read
 
 jobs:
-  ShellCheck:
+  shellcheck:
+    name: ShellCheck
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -53,7 +54,7 @@ jobs:
           args: check --output-format=github
 
   pyrefly:
-    name: Pyrefly (async correctness)
+    name: Pyrefly
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
