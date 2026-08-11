@@ -85,7 +85,6 @@ reseal_luks() {
     fi
     
     # Wipe existing TPM2 slots
-    echo "Wiping TPM2 slots for $device"
     wipe_slots "$device"
     
     # Enroll TPM2 key
