@@ -136,3 +136,19 @@ infer-return-types = "checked"
 [errors]
 unused-coroutine = "error"
 not-async = "error"
+
+parse-error = "error"              # unparseable code, from a broken file to a duplicated keyword argument
+invalid-syntax = "error"           # syntax newer than python-version above
+internal-error = "error"           # pyrefly itself failing on a file, otherwise silent
+unused-ignore = "error"            # a `# pyrefly: ignore` whose finding is gone
+bad-unpacking = "error"            # wrong count in a tuple unpack
+incompatible-comparison = "error"  # comparisons that are always False, e.g. str against bytes
+division-by-zero = "error"
+invalid-yield = "error"            # yield where the enclosing scope cannot take one
+invalid-super-call = "error"       # super() with a class that is not in the MRO
+read-only = "error"                # assignment to a property with no setter
+bad-dunder-all = "error"           # a name in __all__ that the module does not define
+unresolvable-dunder-all = "error"  # an __all__ that is not a static list of names
+bad-instantiation = "error"        # instantiating a class with abstract methods left over
+implicit-abstract-class = "error"  # a subclass that silently stayed abstract
+invalid-abstract-method = "error"  # @abstractmethod on a class that is not abstract
