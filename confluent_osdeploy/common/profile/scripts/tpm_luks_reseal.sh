@@ -99,22 +99,25 @@ while IFS= read -r line; do
     [[ "$line" =~ ^[[:space:]]*# ]] && continue
     [[ -z "$line" ]] && continue
     
-    # Check if line contains tpm2-device
-    if [[ "$line" =~ tpm2-device ]]; then
-        # Extract the second column (device or UUID)
-        device=$(echo "$line" | awk '{print $2}')
+   
+    device=$(echo "$line" | awk '{print $2}')
+    
+    # If it's a UUID, convert to device name
+    if [[ "$device" =~ ^UUID= ]]; then
+        device=$(blkid -U "${device#UUID=}")
+    fi
+
+    if [ -e /bin/systemd-cryptenroll ]; then
+        systemd-cryptenroll "$device" | grep -q "tpm2" || continue
+    else
+        clevis luks list -d "$device" | grep -q "tpm2" || continue
+    fi
         
-        # If it's a UUID, convert to device name
-        if [[ "$device" =~ ^UUID= ]]; then
-            device=$(blkid -U "${device#UUID=}")
-        fi
-        
-        # Process the device
-        if [[ -n "$device" ]]; then
-            reseal_luks "$device"
-        else
-            echo "Warning: Could not determine device for line: $line" >&2
-        fi
+    # Process the device
+    if [[ -n "$device" ]]; then
+        reseal_luks "$device"
+    else
+        echo "Warning: Could not determine device for line: $line" >&2
     fi
 done < /etc/crypttab
 
