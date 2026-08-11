@@ -186,7 +186,8 @@ class NodeHandler(object):
         if self.relay_url:
             kv = util.TLSCertVerifier(self.configmanager, self.relay_server,
                                   'pubkeys.tls_hardwaremanager').verify_cert
-            w = webclient.WebConnection(self.relay_server, verifycallback=kv)
+            w = webclient.WebConnection(self.relay_server, verifycallback=kv,
+                                        port=443)
             relaycreds = self.configmanager.get_node_attributes(self.relay_server, 'secret.*', decrypt=True)
             relaycreds = relaycreds.get(self.relay_server, {})
             relayuser = relaycreds.get('secret.hardwaremanagementuser', {}).get('value', None)

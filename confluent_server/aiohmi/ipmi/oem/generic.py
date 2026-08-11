@@ -189,13 +189,15 @@ class OEMHandler(object):
         if False:
             yield None
 
-    async def get_diagnostic_data(self, savefile, progress=None):
+    async def get_diagnostic_data(self, savefile, progress=None,
+                                  autosuffix=False):
         """Download diagnostic data about target to a file
 
         This should be a payload that the vendor's support team can use
         to do diagnostics.
         :param savefile: File object or filename to save to
         :param progress: Callback to be informed about progress
+        :param autosuffix: Whether to append a vendor suffix to savefile
         :return:
         """
         raise exc.UnsupportedFunctionality(
