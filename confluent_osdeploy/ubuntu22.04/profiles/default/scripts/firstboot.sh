@@ -24,7 +24,7 @@ source /etc/confluent/functions
 confluent_profile=$(grep ^profile: /etc/confluent/confluent.deploycfg|awk '{print $2}')
 if [ -e /etc/confluent/luks.key ]; then
 	tpm2pcrs=""
-	encryptboot=$(grep ^encryptboot: /target/etc/confluent/confluent.deploycfg | sed -e 's/^encryptboot://' -e 's/ //g')
+	encryptboot=$(grep ^encryptboot: /etc/confluent/confluent.deploycfg | sed -e 's/^encryptboot://' -e 's/ //g')
 	case "$encryptboot" in
 		*pcrs=*)
 			tpm2pcrs=$(echo "$encryptboot" | sed -e 's/.*pcrs=//' -e 's/:.*//')

@@ -111,7 +111,7 @@ if [ -f /etc/confluent_lukspass ]; then
     cp /etc/confluent_lukspass /target/etc/confluent/luks.key
     chmod 000 /target/etc/confluent/luks.key
     lukspass=$(cat /etc/confluent_lukspass)
-    chroot /target apt install libtss2-rc0 tpm2-tools
+    chroot /target apt-get install -y libtss2-rc0 tpm2-tools
     PASSWORD=$lukspass chroot /target  systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs="" $CRYPTTAB_SOURCE
     fetch_remote  systemdecrypt
     mv systemdecrypt /target/etc/initramfs-tools/scripts/local-top/systemdecrypt
