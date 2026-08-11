@@ -1739,7 +1739,7 @@ class OEMHandler(generic.OEMHandler):
             deltarget = '{0},{1}'.format(uid, uidtonamemap[uid])
             await wc.grab_json_response('/api/function', {"USER_UserDelete": deltarget})
             return True
-        return await super(OEMHandler, self).user_delete(uid)
+        return await super(OEMHandler, self).user_delete(uid, fishclient)
 
     async def get_user_expiration(self, uid):
         wc = await self.wc()

@@ -222,7 +222,8 @@ class OEMHandler(generic.OEMHandler):
     async def remove_storage_configuration(self, cfgspec):
         if await self.has_xcc():
             return await self.immhandler.remove_storage_configuration(cfgspec)
-        return await super(OEMHandler, self).remove_storage_configuration()
+        return await super(OEMHandler, self).remove_storage_configuration(
+            cfgspec)
 
     async def get_ikvm_methods(self):
         if await self.has_xcc():
@@ -241,7 +242,8 @@ class OEMHandler(generic.OEMHandler):
     async def apply_storage_configuration(self, cfgspec):
         if await self.has_xcc():
             return await self.immhandler.apply_storage_configuration(cfgspec)
-        return await super(OEMHandler, self).apply_storage_configuration()
+        return await super(OEMHandler, self).apply_storage_configuration(
+            cfgspec)
 
     async def check_storage_configuration(self, cfgspec):
         if await self.has_xcc():
