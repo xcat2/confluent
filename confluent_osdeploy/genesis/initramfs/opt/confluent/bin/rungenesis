@@ -7,6 +7,7 @@ export LANG=en_US.utf8
 
 (while :; do TERM=linux tmux a <> /dev/tty1 >&0 2>&1; done) &
 
+pcrextendvalue=2fbe96c50dde38ce9cd2764ddb79c216cfbcd3499568b1125450e60c45dd19f2
 
 get_tpm_hashalgo() {
     if [ -n "$confluent_tpm_hashalgo" ]; then
@@ -18,13 +19,19 @@ get_tpm_hashalgo() {
         # Match only banks that actually have PCRs allocated (a digit in [ ... ]).
         if echo "$tpm_pcrbanks" | grep -Eq "$algo:[[:space:]]*\[[^]]*[0-9]"; then
             confluent_tpm_hashalgo="$algo"
+            if [[ "$algo" == "sha256" ]]; then
+                pcrextendvalue=2fbe96c50dde38ce9cd2764ddb79c216cfbcd3499568b1125450e60c45dd19f2
+            elif [[ "$algo" == "sha384" ]]; then
+                pcrextendvalue=20aaa1073c215c8bc97ff8dc509dd63ff09eef9d2dfa4d8ef224ce372d80e5417e53840ef2fb72924c195f69396a27b9
+            elif [[ "$algo" == "sha512" ]]; then
+                pcrextendvalue=77113aa32ac249789c0cdcf24e78efdb81d5be0d878e9a9a750446ecf9b9b3b1c084194eb6187cfd890b8f61a7f2e79eb4d33f6f27827b862367897c8123bceb
+            fi
             echo "$confluent_tpm_hashalgo"
             return 0
         fi
     done
     return 1
 }
-
 
 mkdir -p /etc/confluent
 if ! grep console= /proc/cmdline >& /dev/null; then
@@ -168,7 +175,7 @@ if [ "$new_apikey" != "$confluent_apikey" ]; then
     cd - > /dev/null
     rm -rf $tmpdir
 fi
-tpm2_pcrextend 15:$(get_tpm_hashalgo)=2fbe96c50dde38ce9cd2764ddb79c216cfbcd3499568b1125450e60c45dd19f2 2> /dev/null
+tpm2_pcrextend 15:$(get_tpm_hashalgo)=${pcrextendvalue} 2> /dev/null
 ifidx=$(cat /tmp/confluent.ifidx)
 ifname=$(ip link |grep ^$ifidx:|awk '{print $2}')
 ifname=${ifname%:}

@@ -1,3 +1,5 @@
+pcrextendvalue=2fbe96c50dde38ce9cd2764ddb79c216cfbcd3499568b1125450e60c45dd19f2
+
 get_tpm_hashalgo() {
     if [ -n "$confluent_tpm_hashalgo" ]; then
         echo "$confluent_tpm_hashalgo"
@@ -8,14 +10,19 @@ get_tpm_hashalgo() {
         # Match only banks that actually have PCRs allocated (a digit in [ ... ]).
         if echo "$tpm_pcrbanks" | grep -Eq "$algo:[[:space:]]*\[[^]]*[0-9]"; then
             confluent_tpm_hashalgo="$algo"
+            if [[ "$algo" == "sha256" ]]; then
+                pcrextendvalue=2fbe96c50dde38ce9cd2764ddb79c216cfbcd3499568b1125450e60c45dd19f2
+            elif [[ "$algo" == "sha384" ]]; then
+                pcrextendvalue=20aaa1073c215c8bc97ff8dc509dd63ff09eef9d2dfa4d8ef224ce372d80e5417e53840ef2fb72924c195f69396a27b9
+            elif [[ "$algo" == "sha512" ]]; then
+                pcrextendvalue=77113aa32ac249789c0cdcf24e78efdb81d5be0d878e9a9a750446ecf9b9b3b1c084194eb6187cfd890b8f61a7f2e79eb4d33f6f27827b862367897c8123bceb
+            fi
             echo "$confluent_tpm_hashalgo"
             return 0
         fi
     done
     return 1
 }
-
-
 get_remote_apikey() {
     while [ -z "$confluent_apikey" ]; do
         /opt/confluent/bin/clortho $nodename $confluent_mgr > /etc/confluent/confluent.apikey
@@ -175,7 +182,7 @@ while [ $ready = "0" ]; do
 done
 if [ ! -z "$autocons" ] && grep "textconsole: true" /etc/confluent/confluent.deploycfg > /dev/null; then /opt/confluent/bin/autocons -c > /dev/null; fi
 if [ -c /dev/tpmrm0 ]; then
-    tpm2_pcrextend 15:$(get_tpm_hashalgo)=2fbe96c50dde38ce9cd2764ddb79c216cfbcd3499568b1125450e60c45dd19f2
+    tpm2_pcrextend 15:$(get_tpm_hashalgo)=${pcrextendvalue}
 fi
 umask $oldumask
 mkdir -p /run/NetworkManager/system-connections
