@@ -1,3 +1,32 @@
+
+pcrextendvalue=2fbe96c50dde38ce9cd2764ddb79c216cfbcd3499568b1125450e60c45dd19f2
+pcrhashalgo=sha256
+
+set_tpm_hashalgo() {
+    if [ -n "$confluent_tpm_hashalgo" ]; then
+        return 0
+    fi
+    tpm_pcrbanks=$(tpm2_getcap pcrs 2>/dev/null)
+    for algo in sha256 sha512 sha384; do
+        # Match only banks that actually have PCRs allocated (a digit in [ ... ]).
+        if echo "$tpm_pcrbanks" | grep -Eq "$algo:[[:space:]]*\[[^]]*[0-9]"; then
+            confluent_tpm_hashalgo="$algo"
+            pcrhashalgo="$algo"
+            if [[ "$algo" == "sha256" ]]; then
+                pcrextendvalue=2fbe96c50dde38ce9cd2764ddb79c216cfbcd3499568b1125450e60c45dd19f2
+            elif [[ "$algo" == "sha384" ]]; then
+                pcrextendvalue=20aaa1073c215c8bc97ff8dc509dd63ff09eef9d2dfa4d8ef224ce372d80e5417e53840ef2fb72924c195f69396a27b9
+            elif [[ "$algo" == "sha512" ]]; then
+                pcrextendvalue=77113aa32ac249789c0cdcf24e78efdb81d5be0d878e9a9a750446ecf9b9b3b1c084194eb6187cfd890b8f61a7f2e79eb4d33f6f27827b862367897c8123bceb
+            fi
+            echo "$confluent_tpm_hashalgo"
+            return 0
+        fi
+    done
+    return 1
+}
+
+
 get_remote_apikey() {
     while [ -z "$confluent_apikey" ]; do
         /opt/confluent/bin/clortho $nodename $confluent_mgr > /etc/confluent/confluent.apikey
@@ -14,10 +43,10 @@ get_remote_apikey() {
             tmpdir=$(mktemp -d)
             cd $tmpdir
             tpm2_startauthsession --session=session.ctx
-            tpm_pcrbank=$(get_tpm_hashalgo)
-            tpm2_policypcr -Q --session=session.ctx --pcr-list="${tpm_pcrbank}:15" --policy=pcr15.${tpm_pcrbank}.policy
+            set_tpm_hashalgo
+            tpm2_policypcr -Q --session=session.ctx --pcr-list="${pcrhashalgo}:15" --policy=pcr15.${pcrhashalgo}.policy
             tpm2_createprimary -G ecc -Q --key-context=prim.ctx
-            (echo -n "CONFLUENT_APIKEY:";cat /etc/confluent/confluent.apikey) | tpm2_create -Q --policy=pcr15.${tpm_pcrbank}.policy --public=data.pub --private=data.priv -i - -C prim.ctx
+            (echo -n "CONFLUENT_APIKEY:";cat /etc/confluent/confluent.apikey) | tpm2_create -Q --policy=pcr15.${pcrhashalgo}.policy --public=data.pub --private=data.priv -i - -C prim.ctx
             tpm2_load -Q --parent-context=prim.ctx --public=data.pub --private=data.priv --name=confluent.apikey --key-context=data.ctx
             tpm2_evictcontrol -Q -c data.ctx
             tpm2_flushcontext session.ctx
@@ -25,32 +54,6 @@ get_remote_apikey() {
             rm -rf $tmpdir
         fi
     done
-}
-
-pcrextendvalue=2fbe96c50dde38ce9cd2764ddb79c216cfbcd3499568b1125450e60c45dd19f2
-
-get_tpm_hashalgo() {
-    if [ -n "$confluent_tpm_hashalgo" ]; then
-        echo "$confluent_tpm_hashalgo"
-        return 0
-    fi
-    tpm_pcrbanks=$(tpm2_getcap pcrs 2>/dev/null)
-    for algo in sha256 sha512 sha384; do
-        # Match only banks that actually have PCRs allocated (a digit in [ ... ]).
-        if echo "$tpm_pcrbanks" | grep -Eq "$algo:[[:space:]]*\[[^]]*[0-9]"; then
-            confluent_tpm_hashalgo="$algo"
-            if [[ "$algo" == "sha256" ]]; then
-                pcrextendvalue=2fbe96c50dde38ce9cd2764ddb79c216cfbcd3499568b1125450e60c45dd19f2
-            elif [[ "$algo" == "sha384" ]]; then
-                pcrextendvalue=20aaa1073c215c8bc97ff8dc509dd63ff09eef9d2dfa4d8ef224ce372d80e5417e53840ef2fb72924c195f69396a27b9
-            elif [[ "$algo" == "sha512" ]]; then
-                pcrextendvalue=77113aa32ac249789c0cdcf24e78efdb81d5be0d878e9a9a750446ecf9b9b3b1c084194eb6187cfd890b8f61a7f2e79eb4d33f6f27827b862367897c8123bceb
-            fi
-            echo "$confluent_tpm_hashalgo"
-            return 0
-        fi
-    done
-    return 1
 }
 
 root=1
@@ -108,8 +111,8 @@ lasthdl=""
 if [ -c /dev/tpmrm0 ]; then
     for hdl in $(tpm2_getcap handles-persistent|awk '{print $2}'); do
         tpm2_startauthsession --policy-session --session=session.ctx
-        tpm_pcrbank=$(get_tpm_hashalgo)
-        tpm2_policypcr -Q --session=session.ctx --pcr-list="${tpm_pcrbank}:15" --policy=pcr15.${tpm_pcrbank}.policy
+        set_tpm_hashalgo
+        tpm2_policypcr -Q --session=session.ctx --pcr-list="${pcrhashalgo}:15" --policy=pcr15.${pcrhashalgo}.policy
         unsealeddata=$(tpm2_unseal --auth=session:session.ctx -Q -c $hdl 2>/dev/null)
         tpm2_flushcontext session.ctx
         if [[ $unsealeddata == "CONFLUENT_APIKEY:"* ]]; then
@@ -184,7 +187,8 @@ while [ $ready = "0" ]; do
 done
 if [ ! -z "$autocons" ] && grep "textconsole: true" /etc/confluent/confluent.deploycfg > /dev/null; then /opt/confluent/bin/autocons -c > /dev/null; fi
 if [ -c /dev/tpmrm0 ]; then
-    tpm2_pcrextend 15:$(get_tpm_hashalgo)=${pcrextendvalue}
+    set_tpm_hashalgo
+    tpm2_pcrextend 15:${pcrhashalgo}=${pcrextendvalue}
 fi
 umask $oldumask
 mkdir -p /run/NetworkManager/system-connections
