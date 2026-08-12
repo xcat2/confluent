@@ -19,7 +19,6 @@ set_tpm_hashalgo() {
             elif [[ "$algo" == "sha512" ]]; then
                 pcrextendvalue=77113aa32ac249789c0cdcf24e78efdb81d5be0d878e9a9a750446ecf9b9b3b1c084194eb6187cfd890b8f61a7f2e79eb4d33f6f27827b862367897c8123bceb
             fi
-            echo "$confluent_tpm_hashalgo"
             return 0
         fi
     done
