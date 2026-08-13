@@ -3,7 +3,7 @@ nodefirmware(8) -- Report firmware information on confluent nodes
 
 ## SYNOPSIS
 
-`nodefirmware <noderange> [list][updatestatus][update [--backup <file>]]|[<components>]`
+`nodefirmware <noderange> [list][updatestatus][update [--backup] [--parameterfile <file>] <file>]|[<components>]`
 
 ## DESCRIPTION
 
@@ -37,10 +37,30 @@ the out of band facilities.  Firmware updates can end in one of three states:
   be affected  
 
 * `-p PARAMETERFILE`, `--parameterfile=PARAMETERFILE`:
-  For updating, a parameter file to provide along with the update payload
+  For updating, a parameter file to provide along with the update payload.  See
+  PARAMETER FILE below
 
 * `-h`, `--help`:
   Show help message and exit    
+
+## PARAMETER FILE
+
+The parameter file given with `-p` holds JSON that is sent alongside the image.
+Its keys are the parts a Redfish multipart update accepts, so `UpdateParameters`
+for the standard fields and `OemParameters` for whatever a vendor asks for on top
+of them.  Without one, an update names no targets, which means "whatever this
+image is for", and that is what most platforms want.
+
+Some platforms will not take an image without being told what kind of firmware it
+holds, and refuse the update rather than guess.  On an AMI MegaRAC that is an
+`ImageType` under `OemParameters`:
+
+    {"OemParameters": {"ImageType": "BIOS"}}
+
+Attempting the update without it names the types the platform accepts in the
+error, so there is no need to look them up first.  The value is checked against
+the same list before anything is uploaded, so a name the platform does not accept
+is refused rather than sent.
 
 ## EXAMPLES
 

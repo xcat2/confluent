@@ -17,6 +17,7 @@ from fnmatch import fnmatch
 import json
 import os
 import re
+import time
 import uuid
 
 import base64
@@ -1427,6 +1428,14 @@ class OEMHandler(object):
     async def update_firmware(self, filename, data=None, progress=None, bank=None, otherfields=()):
         # disable cache to make sure we trigger the token renewal logic if needed
         usd, upurl, ismultipart = await self.retrieve_firmware_upload_url()
+        if ismultipart:
+            # A multipart push has to carry an UpdateParameters part beside the
+            # image, and implementations are entitled to reject the request
+            # when it is missing. Targets empty means "whatever this image is
+            # for", and OperationApplyTime is left out because it is optional
+            # and some implementations refuse the ones they do not implement.
+            otherfields = dict(otherfields) if otherfields else {}
+            otherfields.setdefault('UpdateParameters', {'Targets': []})
         try:
             uploadthread = await webclient.make_uploader(
                 self.webclient, upurl, filename, data, formname='UpdateFile', formwrap=ismultipart,
@@ -1465,6 +1474,20 @@ class OEMHandler(object):
             monitorurl = rsp['@odata.id']
             return await self.monitor_update_progress(monitorurl, progress)
 
+    # How long to keep waiting for a bmc that is expected to restart while it
+    # applies an update to itself. Observed reset to serving again is a bit over
+    # three minutes, so this leaves generous room without hanging forever.
+    _resetgracetime = 300
+
+    async def _bmc_is_back(self):
+        """Check whether the redfish service is serving requests again."""
+        try:
+            rsp, status = await self.webclient.grab_json_response_with_status(
+                '/redfish/v1/')
+        except Exception:
+            return False
+        return status == 200 and bool(rsp)
+
     async def monitor_update_progress(self, monitorurl, progress):
             complete = False
             phase = "apply"
@@ -1473,12 +1496,30 @@ class OEMHandler(object):
             # the validating phase; add a retry here so we don't exit the loop in this case
             retry = 3
             pct = 0.0
+            # Updating the bmc itself takes the bmc, and with it the task we are
+            # watching, away for minutes. That is the update working, not the
+            # monitoring failing, so wait it out and take the bmc coming back
+            # with the task gone as the update having landed.
+            deadline = None
+            if getattr(self, '_updateresetsbmc', False):
+                deadline = time.monotonic() + self._resetgracetime
             while not complete and retry > 0:
                 try:
                     pgress = await self._do_web_request(monitorurl, cache=False)
-                except socket.timeout:
+                except (socket.timeout, exc.PyghmiException, OSError):
                     pgress = None
                 if not pgress:
+                    if deadline is not None:
+                        if time.monotonic() > deadline:
+                            raise Exception(
+                                'The bmc did not return within {0} seconds of '
+                                'starting to apply its firmware'.format(
+                                    self._resetgracetime))
+                        await asyncio.sleep(10)
+                        if await self._bmc_is_back():
+                            progress({'phase': phase, 'progress': 100.0})
+                            return 'pending'
+                        continue
                     retry -= 1
                     await asyncio.sleep(3)
                     continue
