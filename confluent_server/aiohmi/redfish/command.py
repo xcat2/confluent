@@ -1157,6 +1157,107 @@ class Command(object):
         await self._do_web_request(await self.get_bmcnicurl(),
                              {'HostName': hostname}, 'PATCH', etag='*')
 
+    async def _netprotocolurl(self):
+        bmcinfo = await self._do_web_request(await self.get_bmcurl())
+        netprotocols = bmcinfo.get('NetworkProtocol', {}).get('@odata.id', None)
+        if not netprotocols:
+            raise exc.UnsupportedFunctionality(
+                'This platform does not describe its manager network protocols')
+        return netprotocols
+
+    async def get_mci(self):
+        """Get the management controller identifier
+
+        Redfish has no separate identifier for a management controller the way
+        ipmi does, and the platforms that offer both report the same string for
+        each, so use the name the manager answers to.
+        """
+        netcfg = await self._do_web_request(await self._netprotocolurl())
+        name = netcfg.get('HostName', None)
+        if name is None:
+            raise exc.UnsupportedFunctionality(
+                'This platform does not report a manager identifier')
+        return name
+
+    async def set_mci(self, mci):
+        await self._do_web_request(await self._netprotocolurl(),
+                                   {'HostName': mci}, method='PATCH', etag='*')
+
+    async def get_domain_name(self):
+        netcfg = await self._do_web_request(await self._netprotocolurl())
+        fqdn = netcfg.get('FQDN', None)
+        if not fqdn:
+            return ''
+        # The fqdn is the manager name with the domain appended, and only the
+        # domain part is wanted here
+        hostname = netcfg.get('HostName', None)
+        if hostname and fqdn.startswith(hostname + '.'):
+            return fqdn[len(hostname) + 1:]
+        return fqdn.partition('.')[2]
+
+    async def set_domain_name(self, domain):
+        netprotocols = await self._netprotocolurl()
+        netcfg = await self._do_web_request(netprotocols)
+        hostname = netcfg.get('HostName', '')
+        fqdn = '{0}.{1}'.format(hostname, domain) if domain else hostname
+        await self._do_web_request(netprotocols, {'FQDN': fqdn},
+                                   method='PATCH', etag='*')
+
+    async def get_remote_kvm_available(self):
+        bmcinfo = await self._do_web_request(await self.get_bmcurl())
+        gconsole = bmcinfo.get('GraphicalConsole', {})
+        return bool(gconsole.get('ServiceEnabled', False))
+
+    _ledstatusmap = {
+        'Lit': 'On',
+        'Blinking': 'Blink',
+        'Off': 'Off',
+    }
+
+    async def get_leds(self):
+        """Get LED status information
+
+        Standard redfish only describes the identify indicator, so that is all a
+        platform without an oem specific view of its leds can report.
+        """
+        sysinfo = await self.sysinfo()
+        seen = False
+        for chassis in sysinfo.get('Links', {}).get('Chassis', []):
+            chassisinfo = await self._do_web_request(chassis['@odata.id'])
+            state = chassisinfo.get('IndicatorLED', None)
+            if state is None:
+                continue
+            seen = True
+            yield ('identify', {'status': self._ledstatusmap.get(state, state)})
+            break
+        if not seen and sysinfo.get('IndicatorLED', None) is not None:
+            state = sysinfo['IndicatorLED']
+            yield ('identify', {'status': self._ledstatusmap.get(state, state)})
+
+    # A firmware inventory entry says what it belongs to with RelatedItem, so
+    # map the collections that turn up there onto the categories confluent asks
+    # for
+    _fwcategorybyurl = (
+        ('/Drives/', 'disks'),
+        ('/Storage/', 'disks'),
+        ('/PCIeDevices/', 'adapters'),
+        ('/NetworkAdapters/', 'adapters'),
+        ('/NetworkInterfaces/', 'adapters'),
+    )
+
+    def _fwcategory(self, fwi):
+        """Which category a firmware inventory entry belongs to.
+
+        Returns None when the entry gives nothing to judge by.
+        """
+        related = fwi.get('RelatedItem', [])
+        for item in related:
+            url = item.get('@odata.id', '')
+            for frag, category in self._fwcategorybyurl:
+                if frag in url:
+                    return category
+        return 'core' if related else None
+
     async def get_firmware(self, components=(), category=None):
         self._fwnamemap = {}
         oem = await self.oem()

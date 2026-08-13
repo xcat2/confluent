@@ -655,43 +655,13 @@ class IpmiHandler:
             await self.ipmicmd.install_bmc_certificate(cert)
 
     async def handle_alerts(self):
-        if self.element[3] == 'destinations':
-            if len(self.element) == 4:
-                # A list of destinations
-                maxdest = await self.ipmicmd.get_alert_destination_count()
-                for alertidx in range(0, maxdest + 1):
-                    await self.output.put(msg.ChildCollection(alertidx))
-                return
-            elif len(self.element) == 5:
-                alertidx = int(self.element[-1])
-                if self.op == 'read':
-                    destdata = await self.ipmicmd.get_alert_destination(alertidx)
-                    await self.output.put(msg.AlertDestination(
-                        ip=destdata['address'],
-                        acknowledge=destdata['acknowledge_required'],
-                        acknowledge_timeout=destdata.get('acknowledge_timeout', None),
-                        retries=destdata['retries'],
-                        name=self.node))
-                    return
-                elif self.op == 'update':
-                    alertparms = self.inputdata.alert_params_by_node(
-                        self.node)
-                    alertargs = {}
-                    if 'acknowledge' in alertparms:
-                        alertargs['acknowledge_required'] = alertparms['acknowledge']
-                    if 'acknowledge_timeout' in alertparms:
-                        alertargs['acknowledge_timeout'] = alertparms['acknowledge_timeout']
-                    if 'ip' in alertparms:
-                        alertargs['ip'] = alertparms['ip']
-                    if 'retries' in alertparms:
-                        alertargs['retries'] = alertparms['retries']
-                    await self.ipmicmd.set_alert_destination(destination=alertidx,
-                                                       **alertargs)
-                    return
-                elif self.op == 'delete':
-                    await self.ipmicmd.clear_alert_destination(alertidx)
-                    return
-        raise Exception('Not implemented')
+        # Redfish describes where to send events with the EventService
+        # subscription collection, which is a different model from the numbered
+        # ipmi PET destinations this resource was built around, so say so rather
+        # than calling methods the redfish client does not have
+        raise pygexc.UnsupportedFunctionality(
+            'Alert destinations are not implemented for redfish, use the '
+            'EventService subscriptions on the bmc directly')
 
     async def handle_nets(self):
         if len(self.element) == 3:
@@ -1437,9 +1407,23 @@ class IpmiHandler:
             await self.ipmicmd.set_domain_name(dn)
             return
 
+    _locationfields = ('room', 'location', 'building', 'rack', 'contactnames')
+
     async def handle_location_config(self):
         if 'read' == self.op:
-            lc = await self.ipmicmd.get_location_information()
+            await self.output.put(msg.KeyValueData(
+                await self.ipmicmd.get_location_information(), self.node))
+            return
+        elif 'update' == self.op:
+            attribs = self.inputdata.get_attributes(self.node)
+            locargs = {x: attribs[x] for x in self._locationfields
+                       if x in attribs}
+            if not locargs:
+                raise exc.InvalidArgumentException(
+                    'Location accepts only: {0}'.format(
+                        ', '.join(self._locationfields)))
+            await self.ipmicmd.set_location_information(**locargs)
+            return
 
     async def handle_bmcconfig(self, advanced=False, extended=False):
         if 'read' == self.op:
