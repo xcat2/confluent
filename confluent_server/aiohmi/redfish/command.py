@@ -606,6 +606,12 @@ class Command(object):
         if payload is None and method is None:
             self._urlcache[url] = {'contents': res[0],
                                    'vintage': os.times()[4]}
+        elif method != 'GET':
+            # A write may have changed anything, including documents other than
+            # the one written (an action url is not the resource it acts on), so
+            # do not let a cached read from before the write be handed out as
+            # the current state
+            self._urlcache.clear()
         return res[0]
 
     async def get_bootdev(self):
