@@ -881,8 +881,10 @@ class IpmiHandler:
                     await self.output.put(msg.ConfluentTargetTimeout(self.node))
 
     async def list_inventory(self):
+        components = []
         try:
-            components = await self.ipmicmd.get_inventory_descriptions()
+            async for component in self.ipmicmd.get_inventory_descriptions():
+                components.append(component)
         except pygexc.IpmiException:
             await self.output.put(msg.ConfluentTargetTimeout(self.node))
             return

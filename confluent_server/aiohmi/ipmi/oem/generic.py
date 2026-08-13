@@ -455,7 +455,7 @@ class OEMHandler(object):
         """
         return False
 
-    async def get_extended_bmc_configuration(self):
+    async def get_extended_bmc_configuration(self, hideadvanced=True):
         """Get extended bmc configuration
 
         In the case of potentially redundant/slow

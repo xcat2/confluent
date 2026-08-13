@@ -808,7 +808,7 @@ class IpmiHandler:
                                     privilege_level=user['privilege_level'])
             # A list of users
             await self.output.put(msg.ChildCollection('all'))
-            async for user in self.ipmicmd.get_users():
+            for user in await self.ipmicmd.get_users():
                 await self.output.put(msg.ChildCollection(user, candelete=True))
             return
         # List all users

@@ -859,9 +859,10 @@ class Command(object):
         else:
             raise Exception("Unrecognized data format " + repr(fetchdata))
 
-    async def get_extended_bmc_configuration(self):
+    async def get_extended_bmc_configuration(self, hideadvanced=True):
         await self.oem_init()
-        return await self._oem.get_extended_bmc_configuration()
+        return await self._oem.get_extended_bmc_configuration(
+            hideadvanced=hideadvanced)
 
     async def get_bmc_configuration(self):
         await self.oem_init()
@@ -2037,9 +2038,15 @@ class Command(object):
         names = {}
         max_ids = await self.get_channel_max_user_count(channel)
         for uid in range(1, max_ids + 1):
-            name = await self.get_user_name(uid=uid)
-            if await self._oem.is_valid(name):
-                names[uid] = await self.get_user(uid=uid, channel=channel)
+            # A single slot that the bmc refuses to describe must not take the
+            # whole user list with it, as some bmcs leave a slot in a state
+            # where reading it returns an error rather than an empty name
+            try:
+                name = await self.get_user_name(uid=uid)
+                if await self._oem.is_valid(name):
+                    names[uid] = await self.get_user(uid=uid, channel=channel)
+            except exc.IpmiException:
+                continue
         return names
 
     async def create_user(self, uid, name, password, channel=None, callback=False,
