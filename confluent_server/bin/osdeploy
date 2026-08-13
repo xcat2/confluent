@@ -4,6 +4,7 @@ __author__ = 'jjohnson2,bfinley'
 
 import argparse
 import asyncio
+import hashlib
 import glob
 import os
 import os.path
@@ -541,6 +542,33 @@ async def oslist():
             print("  " + rsp['item']['href'].replace('/', ''))
     print("")
 
+async def verify_checksum(destfile, expectedsum, progress_callback=None):
+    checksum = hashlib.sha256()
+    with open(destfile, 'rb') as image:
+        image.seek(0, os.SEEK_END)
+        filesize = image.tell()
+        image.seek(0)
+        
+        while True:
+            chunk = image.read(1024 * 1024)
+            if not chunk:
+                break
+            checksum.update(chunk)
+            if progress_callback:
+                curroffset = image.tell()
+                progress_callback(curroffset, filesize)
+
+    actualsum = checksum.hexdigest()
+    if actualsum.lower() != expectedsum.strip().lower():
+        raise ValueError(
+            'SHA256 checksum mismatch for {0}: expected {1}, got {2}'.format(
+                destfile, expectedsum, actualsum))
+    return actualsum
+
+def verify_progress_callback(current, total):
+    percent = (current / total) * 100
+    sys.stdout.write('\033[K\rVerifying: {:.2f}%'.format(percent))
+    sys.stdout.flush()
 
 async def download_image(distname, destdir):
     destdir = os.path.abspath(destdir)
@@ -557,6 +585,19 @@ async def download_image(distname, destdir):
         sys.exit(1)
     print('Downloading {0} to {1}'.format(dlinfo.iso_url, destfile))
     await download.download_dist(destfile, destdir, progress_callback=download.print_progress, dlinfo=dlinfo)
+    if dlinfo.gpg_status != 'verified':
+        sys.stderr.write('GPG signature verification unavailable for {0}'.format(dlinfo.iso_name))
+    if dlinfo.iso_sha256:
+        sys.stdout.write('Verifying SHA256 checksum...\n')
+        sys.stdout.flush()
+        try:
+            await verify_checksum(destfile, dlinfo.iso_sha256, verify_progress_callback)
+        except ValueError as e:
+            sys.stderr.write(str(e) + '\n')
+            sys.exit(1)
+        sys.stdout.write('\nDone\n')
+    if dlinfo.gpg_status == 'verified':
+        sys.stdout.write('GPG signature verified\n')
 
 async def osimport(imagefile, checkonly=False, custname=None):
     c = client.Command()
