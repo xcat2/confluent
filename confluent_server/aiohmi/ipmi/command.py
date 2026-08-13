@@ -1388,7 +1388,13 @@ class Command(object):
         except exc.UnsupportedFunctionality:
             # Use the DCMI MCI field as a fallback, since it's the closest
             # thing in the IPMI Spec for this
-            return await self.get_mci()
+            try:
+                return await self.get_mci()
+            except exc.UnsupportedFunctionality:
+                # With neither an oem command nor DCMI there is nowhere left to
+                # look, and the caller asked about a hostname rather than DCMI
+                raise exc.UnsupportedFunctionality(
+                    'The bmc hostname is not reported by this platform')
 
     async def get_mci(self):
         """Set the management controller identifier.
@@ -1415,7 +1421,11 @@ class Command(object):
         try:
             return await self._oem.set_hostname(hostname)
         except exc.UnsupportedFunctionality:
-            return await self.set_mci(hostname)
+            try:
+                return await self.set_mci(hostname)
+            except exc.UnsupportedFunctionality:
+                raise exc.UnsupportedFunctionality(
+                    'The bmc hostname cannot be set on this platform')
 
     async def set_mci(self, mci):
         """Set the management controller identifier.
@@ -1449,9 +1459,26 @@ class Command(object):
             return await self._oem.set_asset_tag(tag)
         return await self._chunkwise_dcmi_set(8, tag)
 
+    async def _dcmi_command(self, command, data):
+        """Issue a DCMI command, telling a bmc without DCMI apart from a fault.
+
+        A bmc that does not implement the DCMI group at all rejects the command
+        outright, which is not the same thing as the request having been bad, and
+        the caller can offer something else or say plainly that the platform
+        cannot do it.
+        """
+        try:
+            return await self.raw_command(netfn=0x2c, command=command,
+                                          data=data)
+        except exc.IpmiException as ie:
+            # invalid command, and command disabled or unavailable
+            if ie.ipmicode in (0xc1, 0xd6):
+                raise exc.UnsupportedFunctionality(
+                    'This platform does not support the DCMI commands')
+            raise
+
     async def _chunkwise_dcmi_fetch(self, command):
-        szdata = await self.raw_command(
-            netfn=0x2c, command=command, data=(0xdc, 0, 0))
+        szdata = await self._dcmi_command(command, (0xdc, 0, 0))
         totalsize = bytearray(szdata['data'])[1]
         chksize = 0xf
         offset = 0
@@ -1459,8 +1486,8 @@ class Command(object):
         while offset < totalsize:
             if (offset + chksize) > totalsize:
                 chksize = totalsize - offset
-            chk = await self.raw_command(
-                netfn=0x2c, command=command, data=(0xdc, offset, chksize))
+            chk = await self._dcmi_command(command,
+                                           (0xdc, offset, chksize))
             retstr += chk['data'][2:]
             offset += chksize
         if not isinstance(retstr, str):
@@ -1477,7 +1504,7 @@ class Command(object):
             # set offset, otherwise the last setting will override
             # the previous setting
             offset += len(chunk)
-            await self.raw_command(netfn=0x2c, command=command, data=cmddata)
+            await self._dcmi_command(command, cmddata)
 
     async def set_channel_access(self, channel=None,
                            access_update_mode='non_volatile',
