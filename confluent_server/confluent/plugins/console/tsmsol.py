@@ -20,13 +20,33 @@
 # to use this.
 
 import asyncio
+import traceback
 import confluent.exceptions as cexc
 import confluent.interface.console as conapi
+import confluent.log as log
 import confluent.tasks as tasks
 import confluent.util as util
 import aiohmi.exceptions as pygexc
 import aiohmi.redfish.command as rcmd
 import aiohttp
+
+_tracelog = None
+
+
+def _trace(text, event=log.Events.stacktrace):
+    """Record a console problem where an operator can find it.
+
+    A daemon has nowhere useful to print to, and printing once per message
+    received is how a websocket that had already gone away managed to write
+    gigabytes of a single line.
+    """
+    global _tracelog
+    if _tracelog is None:
+        # Unbuffered: this records a console that has just gone away, and
+        # the daemon may not survive long enough to flush a buffered write.
+        _tracelog = log.Logger('trace', buffered=False)
+    _tracelog.log(text, ltype=log.DataTypes.event, event=event)
+
 
 class CustomVerifier(aiohttp.Fingerprint):
     def __init__(self, verifycallback):
@@ -96,11 +116,20 @@ class TsmConsole(conapi.Console):
                 elif pendingdata.type == aiohttp.WSMsgType.TEXT:
                     await self.datacallback(pendingdata.data.encode())
                     continue
-                elif pendingdata.type == aiohttp.WSMsgType.CLOSE:
-                    await self.datacallback(conapi.ConsoleEvent.Disconnect)
-                    return
-                else:
-                    print("Unknown response in WSConsoleHandler")
+                # Every other message type means the socket is finished.  Once
+                # the peer is gone receive() answers CLOSED straight away and
+                # keeps doing so, so looping here would spin rather than wait.
+                if pendingdata.type != aiohttp.WSMsgType.CLOSE:
+                    _trace(
+                        'Console websocket for {0} ended with {1}{2}'.format(
+                            self.node, pendingdata.type.name,
+                            ': {0}'.format(pendingdata.data)
+                            if pendingdata.type == aiohttp.WSMsgType.ERROR
+                            else ''),
+                        event=log.Events.consoledisconnect)
+                self.connected = False
+                await self.datacallback(conapi.ConsoleEvent.Disconnect)
+                return
         except asyncio.CancelledError:
             pass
 
@@ -133,8 +162,9 @@ class TsmConsole(conapi.Console):
     async def write(self, data):
         try:
             await self.ws.send_str(data.decode())
-        except Exception as e:
-            print(repr(e))
+        except Exception:
+            _trace('Console websocket write for {0} failed:\n{1}'.format(
+                self.node, traceback.format_exc()))
             await self.datacallback(conapi.ConsoleEvent.Disconnect)
 
     async def close(self):
