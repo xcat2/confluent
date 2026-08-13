@@ -391,10 +391,12 @@ class OEMHandler(object):
         return False
 
     async def detach_remote_media(self):
-        raise exc.UnsupportedFunctionality()
+        raise exc.UnsupportedFunctionality(
+            'Remote media is not supported on this platform')
 
     async def attach_remote_media(self, imagename, username, password):
-        raise exc.UnsupportedFunctionality()
+        raise exc.UnsupportedFunctionality(
+            'Remote media is not supported on this platform')
 
     async def upload_media(self, filename, progress, data):
         raise exc.UnsupportedFunctionality(
@@ -403,7 +405,8 @@ class OEMHandler(object):
     async def list_media(self):
         if False:
             yield None
-        raise exc.UnsupportedFunctionality()
+        raise exc.UnsupportedFunctionality(
+            'Remote media is not supported on this platform')
 
     async def set_identify(self, on, duration, blink):
         """Provide an OEM override for set_identify
@@ -411,7 +414,8 @@ class OEMHandler(object):
         Some systems may require an override for set identify.
 
         """
-        raise exc.UnsupportedFunctionality()
+        raise exc.UnsupportedFunctionality(
+            'Identify is not supported on this platform')
 
     async def get_health(self, summary):
         """Provide an alternative or augmented health assessment
@@ -428,16 +432,19 @@ class OEMHandler(object):
 
     async def set_hostname(self, hostname):
         """OEM specific hook to specify name information"""
-        raise exc.UnsupportedFunctionality()
+        raise exc.UnsupportedFunctionality(
+            'Setting the bmc hostname is not supported on this platform')
 
     async def get_hostname(self):
         """OEM specific hook to specify name information"""
-        raise exc.UnsupportedFunctionality()
+        raise exc.UnsupportedFunctionality(
+            'Reading the bmc hostname is not supported on this platform')
 
     async def set_user_access(self, uid, channel, callback, link_auth, ipmi_msg,
                         privilege_level):
         if privilege_level.startswith('custom.'):
-            raise exc.UnsupportedFunctionality()
+            raise exc.UnsupportedFunctionality(
+                'Custom privilege levels are not supported on this platform')
         return  # Nothing to do
 
     async def set_alert_ipv6_destination(self, ip, destination, channel):
@@ -491,21 +498,26 @@ class OEMHandler(object):
 
         Takes a key value pair and applies it against the system configuration
         """
-        raise exc.UnsupportedFunctionality()
+        raise exc.UnsupportedFunctionality(
+            'Setting system configuration is not supported on this platform')
 
     async def get_licenses(self):
-        raise exc.UnsupportedFunctionality()
+        raise exc.UnsupportedFunctionality(
+            'Licenses are not supported on this platform')
         yield None
 
     async def delete_license(self, name):
-        raise exc.UnsupportedFunctionality()
+        raise exc.UnsupportedFunctionality(
+            'Licenses are not supported on this platform')
 
     async def save_licenses(self, directory):
-        raise exc.UnsupportedFunctionality()
+        raise exc.UnsupportedFunctionality(
+            'Licenses are not supported on this platform')
         yield None
 
     async def apply_license(self, filename, progress=None, data=None):
-        raise exc.UnsupportedFunctionality()
+        raise exc.UnsupportedFunctionality(
+            'Licenses are not supported on this platform')
         yield None
 
     async def get_user_expiration(self, uid):

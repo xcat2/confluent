@@ -702,7 +702,8 @@ class OEMHandler(generic.OEMHandler):
         elif await self.has_xcc():
             await self.immhandler.set_identify(on, duration, blink)
         else:
-            raise pygexc.UnsupportedFunctionality()
+            raise pygexc.UnsupportedFunctionality(
+                'Identify is not supported on this platform')
 
     async def process_fru(self, fru, name=None):
         if fru is None:

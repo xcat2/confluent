@@ -1013,7 +1013,8 @@ class XCCClient(IMMClient):
                 {'IndicatorLED': 'Blinking'},
                 method='PATCH')
             raise pygexc.BypassGenericBehavior()
-        raise pygexc.UnsupportedFunctionality()
+        raise pygexc.UnsupportedFunctionality(
+            'Identify is not supported on this platform')
 
     async def get_description(self):
         wc = await self.wc()

@@ -1661,15 +1661,18 @@ class OEMHandler(object):
         overview = await fishclient._do_web_request('/redfish/v1/')
         licsrv = overview.get('LicenseService', {}).get('@odata.id', None)
         if not licsrv:
-            raise exc.UnsupportedFunctionality()
+            raise exc.UnsupportedFunctionality(
+                'This platform does not implement the redfish license service')
         lcs = await fishclient._do_web_request(licsrv)
         licenses = lcs.get('Licenses', {}).get('@odata.id',None)
         if not licenses:
-            raise exc.UnsupportedFunctionality()
+            raise exc.UnsupportedFunctionality(
+                'This platform does not offer a redfish license collection')
         return licenses
 
-    def get_extended_bmc_configuration(self, fishclient, hideadvanced=True):
-        raise exc.UnsupportedFunctionality()
+    async def get_extended_bmc_configuration(self, fishclient, hideadvanced=True):
+        raise exc.UnsupportedFunctionality(
+            'Extended bmc configuration is not supported on this platform')
 
 
     async def _get_licenses(self, fishclient):

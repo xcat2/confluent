@@ -284,6 +284,18 @@ def _donothing(data):
     pass
 
 
+def exc_text(theexc):
+    """Render an exception for a user, even when it carries no message.
+
+    An error with no text at all tells the user nothing, so name the exception
+    when that is all we have.
+    """
+    text = str(theexc)
+    if not text or text == 'None':
+        return type(theexc).__name__
+    return text
+
+
 class IpmiConsole(conapi.Console):
     configattributes = frozenset(_configattributes)
     bmctonodemapping = {}
@@ -440,8 +452,12 @@ async def perform_request(operator, node, element,
             operator, node, element, configdata, inputdata, cfg, results,
             realop)
         return await ih.handle_request()
+    except pygexc.UnsupportedFunctionality as ue:
+        # Not an unexpected error, just something this target cannot do, so say
+        # so plainly and without a traceback in the log
+        await results.put(msg.ConfluentNodeError(node, exc_text(ue)))
     except pygexc.IpmiException as ipmiexc:
-        excmsg = str(ipmiexc)
+        excmsg = exc_text(ipmiexc)
         if excmsg in ('Session no longer connected', 'timeout'):
             await results.put(msg.ConfluentTargetTimeout(node))
         elif 'Unauthorized name' in excmsg or 'Incorrect password provided' in excmsg:
@@ -461,9 +477,10 @@ async def perform_request(operator, node, element,
             'Mismatch detected between target certificate fingerprint '
             'and pubkeys.tls_hardwaremanager attribute'))
     except pygexc.InvalidParameterValue as e:
-        await results.put(msg.ConfluentNodeError(node, str(e)))
+        await results.put(msg.ConfluentNodeError(node, exc_text(e)))
     except Exception as e:
-        await results.put(msg.ConfluentNodeError(node, 'Unexpected Error: {0}'.format(str(e))))
+        await results.put(msg.ConfluentNodeError(
+            node, 'Unexpected Error: {0}'.format(exc_text(e))))
         traceback.print_exc()
     finally:
         await results.put('Done')
