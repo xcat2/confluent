@@ -990,8 +990,8 @@ class OEMHandler(object):
     async def detach_remote_media(self):
         return None
 
-    async def get_description(self):
-        sysinfo = await self.sysinfo()
+    async def get_description(self, fishclient):
+        sysinfo = await fishclient.sysinfo()
         for chassis in sysinfo.get('Links', {}).get('Chassis', []):
             chassisurl = chassis['@odata.id']
             chassisinfo = await self._do_web_request(chassisurl)

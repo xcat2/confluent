@@ -873,8 +873,24 @@ class Command(object):
     }
 
     async def get_identify(self):
-        await self.sysinfo()
-        ledstate = self.sysinfo
+        sysinfo = await self.sysinfo()
+        ledstate = sysinfo.get('IndicatorLED', None)
+        # The physical indicator belongs to the chassis, and some
+        # implementations do not refresh the system copy of it when it
+        # changes, so prefer a chassis that describes this system alone.
+        for chassis in sysinfo.get('Links', {}).get('Chassis', []):
+            chassisinfo = await self._do_web_request(chassis['@odata.id'])
+            if len(chassisinfo.get('Links', {}).get('ComputerSystems', [])) > 1:
+                continue
+            if chassisinfo.get('IndicatorLED', None) in self._idstatemap:
+                ledstate = chassisinfo['IndicatorLED']
+                break
+        if ledstate is None:
+            raise exc.UnsupportedFunctionality(
+                'Indicator LED state is not reported by this platform')
+        if ledstate not in self._idstatemap:
+            raise exc.PyghmiException(
+                'Unrecognized indicator LED state "{0}"'.format(ledstate))
         return {'identifystate': self._idstatemap[ledstate]}
 
     async def get_health(self, verbose=True):
