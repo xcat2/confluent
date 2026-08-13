@@ -38,14 +38,25 @@ class OEMHandler(generic.OEMHandler):
         self._certverify = webclient.verifycallback
         return self
 
+    # Auxiliary power cycle, offered by the chassis on the megarac based systems
+    # that have an aux power domain to cycle
+    _auxresetaction = '#NvidiaChassis.AuxPowerReset'
+
     async def reseat_bay(self, bay):
         if bay != -1:
             raise pygexc.UnsupportedFunctionality(
                 'This is not an enclosure manager')
-        
-        await self._do_web_request('/redfish/v1/Chassis/Chassis_0/Actions/Oem/NvidiaChassis.AuxPowerReset', {
-            "ResetType": "AuxPowerCycle"
-        })
+        chassiscol = await self._do_web_request('/redfish/v1/Chassis')
+        for chassis in chassiscol.get('Members', []):
+            chassisinfo = await self._do_web_request(chassis['@odata.id'])
+            action = chassisinfo.get('Actions', {}).get('Oem', {}).get(
+                self._auxresetaction, {}).get('target', None)
+            if action:
+                await self._do_web_request(action,
+                                           {'ResetType': 'AuxPowerCycle'})
+                return
+        raise pygexc.UnsupportedFunctionality(
+            'Reseat is not supported on this platform')
 
     def format_messages(self, response):
         msgs = response.get('Messages', [])

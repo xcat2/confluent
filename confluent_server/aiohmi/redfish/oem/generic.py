@@ -713,14 +713,33 @@ class OEMHandler(object):
         # Blanking the username seems to be the convention
         # First, set a bogus password in case the implementation does honor
         # blank user, at least render such an account harmless
+        accinfo = await fishclient._account_url_info_by_id(uid)
+        if not accinfo:
+            raise Exception("No such account found")
+        accounturl = accinfo[0]
+        delerr = None
+        # Some implementations take longer to delete an account than they allow
+        # themselves, and report a timeout for a delete that is really underway
+        # or that would work on a second ask, so give the delete another go and
+        # then check whether the account is actually gone before concluding that
+        # this implementation cannot delete at all
+        for _ in range(3):
+            try:
+                await self._do_web_request(accounturl, method='DELETE')
+                return True
+            except Exception as de:
+                if delerr is None:
+                    delerr = de
+            await asyncio.sleep(3)
+            if not await fishclient._account_url_info_by_id(uid):
+                return True
         try:
-            accinfo = await fishclient._account_url_info_by_id(uid)
-            if not accinfo:
-                raise Exception("No such account found")
-            await self._do_web_request(accinfo[0], method='DELETE')
-        except Exception: # fall back to old ipmi-like behavior for such implementations
             await fishclient.set_user_password(uid, base64.b64encode(os.urandom(15)))
-            await fishclient.set_user_name(uid, '')        
+            await fishclient.set_user_name(uid, '')
+        except Exception:
+            # Report why deleting failed rather than why the fallback failed,
+            # since the delete is what was asked for
+            raise delerr
         return True
 
     async def set_bootdev(self, bootdev, persist=False, uefiboot=None,

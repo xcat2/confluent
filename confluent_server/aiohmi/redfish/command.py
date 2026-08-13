@@ -1268,10 +1268,23 @@ class Command(object):
             return
         fwlist = await self._do_web_request(await self.get_fwinventory())
         fwurls = [x['@odata.id'] for x in fwlist.get('Members', [])]
+        wantcategory = category if category not in (None, 'all') else None
+        entries = []
         async for res in self._do_bulk_requests(fwurls):
-            res = self._extract_fwinfo(res)
+            entries.append((self._fwcategory(res[0]), self._extract_fwinfo(res)))
+        categorised = any(x[0] for x in entries)
+        for fwcategory, res in entries:
             if res[0] is None:
                 continue
+            if wantcategory:
+                if categorised:
+                    if fwcategory != wantcategory:
+                        continue
+                elif wantcategory != 'core':
+                    # This platform does not say what any of its firmware
+                    # belongs to, and an uncategorised inventory on a bmc is
+                    # system firmware, so it can only answer for 'core'
+                    continue
             yield res
 
     def _extract_fwinfo(self, inf):
@@ -1577,32 +1590,48 @@ class Command(object):
                 if 'Authorization' in self.wc.stdheaders:
                     del self.wc.stdheaders['Authorization']            
             return
+        attached = False
         for vmurl in vmurls:
             vminfo = await self._do_web_request(vmurl, cache=False)
-            if vminfo.get('ConnectedVia', None) != 'NotConnected':
+            # ConnectedVia describes how the device is wired to the host rather
+            # than whether anything is in it, and some implementations report a
+            # permanent value there, so judge free by whether an image is loaded
+            if vminfo.get('Image', None) or vminfo.get('Inserted', False):
                 continue
             inserturl = vminfo.get(
                 'Actions', {}).get(
                     '#VirtualMedia.InsertMedia', {}).get('target', None)
             if inserturl:
-                await self._do_web_request(inserturl, {'Image': url})
-            else:
+                try:
+                    await self._do_web_request(inserturl, {'Image': url})
+                    attached = True
+                except (exc.RedfishError, exc.PyghmiException):
+                    # Some implementations advertise the insert action without
+                    # serving it, so fall back to setting the properties
+                    inserturl = None
+            if not inserturl:
                 try:
                     await self._do_web_request(vmurl,
                                                {'Image': url, 'Inserted': True},
-                                               'PATCH')
+                                               'PATCH', etag='*')
                 except exc.RedfishError as re:
                     if re.msgid.endswith(u'PropertyUnknown'):
-                        await self._do_web_request(vmurl, {'Image': url}, 'PATCH')
+                        await self._do_web_request(vmurl, {'Image': url}, 'PATCH',
+                                                   etag='*')
                     else:
                         raise
+                attached = True
             break
         if suspendedxauth:
                 self.wc.stdheaders['X-Auth-Token'] = self.xauthtoken
                 if 'Authorization' in self.wc.stdheaders:
-                    del self.wc.stdheaders['Authorization']    
+                    del self.wc.stdheaders['Authorization']
+        if not attached:
+            raise exc.UnsupportedFunctionality(
+                'No virtual media device on this platform was able to accept '
+                'the image')
         async for res in oem.list_media(self, cache=False):
-            pass          
+            pass
 
     async def detach_remote_media(self):
         oem = await self.oem()
