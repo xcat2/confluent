@@ -817,6 +817,25 @@ class Command(object):
         await self.oem_init()
         return await self._oem.get_sensor_reading(sensorname)
 
+    async def _fetch_lancfg_data(self, channel, param, selector=0):
+        """Internal helper for fetching a lan cfg parameter's raw data
+
+        Answers None if the bmc does not have the parameter.  Such a bmc says
+        so in the completion code and sends no data at all, so the code has to
+        be read before the payload is, and oldraw_command reports the code
+        rather than raising on it, which is why this cannot be done by
+        catching something.
+        """
+        fetchcmd = bytearray((channel, param, selector, 0))
+        fetched = await self.oldraw_command(0xc, 2, data=fetchcmd)
+        if fetched['code'] in (0x80, 0xc9):
+            # parameter not supported, and parameter out of range
+            return None
+        if fetched['code']:
+            raise exc.IpmiException(util.get_ipmi_error(fetched),
+                                    fetched['code'])
+        return bytearray(fetched['data'])
+
     async def _fetch_lancfg_param(self, channel, param, prefixlen=False):
         """Internal helper for fetching lan cfg parameters
 
@@ -824,20 +843,8 @@ class Command(object):
         string with ipv4.  If 6 bytes, colon delimited hex (mac address).  If
         one byte, return the int value
         """
-        fetchcmd = bytearray((channel, param, 0, 0))
-        fetched = await self.oldraw_command(0xc, 2, data=fetchcmd)
-        # A bmc without the parameter says so in the completion code and sends
-        # no data at all, so the code has to be read before the payload is.
-        # oldraw_command reports the code rather than raising on it, which is
-        # why this cannot be done by catching something.
-        if fetched['code'] in (0x80, 0xc9):
-            # parameter not supported, and parameter out of range
-            return None
-        if fetched['code']:
-            raise exc.IpmiException(util.get_ipmi_error(fetched),
-                                    fetched['code'])
-        fetchdata = fetched['data']
-        if not fetchdata or bytearray(fetchdata)[0] != 17:
+        fetchdata = await self._fetch_lancfg_data(channel, param)
+        if not fetchdata or fetchdata[0] != 17:
             return None
         if param == 0x14:
             vlaninfo = struct.unpack('<H', fetchdata[1:])[0]
@@ -1179,12 +1186,14 @@ class Command(object):
         """
         if channel is None:
             channel = await self.get_network_channel()
-        rqdata = (channel, 0x11, 0, 0)
-        rsp = await self.raw_command(netfn=0xc, command=2, data=rqdata)
+        rspdata = await self._fetch_lancfg_data(channel, 0x11)
+        if rspdata is None:
+            raise exc.UnsupportedFunctionality(
+                'This platform does not support alert destinations')
         await self.oem_init()
         if hasattr(self._oem, 'get_alert_destination_count'):
-            return await self._oem.get_alert_destination_count(ord(rsp['data'][1]))
-        return bytearray(rsp['data'])[1]
+            return await self._oem.get_alert_destination_count(rspdata[1])
+        return rspdata[1]
 
     async def get_alert_destination(self, destination=0, channel=None):
         """Get alert destination
@@ -1210,23 +1219,27 @@ class Command(object):
         destinfo = {}
         if channel is None:
             channel = await self.get_network_channel()
-        rqdata = (channel, 18, destination, 0)
-        rsp = await self.raw_command(netfn=0xc, command=2, data=rqdata)
-        dtype, acktimeout, retries = struct.unpack('BBB', rsp['data'][2:])
+        rspdata = await self._fetch_lancfg_data(channel, 18, destination)
+        if rspdata is None:
+            raise exc.UnsupportedFunctionality(
+                'This platform does not support alert destinations')
+        dtype, acktimeout, retries = struct.unpack('BBB', rspdata[2:])
         destinfo['acknowledge_required'] = dtype & 0b10000000 == 0b10000000
         # Ignore destination type for now...
         if destinfo['acknowledge_required']:
             destinfo['acknowledge_timeout'] = acktimeout
         destinfo['retries'] = retries
-        rqdata = (channel, 19, destination, 0)
-        rsp = await self.raw_command(netfn=0xc, command=2, data=rqdata)
-        if bytearray(rsp['data'])[2] & 0b11110000 == 0:
+        rspdata = await self._fetch_lancfg_data(channel, 19, destination)
+        if rspdata is None:
+            raise exc.UnsupportedFunctionality(
+                'This platform does not report alert destination addresses')
+        if rspdata[2] & 0b11110000 == 0:
             destinfo['address_format'] = 'ipv4'
-            destinfo['address'] = socket.inet_ntoa(rsp['data'][4:8])
-        elif bytearray(rsp['data'])[2] & 0b11110000 == 0b10000:
+            destinfo['address'] = socket.inet_ntoa(bytes(rspdata[4:8]))
+        elif rspdata[2] & 0b11110000 == 0b10000:
             destinfo['address_format'] = 'ipv6'
             destinfo['address'] = socket.inet_ntop(socket.AF_INET6,
-                                                   rsp['data'][3:])
+                                                   bytes(rspdata[3:]))
         return destinfo
 
     async def clear_alert_destination(self, destination=0, channel=None):
