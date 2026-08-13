@@ -543,6 +543,7 @@ async def oslist():
 
 
 async def download_image(distname, destdir):
+    destdir = os.path.abspath(destdir)
     dlinfo = await download.get_dlinfo(distname)
     if not dlinfo.iso_url:
         sys.stderr.write('No download information available for {0}\n'.format(distname))
