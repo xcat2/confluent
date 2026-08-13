@@ -17,6 +17,7 @@ if path.startswith('/opt'):
     sys.path.append(path)
 import confluent.collective.manager as collective
 import confluent.selfservice as selfservice
+import confluent.deployment.download as download
 import confluent.util as util
 import confluent.asynclient as client
 import confluent.sshutil as sshutil
@@ -54,6 +55,9 @@ async def main(args):
     osip = sp.add_parser('import', help='Import an OS image from an ISO image')
     osip.add_argument('imagefile', help='File to use for source of importing')
     osip.add_argument('-n', help='Specific a custom distribution name')
+    fetchargs = sp.add_parser('fetch', help='Fetch an OS image from a remote source')
+    fetchargs.add_argument('distname', help='Distribution name to fetch')
+    fetchargs.add_argument('destdir', help='Directory to save the fetched image in')
     upb = sp.add_parser(
         'updateboot',
         help='Push profile.yaml of the named profile data into boot assets as appropriate')
@@ -65,6 +69,8 @@ async def main(args):
 
     if cmdset.command == 'list':
         return await oslist()
+    if cmdset.command == 'fetch':
+        return await download_image(cmdset.distname, cmdset.destdir)
     if cmdset.command == 'import':
         return await osimport(cmdset.imagefile, custname=cmdset.n)
     if cmdset.command == 'importcheck':
@@ -535,6 +541,21 @@ async def oslist():
             print("  " + rsp['item']['href'].replace('/', ''))
     print("")
 
+
+async def download_image(distname, destdir):
+    dlinfo = await download.get_dlinfo(distname)
+    if not dlinfo.iso_url:
+        sys.stderr.write('No download information available for {0}\n'.format(distname))
+        sys.exit(1)
+    if not os.path.exists(destdir):
+        sys.stderr.write('Destination directory {0} does not exist\n'.format(destdir))
+        sys.exit(1)
+    destfile = os.path.join(destdir, dlinfo.iso_name)
+    if os.path.exists(destfile):
+        sys.stderr.write('Destination file {0} already exists\n'.format(destfile))
+        sys.exit(1)
+    print('Downloading {0} to {1}'.format(dlinfo.iso_url, destfile))
+    await download.download_dist(destfile, destdir, dlinfo=dlinfo)
 
 async def osimport(imagefile, checkonly=False, custname=None):
     c = client.Command()
