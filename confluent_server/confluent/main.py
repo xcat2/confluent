@@ -230,10 +230,15 @@ def doexit():
         os.remove('/var/run/confluent/dbg.sock')
     except OSError:
         pass
-    pidfile = open('/var/run/confluent/pid')
-    pid = pidfile.read()
-    if pid == str(os.getpid()):
-        os.remove('/var/run/confluent/pid')
+    try:
+        with open('/var/run/confluent/pid') as pidfile:
+            pid = pidfile.read()
+        if pid == str(os.getpid()):
+            os.remove('/var/run/confluent/pid')
+    except OSError:
+        # Someone else already tidied it up, which is not worth a traceback out
+        # of an atexit callback
+        pass
 
 
 def _initsecurity(config):
