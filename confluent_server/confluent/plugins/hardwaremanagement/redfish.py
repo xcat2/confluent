@@ -334,10 +334,9 @@ async def perform_request(operator, node, element,
             realop)
         return await ih.handle_request()
     except socket.error as se:
-        if hasattr(se, 'strerror'):
-            await results.put(msg.ConfluentTargetTimeout(node, se.strerror))
-        else:
-            await results.put(msg.ConfluentTargetTimeout(node, str(se)))
+        # Every OSError has a strerror, but it is None on plenty of them, so
+        # ask for the text the same way as everywhere else rather than trust it
+        await results.put(msg.ConfluentTargetTimeout(node, exc_text(se)))
     except pygexc.IpmiException as ipmiexc:
         excmsg = exc_text(ipmiexc)
         if excmsg in ('Session no longer connected', 'timeout'):
@@ -346,7 +345,7 @@ async def perform_request(operator, node, element,
             await results.put(msg.ConfluentNodeError(node, excmsg))
             raise
     except exc.TargetEndpointUnreachable as tu:
-        await results.put(msg.ConfluentTargetTimeout(node, str(tu)))
+        await results.put(msg.ConfluentTargetTimeout(node, exc_text(tu)))
     except exc.TargetEndpointBadCredentials:
         await results.put(msg.ConfluentTargetInvalidCredentials(node))
     except ssl.SSLEOFError:

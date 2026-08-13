@@ -455,7 +455,7 @@ async def perform_request(operator, node, element,
             await results.put(msg.ConfluentNodeError(node, excmsg))
             #raise
     except exc.TargetEndpointUnreachable as tu:
-        await results.put(msg.ConfluentTargetTimeout(node, str(tu)))
+        await results.put(msg.ConfluentTargetTimeout(node, exc_text(tu)))
     except ssl.SSLEOFError:
         await results.put(msg.ConfluentNodeError(
             node, 'Unable to communicate with the https server on '

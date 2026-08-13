@@ -46,13 +46,15 @@ class WebClient(object):
                 'pubkeys.tls_hardwaremanager attribute'))
             return {}
         except (socket.gaierror, socket.herror, TimeoutError) as e:
-            results.put_nowait(msg.ConfluentTargetTimeout(self.node, str(e)))
+            results.put_nowait(
+                msg.ConfluentTargetTimeout(self.node, exc.exc_text(e)))
             return {}
         except OSError as e:
             if e.errno == 113:
                 results.put_nowait(msg.ConfluentTargetTimeout(self.node))
             else:
-                results.put_nowait(msg.ConfluentTargetTimeout(self.node), str(e))
+                results.put_nowait(
+                    msg.ConfluentTargetTimeout(self.node, exc.exc_text(e)))
             return {}
         except Exception as e:
             results.put_nowait(msg.ConfluentNodeError(self.node,

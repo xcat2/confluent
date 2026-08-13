@@ -238,10 +238,14 @@ class ConfluentMessage(object):
 
 class ConfluentNodeError(object):
     apicode = 500
+    # What to say when the caller had no text to offer.  An error that reads
+    # "None" tells a user nothing, and every route out of here, the api body,
+    # the html and the exception strip_node raises, wants something to print.
+    defaulterror = 'Unknown error'
 
-    def __init__(self, node, errorstr):
+    def __init__(self, node, errorstr=None):
         self.node = node
-        self.error = errorstr
+        self.error = errorstr if errorstr else self.defaulterror
 
     def serialize(self):
         return msgpack.packb(
@@ -267,10 +271,7 @@ class ConfluentNodeError(object):
 
 class NotImplemented(ConfluentNodeError):
     apicode = 501
-
-    def __init__(self, node, errorstr='Not implemented'):
-        self.node = node
-        self.error = errorstr
+    defaulterror = 'Not implemented'
 
 class Generic(ConfluentMessage):
 
@@ -289,10 +290,7 @@ class Generic(ConfluentMessage):
 
 class ConfluentResourceUnavailable(ConfluentNodeError):
     apicode = 503
-
-    def __init__(self, node, errstr='Unavailable'):
-        self.node = node
-        self.error = errstr
+    defaulterror = 'Unavailable'
 
     def strip_node(self, node):
         raise exc.TargetResourceUnavailable()
@@ -300,11 +298,7 @@ class ConfluentResourceUnavailable(ConfluentNodeError):
 
 class ConfluentTargetTimeout(ConfluentNodeError):
     apicode = 504
-
-    def __init__(self, node, errstr='timeout'):
-        self.node = node
-        self.error = errstr
-
+    defaulterror = 'timeout'
 
     def strip_node(self, node):
         raise exc.TargetEndpointUnreachable(self.error)
@@ -312,10 +306,7 @@ class ConfluentTargetTimeout(ConfluentNodeError):
 
 class ConfluentTargetNotFound(ConfluentNodeError):
     apicode = 404
-
-    def __init__(self, node, errorstr='not found'):
-        self.node = node
-        self.error = errorstr
+    defaulterror = 'not found'
 
     def strip_node(self, node):
         raise exc.NotFoundException(self.error)
@@ -323,9 +314,7 @@ class ConfluentTargetNotFound(ConfluentNodeError):
 
 class ConfluentTargetInvalidCredentials(ConfluentNodeError):
     apicode = 502
-    def __init__(self, node, errstr='bad credentials'):
-        self.node = node
-        self.error = errstr
+    defaulterror = 'bad credentials'
 
     def strip_node(self, node):
         raise exc.TargetEndpointBadCredentials
