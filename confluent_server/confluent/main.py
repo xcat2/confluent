@@ -194,7 +194,24 @@ def _checkpidfile():
         pidfile.close()
 
 
+_stopevent = None
+
+
+def request_stop():
+    """Ask the service to shut down.
+
+    Called from the event loop, either by a signal handler or by a client
+    asking for a shutdown, so it only has to wake the main coroutine.
+    """
+    if _stopevent is not None:
+        _stopevent.set()
+
+
 def terminate(signalname, frame):
+    # Only for platforms where the event loop cannot deliver signals for us.
+    # Raising SystemExit from a handler while the loop runs escapes run_forever
+    # and leaves asyncio unable to close the loop, which is why the loop is
+    # asked to stop instead wherever that is possible.
     sys.exit(0)
 
 def dumptrace(signalname, frame):
@@ -319,8 +336,14 @@ async def asyncrun(args):
     if havefcntl:
         _updatepidfile()
     asyncio.get_running_loop().set_debug(True)
-    signal.signal(signal.SIGINT, terminate)
-    signal.signal(signal.SIGTERM, terminate)
+    global _stopevent
+    _stopevent = asyncio.Event()
+    for stopsig in (signal.SIGINT, signal.SIGTERM):
+        try:
+            asyncio.get_running_loop().add_signal_handler(stopsig, request_stop)
+        except NotImplementedError:  # silly windows
+            signal.signal(stopsig, terminate)
+    configmanager.set_shutdown_hook(request_stop)
     atexit.register(doexit)
     confluentuuid = configmanager.get_global('confluent_uuid')
     if not confluentuuid:
@@ -363,10 +386,17 @@ async def asyncrun(args):
     if not watchdogsecs:
         watchdogsecs = 200
     watchdogsecs = watchdogsecs / 2
-    while 1:
-        await asyncio.sleep(watchdogsecs)
+    while not _stopevent.is_set():
+        try:
+            await asyncio.wait_for(_stopevent.wait(), watchdogsecs)
+        except asyncio.TimeoutError:
+            pass
+        else:
+            break
         if notifysock:
             sock.send(b'WATCHDOG=1')
+    log.log({'info': 'Confluent management service shutting down'}, flush=True)
+    configmanager.ConfigManager.wait_for_sync()
 
 def _get_connector_config(session):
     host = conf.get_option(session, 'bindhost')

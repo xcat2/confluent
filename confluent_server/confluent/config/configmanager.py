@@ -105,6 +105,9 @@ _initlock = asyncio.Lock()
 _followerlocks = {}
 _config_areas = ('nodegroups', 'nodes', 'usergroups', 'users')
 tracelog = None
+# How to stop the service when a client asks for a shutdown. The running
+# service registers this, since only it knows how to unwind itself.
+_shutdownhook = None
 statelessmode = False
 _cfgstore = None
 _pendingchangesets = {}
@@ -143,6 +146,12 @@ def attrib_supports_expression(attrib):
     if attrib.startswith('secret.') or attrib.startswith('crypted.') or attrib.startswith('custom.nodesecret.'):
         return False
     return True
+
+
+def set_shutdown_hook(hook):
+    """Register how the running service should be asked to stop."""
+    global _shutdownhook
+    _shutdownhook = hook
 
 
 def _mkpath(pathname):
@@ -2884,6 +2893,12 @@ class ConfigManager(object):
 
     @classmethod
     def shutdown(cls):
+        if _shutdownhook is not None:
+            # The service knows how to stop itself in an orderly way, including
+            # flushing configuration, and raising SystemExit from here would go
+            # through a running event loop, which asyncio cannot recover from
+            _shutdownhook()
+            return
         cls.wait_for_sync()
         sys.exit(0)
 
