@@ -93,6 +93,21 @@ REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=30)
 DOWNLOAD_TIMEOUT = aiohttp.ClientTimeout(total=None, sock_connect=30, sock_read=60)
 
 
+def list_fetchable_distributions():
+    """Return a list of all known fetchable distributions."""
+    distlist = []
+    for name, cfg in EL_DISTROS.items():
+        for arch in SUPPORTED_ARCHS:
+            for major in (8, 9, 10):
+                distlist.append(f"{name}-{major}-{arch}")
+    for ver in UBUNTU["sources"]:
+        for version in ["24.04", "26.04"]:
+            distlist.append(f"ubuntu-{version}-{ver[0]}")
+    for codename, ver in DEBIAN["suites"]:
+        for arch in DEBIAN["arches"]:
+            distlist.append(f"debian-{ver}-{arch}")
+    return distlist
+
 # Many of the OS download sites are auto generated HTML indexes, we must parse them
 class DirectoryParser(HTMLParser):
     """Extract href links from an nginx/apache directory listing page."""

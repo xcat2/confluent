@@ -166,7 +166,7 @@ _confluent_osimage_completion()
         return
     elif [ ${CMPARGS[1]} == 'fetch' ]; then
         if [ $NUMARGS == 3 ]; then
-            COMPREPLY=($(compgen -W "alma-10-aarch64 alma-10-x86_64  debian-13-amd64 rocky-10-aarch64 rocky-10-x86_64 ubuntu-26.04-amd64 ubuntu-26.04-arm64 " -- ${COMP_WORDS[COMP_CWORD]}))
+            COMPREPLY=($(compgen -W "$(osdeploy getfetchable)" -- "${COMP_WORDS[COMP_CWORD]}"))
             return
         fi
         compopt -o  dirnames

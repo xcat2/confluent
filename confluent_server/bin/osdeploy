@@ -66,6 +66,10 @@ async def main(args):
     osls = sp.add_parser('list', help='List OS images available for deployment')
     ubp = sp.add_parser('rebase', help='Update stock profile content from packaged updates')
     ubp.add_argument('profile', help='Profile to rebase from packaged content')
+    if len(sys.argv) > 2 and sys.argv[1] == 'getfetchable':  # for bash completion
+        distlist = download.list_fetchable_distributions()
+        print (' '.join(distlist))
+        sys.exit(0)
     cmdset = ap.parse_args()
 
     if cmdset.command == 'list':
