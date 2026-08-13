@@ -301,6 +301,11 @@ class OEMHandler(object):
         # code to know whether it cares or not.  The main purpose of the
         # components argument is to indicate when certain performance
         # optimizations can be performed.
+        if category not in (None, 'all', 'core'):
+            # The bmc firmware is system firmware, so it is the answer to
+            # 'core' and to nothing else. Without this a request for, say,
+            # disk firmware answers with the bmc version.
+            return
         yield 'BMC Version', {'version': bmcver}
 
     async def get_oem_capping_enabled(self):
