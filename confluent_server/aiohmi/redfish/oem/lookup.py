@@ -39,9 +39,25 @@ async def get_oem_handler(sysinfo, sysurl, webclient, cache, cmd, rootinfo={}):
         if oem in OEMMAP:
             return await OEMMAP[oem].get_handler(sysinfo, sysurl, webclient, cache,
                                                  cmd, rootinfo)
-    if rootinfo:  # rootinfo indicates early invocation, bmcinfo not ready yet
-        return await generic.OEMHandler.create(sysinfo, sysurl, webclient, cache, cmd._gpool, rootinfo)
-    bmcinfo = await cmd.bmcinfo()
+    # The manager document names the vendor on implementations that do not say
+    # so at the service root or on the system, so consult it before settling for
+    # generic. During the early invocation the client cannot fetch it through
+    # cmd yet, so ask for it directly.
+    bmcinfo = {}
+    if rootinfo:
+        managers = rootinfo.get('Managers', {}).get('@odata.id', None)
+        if managers:
+            mgrcol, status = await webclient.grab_json_response_with_status(
+                managers)
+            if status == 200:
+                for manager in mgrcol.get('Members', []):
+                    mgrinfo, status = await webclient.grab_json_response_with_status(
+                        manager['@odata.id'])
+                    if status == 200:
+                        bmcinfo = mgrinfo
+                    break
+    else:
+        bmcinfo = await cmd.bmcinfo()
     for oem in bmcinfo.get('Oem', {}):
         if oem in OEMMAP:
             return await OEMMAP[oem].get_handler(sysinfo, sysurl, webclient, cache,
