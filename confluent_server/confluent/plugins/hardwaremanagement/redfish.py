@@ -17,6 +17,7 @@ import json
 import asyncio
 import confluent.vinzmanager as vinzmanager
 import confluent.exceptions as exc
+from confluent.exceptions import exc_text
 import confluent.firmwaremanager as firmwaremanager
 import confluent.messages as msg
 import confluent.util as util
@@ -270,18 +271,6 @@ def _donothing(data):
     # a dummy function to avoid some awkward exceptions from
     # zombie pyghmi console objects
     pass
-
-
-def exc_text(theexc):
-    """Render an exception for a user, even when it carries no message.
-
-    An error with no text at all tells the user nothing, so name the exception
-    when that is all we have.
-    """
-    text = str(theexc)
-    if not text or text == 'None':
-        return type(theexc).__name__
-    return text
 
 
 async def perform_requests(operator, nodes, element, cfg, inputdata, realop):

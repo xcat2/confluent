@@ -29,11 +29,11 @@ async def reseat_bays(encmgr, bays, configmanager, rspq):
                         inputdata={'reseat': encbay}):
                     await rspq.put(rsp)
             except pygexc.UnsupportedFunctionality as uf:
-                await rspq.put(msg.ConfluentNodeError(node, str(uf)))
+                await rspq.put(msg.ConfluentNodeError(node, exc.exc_text(uf)))
             except exc.TargetEndpointUnreachable as uf:
-                await rspq.put(msg.ConfluentNodeError(node, str(uf)))
+                await rspq.put(msg.ConfluentNodeError(node, exc.exc_text(uf)))
             except Exception as e:
-                await rspq.put(msg.ConfluentNodeError(node, str(e)))
+                await rspq.put(msg.ConfluentNodeError(node, exc.exc_text(e)))
     finally:
         await rspq.put(None)
 

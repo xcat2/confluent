@@ -19,6 +19,19 @@ import base64
 import json
 import msgpack
 
+def exc_text(theexc):
+    """Render an exception for a user, even when it carries no message.
+
+    An error with no text at all tells the user nothing, so fall back to the
+    description a confluent exception carries by class, and then to the name of
+    the exception.
+    """
+    text = str(theexc)
+    if text and text != 'None':
+        return text
+    return getattr(theexc, '_apierrorstr', None) or type(theexc).__name__
+
+
 def deserialize_exc(msg):
     excd = msgpack.unpackb(msg, raw=False)
     if excd[0] == 'Exception':
@@ -35,8 +48,7 @@ class ConfluentException(Exception):
     _apierrorstr = 'Unexpected Error'
 
     def get_error_body(self):
-        errstr = ' - '.join((self._apierrorstr, str(self)))
-        return json.dumps({'error': errstr })
+        return json.dumps({'error': self.apierrorstr})
 
     def serialize(self):
         return msgpack.packb([self.__class__.__name__, [str(self)]],
