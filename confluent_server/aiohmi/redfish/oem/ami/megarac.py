@@ -168,6 +168,8 @@ class OEMHandler(generic.OEMHandler):
             raise Exception('Failed to authenticate to BMC')
         if 'CSRFToken' in rsp:
             self.csrftok = rsp['CSRFToken']
-            wc.set_header('X-CSRF-Token', rsp['CSRFToken'])
+            # The header MegaRAC checks is spelled without separators; with
+            # X-CSRF-Token every subsequent call answers Invalid Authentication
+            wc.set_header('X-CSRFTOKEN', rsp['CSRFToken'])
         self._wc = wc
         return wc
