@@ -555,7 +555,7 @@ async def download_image(distname, destdir):
         sys.stderr.write('Destination file {0} already exists\n'.format(destfile))
         sys.exit(1)
     print('Downloading {0} to {1}'.format(dlinfo.iso_url, destfile))
-    await download.download_dist(destfile, destdir, dlinfo=dlinfo)
+    await download.download_dist(destfile, destdir, progress_callback=download.print_progress, dlinfo=dlinfo)
 
 async def osimport(imagefile, checkonly=False, custname=None):
     c = client.Command()
