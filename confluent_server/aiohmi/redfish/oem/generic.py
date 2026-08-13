@@ -1458,7 +1458,8 @@ class OEMHandler(object):
             if 'HttpPushUriTargetsBusy' in usd:
                 await self._do_web_request(
                     '/redfish/v1/UpdateService',
-                    {'HttpPushUriTargetsBusy': False}, method='PATCH')
+                    {'HttpPushUriTargetsBusy': False}, method='PATCH',
+                    etag='*')
 
     async def continue_update(self, rsp, progress):
             monitorurl = rsp['@odata.id']
@@ -1524,7 +1525,8 @@ class OEMHandler(object):
                 raise exc.UnsupportedFunctionality('Redfish firmware update only supported for implementations with push update support')
             if 'HttpPushUriTargetsBusy' in usd:
                 await self._do_web_request('/redfish/v1/UpdateService',
-                    {'HttpPushUriTargetsBusy': True}, method='PATCH')
+                    {'HttpPushUriTargetsBusy': True}, method='PATCH',
+                    etag='*')
                     
         return usd,upurl,ismultipart
 

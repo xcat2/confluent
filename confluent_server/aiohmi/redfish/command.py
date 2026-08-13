@@ -945,7 +945,8 @@ class Command(object):
         netprotocols = bmcinfo.get('NetworkProtocol', {}).get('@odata.id', None)
         if netprotocols:
             request = {'NTP':{'ProtocolEnabled': enable}}
-            await self._do_web_request(netprotocols, request, method='PATCH')
+            await self._do_web_request(netprotocols, request, method='PATCH',
+                                       etag='*')
             await self._do_web_request(netprotocols, cache=0)
 
     async def get_ntp_servers(self):
@@ -975,7 +976,8 @@ class Command(object):
                 else:
                     currntpservers[index] = server
         request = {'NTP':{'NTPServers': currntpservers}}
-        await self._do_web_request(netprotocols, request, method='PATCH')
+        await self._do_web_request(netprotocols, request, method='PATCH',
+                                   etag='*')
         await self._do_web_request(netprotocols, cache=0)
 
     async def clear_bmc_configuration(self):
@@ -1047,7 +1049,7 @@ class Command(object):
             }]
         if patch:
             nicurl = await self._get_bmc_nic_url(name)
-            await self._do_web_request(nicurl, patch, 'PATCH')
+            await self._do_web_request(nicurl, patch, 'PATCH', etag='*')
 
     async def set_net_configuration(self, ipv4_address=None, ipv4_configuration=None,
                               ipv4_gateway=None, vlan_id=None, name=None):
@@ -1085,14 +1087,14 @@ class Command(object):
         if patch:
             nicurl = await self._get_bmc_nic_url(name)
             try:
-                await self._do_web_request(nicurl, patch, 'PATCH')
+                await self._do_web_request(nicurl, patch, 'PATCH', etag='*')
             except exc.RedfishError:
                 patch = {'IPv4Addresses': [ipinfo]}
                 if dodhcp:
                     ipinfo['AddressOrigin'] = 'DHCP'
                 elif dodhcp is not None:
                     ipinfo['AddressOrigin'] = 'Static'
-                await self._do_web_request(nicurl, patch, 'PATCH')
+                await self._do_web_request(nicurl, patch, 'PATCH', etag='*')
 
     async def get_net6_configuration(self, name=None):
         nicurl = await self._get_bmc_nic_url(name)
@@ -1147,7 +1149,7 @@ class Command(object):
 
     async def set_hostname(self, hostname):
         await self._do_web_request(await self.get_bmcnicurl(),
-                             {'HostName': hostname}, 'PATCH')
+                             {'HostName': hostname}, 'PATCH', etag='*')
 
     async def get_firmware(self, components=(), category=None):
         self._fwnamemap = {}
@@ -1264,7 +1266,7 @@ class Command(object):
             for chassis in sysinfo.get('Links', {}).get('Chassis', []):
                 chassisurl = chassis['@odata.id']
                 await self._do_web_request(chassisurl, {'Location': locationinfo},
-                                     method='PATCH')
+                                     method='PATCH', etag='*')
 
     async def oem(self):
         if not self._oem:
@@ -1522,11 +1524,11 @@ class Command(object):
                             await self._do_web_request(currl,
                                                        {'Image': None,
                                                         'Inserted': False},
-                                                       method='PATCH')
+                                                       method='PATCH', etag='*')
                         except exc.RedfishError as re:
                             if re.msgid.endswith(u'PropertyUnknown'):
                                 await self._do_web_request(currl, {'Image': None},
-                                                     method='PATCH')
+                                                     method='PATCH', etag='*')
                             else:
                                 raise
         oem = await self.oem()
