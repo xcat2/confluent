@@ -549,6 +549,23 @@ class OEMHandler(object):
                     }
                     yield certdesc
 
+    # A log service whose id or name says one of these is not an event log:
+    # the bmc's own systemd journal, dumps of several kinds, and firmware boot
+    # progress.  Reading them buries the events that were asked for, and
+    # clearing them destroys diagnostic data that has nothing to do with the
+    # event log.
+    noneventlogwords = ('journal', 'dump', 'postcode', 'hostlogger', 'crash')
+
+    @classmethod
+    def is_event_log(cls, loginfo):
+        """Say whether a log service holds events rather than something else"""
+        identity = '{0} {1}'.format(loginfo.get('Id', ''),
+                                    loginfo.get('Name', '')).lower()
+        for word in cls.noneventlogwords:
+            if word in identity:
+                return False
+        return True
+
     async def get_event_log(self, clear=False, fishclient=None, extraurls=[]):
         bmcinfo = await self._do_web_request(await fishclient.get_bmcurl())
         lsurl = bmcinfo.get('LogServices', {}).get('@odata.id', None)
@@ -566,10 +583,41 @@ class OEMHandler(object):
                 correction = now - currtime
             except TypeError:
                 correction = now - currtime.replace(tzinfo=utz)
-        lurls = (await self._do_web_request(lsurl)).get('Members', [])
-        lurls.extend(extraurls)
+
+        async def eventlogurls(lscollection):
+            """The log services in a collection that hold events"""
+            found = []
+            lscol = await self._do_web_request(lscollection)
+            for member in lscol.get('Members', []):
+                candidate = member['@odata.id']
+                try:
+                    loginfo = await self._do_web_request(candidate,
+                                                         cache=(not clear))
+                except Exception:
+                    # leave it in, so the loop below reports it as unreadable
+                    found.append(candidate)
+                    continue
+                if self.is_event_log(loginfo):
+                    found.append(candidate)
+            return found
+
+        lurls = await eventlogurls(lsurl)
+        if not lurls:
+            # Some implementations keep no event log under the manager and put
+            # it under the system instead, so fall back to looking there rather
+            # than answering with nothing at all.
+            for sysurl in self._allsysurls:
+                currsysinfo = await self._do_web_request(sysurl)
+                syslsurl = currsysinfo.get('LogServices', {}).get(
+                    '@odata.id', None)
+                if syslsurl:
+                    lurls.extend(await eventlogurls(syslsurl))
+        lurls.extend([x['@odata.id'] for x in extraurls])
+        seenurls = set()
         for lurl in lurls:
-            lurl = lurl['@odata.id']
+            if lurl in seenurls:
+                continue
+            seenurls.add(lurl)
             try:
                 loginfo = await self._do_web_request(lurl, cache=(not clear))
             except Exception:
@@ -580,7 +628,6 @@ class OEMHandler(object):
                 record['timestamp'] = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
                 yield record
                 continue
-            loginfo = await self._do_web_request(lurl, cache=(not clear))
             entriesurl = loginfo.get('Entries', {}).get('@odata.id', None)
             if not entriesurl:
                 continue
