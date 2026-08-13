@@ -1559,6 +1559,11 @@ class IpmiHandler:
         if self.element[3] == 'enabled':
             if 'read' == self.op:
                 enabled = await self.ipmicmd.get_ntp_enabled()
+                if enabled is None:
+                    # None is how the platform says it cannot tell us, and
+                    # reporting that as the text "None" tells the caller nothing
+                    raise pygexc.UnsupportedFunctionality(
+                        'NTP state is not reported by this platform')
                 await self.output.put(msg.NTPEnabled(self.node, enabled))
                 return
             elif 'update' == self.op:
