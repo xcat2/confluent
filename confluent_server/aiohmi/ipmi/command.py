@@ -825,14 +825,19 @@ class Command(object):
         one byte, return the int value
         """
         fetchcmd = bytearray((channel, param, 0, 0))
-        try:
-            fetched = await self.oldraw_command(0xc, 2, data=fetchcmd)
-        except exc.IpmiException as ie:
-            if ie.ipmicode == 0x80:
-                return None
-            raise
+        fetched = await self.oldraw_command(0xc, 2, data=fetchcmd)
+        # A bmc without the parameter says so in the completion code and sends
+        # no data at all, so the code has to be read before the payload is.
+        # oldraw_command reports the code rather than raising on it, which is
+        # why this cannot be done by catching something.
+        if fetched['code'] in (0x80, 0xc9):
+            # parameter not supported, and parameter out of range
+            return None
+        if fetched['code']:
+            raise exc.IpmiException(util.get_ipmi_error(fetched),
+                                    fetched['code'])
         fetchdata = fetched['data']
-        if bytearray(fetchdata)[0] != 17:
+        if not fetchdata or bytearray(fetchdata)[0] != 17:
             return None
         if param == 0x14:
             vlaninfo = struct.unpack('<H', fetchdata[1:])[0]
@@ -1066,8 +1071,12 @@ class Command(object):
             3: 'BIOS',
             4: 'Other',
         }
-        retdata['ipv4_configuration'] = v4cfgmethods[await self._fetch_lancfg_param(
-            channel, 4)]
+        v4cfgmethod = await self._fetch_lancfg_param(channel, 4)
+        if v4cfgmethod is None:
+            retdata['ipv4_configuration'] = None
+        else:
+            retdata['ipv4_configuration'] = v4cfgmethods.get(
+                v4cfgmethod, 'Unknown ({0})'.format(v4cfgmethod))
         retdata['mac_address'] = await self._fetch_lancfg_param(channel, 5)
         retdata['ipv4_gateway'] = await self._fetch_lancfg_param(channel, 12)
         retdata['ipv4_backup_gateway'] = await self._fetch_lancfg_param(channel, 14)
