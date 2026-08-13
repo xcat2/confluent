@@ -489,6 +489,10 @@ def direct_console():
     global oldfl
     if console_direct_mode:
         return False
+    if not sys.stdin.isatty():
+        # Nothing to put in raw mode, which is fine for output only usage such
+        # as reporting an error from a screenshot request
+        return False
     console_direct_mode = True
     oldtcattr = termios.tcgetattr(sys.stdin.fileno())
     oldfl = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFL)
@@ -907,7 +911,9 @@ async def do_screenshot():
                         if len(imgdata) < 32: # We were subjected to error
                             errorstr = 'Unable to get screenshot'
                     if errorstr or imgdata:
-                        imgdata = base64.b64decode(imgdata)
+                        # A node may report an error with no image at all, and
+                        # there is nothing to decode in that case
+                        imgdata = base64.b64decode(imgdata) if imgdata else None
                         draw_node(node, imgdata, errorstr, firstnodename, cwidth, cheight)
         urlbynode = {}
         for node in vnconly:
@@ -1086,6 +1092,10 @@ def draw_node(node, imgdata, errorstr, firstnodename, cwidth, cheight):
     sys.stdout.flush()
 
 if options.screenshot or options.video:
+    if not sys.stdout.isatty():
+        sys.stderr.write(
+            'Screenshot and video rendering need a terminal to draw in\n')
+        sys.exit(1)
     streaming = options.video
     try:
         cursor_hide()

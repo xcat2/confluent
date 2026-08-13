@@ -175,6 +175,10 @@ class LogReplay(object):
 
 
 def _replay_to_console(txtfile, binfile):
+    if not sys.stdin.isatty():
+        # Interactive replay needs a terminal to put in raw mode and to take
+        # navigation keys from, so without one just write the log out
+        return dump_to_console(txtfile)
     replay = LogReplay(txtfile, binfile)
     oldtcattr = termios.tcgetattr(sys.stdin.fileno())
     tty.setraw(sys.stdin.fileno())

@@ -584,9 +584,9 @@ def get_input_message(path, operation, inputdata, nodes=None, multinode=False,
     elif '/'.join(path).startswith('media/') and inputdata:
         return InputMedia(path, nodes, inputdata, configmanager)
     elif '/'.join(path).startswith('support/servicedata') and inputdata:
-        return InputMedia(path, nodes, inputdata, configmanager)
+        return InputDownloadTarget(path, nodes, inputdata, configmanager)
     elif '/'.join(path).startswith('configuration/management_controller/save_licenses') and inputdata:
-        return InputMedia(path, nodes, inputdata, configmanager)
+        return InputDownloadTarget(path, nodes, inputdata, configmanager)
     elif '/'.join(path).startswith(
             'configuration/management_controller/licenses') and inputdata:
         return InputLicense(path, nodes, inputdata, configmanager)
@@ -631,6 +631,9 @@ def isurl(value):
 
 class InputFirmwareUpdate(ConfluentMessage):
     urlsupported = False
+    # Whether the named file is something confluent will read from the caller,
+    # or somewhere confluent is being asked to write to
+    isdownload = False
     def __init__(self, path, nodes, inputdata, configmanager):
         self._filename = inputdata.get('filename', inputdata.get('url', inputdata.get('dirname', None)))
         self.bank = inputdata.get('bank', None)
@@ -660,7 +663,8 @@ class InputFirmwareUpdate(ConfluentMessage):
                 if value.startswith('/var/log/confluent'):
                     raise Exception(
                         'File transfer with /var/log/confluent is not supported')
-                if curruser and not value.startswith('/var/lib/confluent/client_assets/'):
+                if (curruser and not self.isdownload
+                        and not value.startswith('/var/lib/confluent/client_assets/')):
                     try:
                         pwent = pwd.getpwnam(curruser)
                         if not checkaccess(curruser, value, pwent):
@@ -699,6 +703,12 @@ class InputFirmwareUpdate(ConfluentMessage):
             raise Exception(
                 'File transfer with /var/log/confluent is not supported')
         return self.filebynode[node]
+
+class InputDownloadTarget(InputFirmwareUpdate):
+    # Where to save something confluent fetches, so the path is a destination
+    # rather than a file that has to exist and be readable already
+    isdownload = True
+
 
 class InputMedia(InputFirmwareUpdate):
     # Use InputFirmwareUpdate

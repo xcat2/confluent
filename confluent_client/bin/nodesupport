@@ -76,6 +76,11 @@ def download_servicedata(noderange, media, options):
     session.stop_if_noderange_over(noderange, options.maxnodes)
     for res in session.create(resource, upargs):
         if 'created' not in res:
+            if not res.get('databynode', None):
+                # A failure that is not attributed to any node still has to be
+                # reported, or the command looks like it quietly did nothing
+                printerror(res)
+                continue
             for nodename in res.get('databynode', ()):
                 output.set_output(nodename, 'error!')
                 noderrs[nodename] = res['databynode'][nodename].get(
@@ -148,5 +153,9 @@ def main():
         argparser.print_help()
         sys.exit(1)
     handler(noderange, media, options)
+    # The handlers record failures in exitcode, so let a caller see them
+    sys.exit(exitcode)
+
+
 if __name__ == '__main__':
     main()

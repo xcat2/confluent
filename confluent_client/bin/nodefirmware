@@ -99,7 +99,7 @@ def get_update_progress(session, url):
     for res in session.read(url):
         status = res.get('phase', 'error')
         percent = res.get('progress', None)
-        detail = res.get('detail', repr(res)),
+        detail = res.get('detail', repr(res))
         if status == 'error':
             text = 'error!'
         else:
@@ -143,6 +143,11 @@ def update_firmware(session, filename):
                 pass
     for res in session.create(resource, upargs):
         if 'created' not in res:
+            if not res.get('databynode', None):
+                # A failure that is not attributed to any node still has to be
+                # reported, or the command looks like it quietly did nothing
+                exitcode |= client.printerror(res)
+                continue
             for nodename in res.get('databynode', ()):
                 output.set_output(nodename, 'error!')
                 noderrs[nodename] = res['databynode'][nodename].get(
@@ -196,7 +201,10 @@ def show_firmware(session):
     if not nodes_matched:
         sys.stderr.write('No matching nodes for noderange "{0}"\n'.format(noderange))
     elif not firmware_shown and not exitcode:
-        argparser.print_help()
+        # Asking about firmware the target does not describe is a legitimate
+        # question with an empty answer, not a mistake in how it was asked
+        sys.stderr.write('No firmware reported for "{0}"\n'.format(
+            ','.join(components)))
 
 
 try:
@@ -204,12 +212,11 @@ try:
     if querystatus:
         for res in session.read(
                 '/noderange/{0}/inventory/firmware/updatestatus'.format(noderange)):
+            exitcode |= client.printerror(res)
             for node in res.get('databynode', {}):
                 currstat = res['databynode'][node].get('status', None)
                 if currstat:
                     print('{}: {}'.format(node, currstat))
-                else:
-                    print(repr(res))
     elif upfile is None:
         show_firmware(session)
     else:
