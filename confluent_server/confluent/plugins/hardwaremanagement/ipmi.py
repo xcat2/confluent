@@ -554,6 +554,17 @@ class IpmiHandler:
             self.ipmicmd = ipmicmd
             self.loggedin = True
 
+    def _unsupported(self):
+        """Say that the requested resource has no ipmi implementation.
+
+        Falling through to a bare exception would be reported as an unexpected
+        error and logged with a traceback, when all that happened is that this
+        transport does not offer the resource.
+        """
+        return pygexc.UnsupportedFunctionality(
+            '"{0}" is not implemented for ipmi'.format(
+                '/'.join([str(x) for x in self.element])))
+
     async def handle_request(self):
         if self.broken:
             if (self.error == 'timeout' or
@@ -622,7 +633,7 @@ class IpmiHandler:
         elif self.element == ['console', 'ikvm']:
             await self.handle_ikvm()
         else:
-            raise Exception('Not Implemented')
+            raise self._unsupported()
 
     async def handle_update(self):
         u = firmwaremanager.Updater(self.node, self.ipmicmd.update_firmware,
@@ -703,7 +714,7 @@ class IpmiHandler:
             return await self.handle_licenses()
         elif self.element[1:3] == ['management_controller', 'save_licenses']:
             return await self.save_licenses()
-        raise Exception('Not implemented')
+        raise self._unsupported()
 
     async def decode_alert(self):
         inputdata = self.inputdata.get_alert(self.node)
@@ -754,7 +765,7 @@ class IpmiHandler:
                 elif self.op == 'delete':
                     await self.ipmicmd.clear_alert_destination(alertidx)
                     return
-        raise Exception('Not implemented')
+        raise self._unsupported()
 
     async def handle_nets(self):
         if len(self.element) == 3:

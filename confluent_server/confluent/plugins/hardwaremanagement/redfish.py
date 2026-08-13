@@ -428,6 +428,17 @@ class IpmiHandler:
     }
 
 
+    def _unsupported(self):
+        """Say that the requested resource has no redfish implementation.
+
+        Falling through to a bare exception would be reported as an unexpected
+        error and logged with a traceback, when all that happened is that this
+        transport does not offer the resource.
+        """
+        return pygexc.UnsupportedFunctionality(
+            '"{0}" is not implemented for redfish'.format(
+                '/'.join([str(x) for x in self.element])))
+
     async def handle_request(self):
         if self.broken:
             if (self.error == 'timeout' or
@@ -494,7 +505,7 @@ class IpmiHandler:
         elif self.element == ['console', 'ikvm']:
             await self.handle_ikvm()
         else:
-            raise Exception('Not Implemented')
+            raise self._unsupported()
 
     async def update_firmware(self, filename, progress, data, bank):
         params=()
@@ -590,10 +601,11 @@ class IpmiHandler:
             return await self.handle_licenses()
         elif self.element[1:3] == ['management_controller', 'save_licenses']:
             return await self.save_licenses()
-        raise Exception('Not implemented')
+        raise self._unsupported()
 
     def decode_alert(self):
-        raise Exception("Decode Alert not implemented for redfish")
+        raise pygexc.UnsupportedFunctionality(
+            'Decoding an alert is not implemented for redfish')
 
     async def handle_cert_authorities(self):
         if len(self.element) == 3:
