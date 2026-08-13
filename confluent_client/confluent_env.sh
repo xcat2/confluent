@@ -156,12 +156,20 @@ _confluent_osimage_completion()
 {
     _confluent_get_args
     if [ $NUMARGS == 2 ]; then
-        COMPREPLY=($(compgen -W "initialize import importcheck updateboot rebase" -- ${COMP_WORDS[COMP_CWORD]}))
+        COMPREPLY=($(compgen -W "initialize import importcheck updateboot rebase fetch" -- ${COMP_WORDS[COMP_CWORD]}))
         return
     elif [ ${CMPARGS[1]} == 'initialize' ]; then
         COMPREPLY=($(compgen -W "-h -a -g -u -s -k -t -p -i -l -r" -- ${COMP_WORDS[COMP_CWORD]}))
     elif [ ${CMPARGS[1]} == 'import' ] || [ ${CMPARGS[1]} == 'importcheck' ]; then
         compopt -o default
+        COMPREPLY=()
+        return
+    elif [ ${CMPARGS[1]} == 'fetch' ]; then
+        if [ $NUMARGS == 3 ]; then
+            COMPREPLY=($(compgen -W "alma-10-aarch64 alma-10-x86_64  debian-13-amd64 rocky-10-aarch64 rocky-10-x86_64 ubuntu-26.04-amd64 ubuntu-26.04-arm64 " -- ${COMP_WORDS[COMP_CWORD]}))
+            return
+        fi
+        compopt -o  dirnames
         COMPREPLY=()
         return
     elif [ ${CMPARGS[1]} == 'updateboot' -o ${CMPARGS[1]} == 'rebase' ]; then
