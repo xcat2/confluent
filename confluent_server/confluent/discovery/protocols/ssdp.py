@@ -174,6 +174,13 @@ def _renew_snoop_sockets(cloop, pktq, net4, net6):
     return _open_snoop_sockets(cloop, pktq)
 
 
+async def get_srp(pktq, timeout):
+    try:
+        srp = await asyncio.wait_for(pktq.get(), timeout)
+    except asyncio.exceptions.TimeoutError:
+        return None
+    return srp
+
 async def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
     """Watch for SSDP notify messages
 
@@ -211,7 +218,7 @@ async def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
             newmacs.clear()
             deferrednotifies.clear()
             machandlers.clear()
-            timeout = None
+            timeout = 0.2
             # Periodically close and reopen the sockets so that multicast
             # group memberships are reasserted, working around switches with
             # glitchy MLD/IGMP snooping that would otherwise stop forwarding.
@@ -227,17 +234,15 @@ async def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
                 lastrenew = time.time()
                 continue
             recent_peers.clear()
-            while srp and len(deferrednotifies) < 256:
-                srp = None
-                if timeout is None:
-                    srp = await pktq.get()
-                else:
-                    try:
-                        srp = await asyncio.wait_for(pktq.get(), timeout=timeout)
-                    except asyncio.exceptions.TimeoutError:
-                        break
-                timeout = 0.2
+            while len(deferrednotifies) < 256:
+                if not srp:
+                    break
+                if srp is True:
+                    srp = await get_srp(pktq, timeout)
+                if srp is None:
+                    break
                 s, rsp, peer = srp
+                srp = True
                 if rsp[:4] == b'PING':
                     continue
                 if peer in recent_peers:
