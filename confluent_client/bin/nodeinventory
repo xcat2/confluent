@@ -38,6 +38,8 @@ if sys.version_info[0] < 3:
     sys.stdout = codecs.getwriter('utf8')(sys.stdout)
 
 filters = []
+wanted = []
+matched = False
 
 
 def pretty(text):
@@ -123,6 +125,8 @@ if len(args) > 1:
         url = '/noderange/{0}/inventory/hardware/all/system'
         for rawarg in args:
             for arg in rawarg.split(','):
+                if arg in ('serial', 'model', 'uuid', 'mac'):
+                    wanted.append(arg)
                 if arg == 'serial':
                     filters.append(re.compile('serial number'))
                 elif arg == 'model':
@@ -203,6 +207,7 @@ try:
                             continue
                     if info[datum] is None:
                         continue
+                    matched = True
                     if options.json:
                         if node not in databynode:
                             databynode[node] = {}
@@ -212,6 +217,11 @@ try:
                         print(u'{0}: {1} {2}: {3}'.format(node, prefix,
                                                          pretty(datum),
                                                          info[datum]))
+    if filters and not matched and not options.store:
+        # An inventory that does not describe what was asked for is a valid
+        # answer, but saying nothing at all leaves the caller guessing
+        sys.stderr.write('No {0} reported for "{1}"\n'.format(
+            '/'.join(wanted) if wanted else 'matching inventory', noderange))
     if options.json:
         print(json.dumps(databynode, sort_keys=True, indent=4,
                          separators=(',', ': ')))
