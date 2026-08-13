@@ -866,7 +866,16 @@ class Command(object):
                 if len(targurl.get('Members', [])) == 1:
                     targurl = targurl['Members'][0]['@odata.id']
         if not targurl:
-            raise Exception("Unable to identify system url")        
+            raise Exception("Unable to identify system url")
+        targinfo = await self._do_web_request(targurl)
+        if ('IndicatorLED' not in targinfo
+                and 'LocationIndicatorActive' in targinfo):
+            # IndicatorLED is deprecated in favour of a boolean, which has no
+            # way to ask for blinking, so blinking becomes simply lit
+            await self._do_web_request(
+                targurl, {'LocationIndicatorActive': bool(blink or on)},
+                method='PATCH', etag='*')
+            return
         await self._do_web_request(
             targurl,
             {'IndicatorLED': 'Blinking' if blink else 'Lit' if on else 'Off'},
@@ -878,9 +887,27 @@ class Command(object):
         'Off': 'off',
     }
 
+    def _indicator_state(self, info):
+        """Read a location indicator, by either the old or the current property.
+
+        Returns None when the resource does not describe one.
+        """
+        ledstate = info.get('IndicatorLED', None)
+        if ledstate is not None:
+            if ledstate not in self._idstatemap:
+                raise exc.PyghmiException(
+                    'Unrecognized indicator LED state "{0}"'.format(ledstate))
+            return self._idstatemap[ledstate]
+        # IndicatorLED is deprecated in favour of a boolean, which cannot
+        # express blinking
+        active = info.get('LocationIndicatorActive', None)
+        if active is None:
+            return None
+        return 'on' if active else 'off'
+
     async def get_identify(self):
         sysinfo = await self.sysinfo()
-        ledstate = sysinfo.get('IndicatorLED', None)
+        idstate = self._indicator_state(sysinfo)
         # The physical indicator belongs to the chassis, and some
         # implementations do not refresh the system copy of it when it
         # changes, so prefer a chassis that describes this system alone.
@@ -888,16 +915,14 @@ class Command(object):
             chassisinfo = await self._do_web_request(chassis['@odata.id'])
             if len(chassisinfo.get('Links', {}).get('ComputerSystems', [])) > 1:
                 continue
-            if chassisinfo.get('IndicatorLED', None) in self._idstatemap:
-                ledstate = chassisinfo['IndicatorLED']
+            chassisstate = self._indicator_state(chassisinfo)
+            if chassisstate is not None:
+                idstate = chassisstate
                 break
-        if ledstate is None:
+        if idstate is None:
             raise exc.UnsupportedFunctionality(
                 'Indicator LED state is not reported by this platform')
-        if ledstate not in self._idstatemap:
-            raise exc.PyghmiException(
-                'Unrecognized indicator LED state "{0}"'.format(ledstate))
-        return {'identifystate': self._idstatemap[ledstate]}
+        return {'identifystate': idstate}
 
     async def get_health(self, verbose=True):
         oem = await self.oem()
@@ -1209,9 +1234,9 @@ class Command(object):
         return bool(gconsole.get('ServiceEnabled', False))
 
     _ledstatusmap = {
-        'Lit': 'On',
-        'Blinking': 'Blink',
-        'Off': 'Off',
+        'on': 'On',
+        'blink': 'Blink',
+        'off': 'Off',
     }
 
     async def get_leds(self):
@@ -1221,17 +1246,15 @@ class Command(object):
         platform without an oem specific view of its leds can report.
         """
         sysinfo = await self.sysinfo()
-        seen = False
+        state = None
         for chassis in sysinfo.get('Links', {}).get('Chassis', []):
             chassisinfo = await self._do_web_request(chassis['@odata.id'])
-            state = chassisinfo.get('IndicatorLED', None)
-            if state is None:
-                continue
-            seen = True
-            yield ('identify', {'status': self._ledstatusmap.get(state, state)})
-            break
-        if not seen and sysinfo.get('IndicatorLED', None) is not None:
-            state = sysinfo['IndicatorLED']
+            state = self._indicator_state(chassisinfo)
+            if state is not None:
+                break
+        if state is None:
+            state = self._indicator_state(sysinfo)
+        if state is not None:
             yield ('identify', {'status': self._ledstatusmap.get(state, state)})
 
     # A firmware inventory entry says what it belongs to with RelatedItem, so
