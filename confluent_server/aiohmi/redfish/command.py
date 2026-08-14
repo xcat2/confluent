@@ -688,11 +688,22 @@ class Command(object):
         return await oem.set_bootdev(bootdev, persist, uefiboot, self)
 
     async def get_biosurl(self):
-        if not self._varbiosurl:
-            sysinfo = await self.sysinfo()
-            self._varbiosurl = sysinfo.get('Bios', {}).get('@odata.id',
-                                                          None)
         if self._varbiosurl is None:
+            sysinfo = await self.sysinfo()
+            biosurl = sysinfo.get('Bios', {}).get('@odata.id', '')
+            if biosurl:
+                # A link may be advertised and not served.  To a caller that is
+                # the same as not having one, so answer the same way rather
+                # than passing the bmc's complaint on as an unexpected error.
+                try:
+                    await self._do_web_request(biosurl)
+                except exc.RedfishError as re:
+                    if 'ResourceNotFound' not in str(re.msgid):
+                        raise
+                    biosurl = ''
+            # '' is remembered as 'asked, and there is none'
+            self._varbiosurl = biosurl
+        if not self._varbiosurl:
             raise exc.UnsupportedFunctionality(
                 'Bios management not detected on this platform')
         return self._varbiosurl
