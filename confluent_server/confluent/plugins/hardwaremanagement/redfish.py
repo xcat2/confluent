@@ -513,7 +513,14 @@ class IpmiHandler:
         if self.inputdata.parameterdata:
             params = self.inputdata.parameterdata
         if params and isinstance(params, str):
-            params = json.loads(params)
+            try:
+                params = json.loads(params)
+            except ValueError as ve:
+                raise pygexc.InvalidParameterValue(
+                    'The parameter file is not valid json: {0}'.format(ve))
+        if params and not isinstance(params, dict):
+            raise pygexc.InvalidParameterValue(
+                'The parameter file must hold a json object, see nodefirmware(8)')
         return await self.ipmicmd.update_firmware(filename, progress=progress, data=data, bank=bank, otherfields=params)
 
     async def handle_update(self):
