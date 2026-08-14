@@ -422,6 +422,24 @@ class Session(object):
             KEEPALIVE_SESSIONS.release()
         return not session.broken
 
+    @classmethod
+    async def _await_login(cls, session):
+        """Wait out a login that another caller has already started
+
+        A session handed out mid login is not usable yet, and the caller
+        receiving it cannot tell, so wait and give it the same answer as the
+        caller that built it.
+        """
+        while not (session.logged or session.broken):
+            # A ceiling, not a wait: with nothing registered to wait for,
+            # wait_for_rsp returns at once.  Traffic still ends it early.
+            await cls.wait_for_rsp(1)
+        if session.broken:
+            raise exc.IpmiException(
+                getattr(session, 'errormsg', None)
+                or 'Unable to establish a session with the bmc')
+        return session
+
     async def __new__(cls,
                 bmc,
                 userid,
@@ -432,6 +450,7 @@ class Session(object):
                 keepalive=True):
         trueself = None
         forbidsock = []
+        sesskey = (bmc, userid, password, port, kg)
         for res in socket.getaddrinfo(bmc, port, 0, socket.SOCK_DGRAM):
             sockaddr = res[4]
             if ipv6support and res[0] == socket.AF_INET:
@@ -460,18 +479,23 @@ class Session(object):
                     # id, however it's easier this way
                     forbidsock.append(self.socket)
             if trueself:
-                return trueself
-            i = cls.initting_sessions.get(
-                (bmc, userid, password, port, kg), False)
+                return await cls._await_login(trueself)
+            i = cls.initting_sessions.get(sesskey, False)
             if i:
-                i.initialized = True
-                i.logging = True
-                return i
+                return await cls._await_login(i)
             self = super().__new__(cls)
             self.forbidsock = forbidsock
-            await self.__init__(
-                bmc, userid, password, port, kg, privlevel, keepalive)
-            cls.initting_sessions[(bmc, userid, password, port, kg)] = self
+            # Register before establishing, not after: this is where a caller
+            # asking for a session already on its way finds it, and leaving it
+            # to the end left the whole login uncovered
+            cls.initting_sessions[sesskey] = self
+            try:
+                await self.__init__(
+                    bmc, userid, password, port, kg, privlevel, keepalive)
+            finally:
+                # The only removal, and it has to happen whether the login
+                # worked or not, or the entry outlives the session
+                cls.initting_sessions.pop(sesskey, None)
             return self
 
     async def __init__(self,
@@ -569,12 +593,6 @@ class Session(object):
             Session.waiting_sessions.pop(self, None)
         finally:
             WAITING_SESSIONS.release()
-        try:
-            del Session.initting_sessions[(self.bmc, self.userid,
-                                           self.password, self.port,
-                                           self.kgo)]
-        except KeyError:
-            pass
         await self.logout(False)
         # self.logging = False
         self.errormsg = error
@@ -1890,12 +1908,6 @@ class Session(object):
                         Session.bmc_handlers[sockaddr] = {}
                     Session.bmc_handlers[sockaddr][myport] = self
                     _io_sendto(self.socket, self.netpacket, sockaddr)
-                try:
-                    del Session.initting_sessions[(self.bmc, self.userid,
-                                                   self.password, self.port,
-                                                   self.kgo)]
-                except KeyError:
-                    pass
             except socket.gaierror:
                 raise exc.IpmiException(
                     "Unable to transmit to specified address")
