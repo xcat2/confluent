@@ -687,6 +687,15 @@ class InputFirmwareUpdate(ConfluentMessage):
                                     '{0} is not writable by {1}, check the '
                                     'directory and parent directory ownership '
                                     'and permissions'.format(target, curruser))
+                            if target != value and os.path.exists(value):
+                                # /tmp lets anyone create a file, which says
+                                # nothing about one already sitting there
+                                if not checkaccess(curruser, value, pwent,
+                                                   os.W_OK):
+                                    raise Exception(
+                                        '{0} already exists and is not writable '
+                                        'by {1}, check the file ownership and '
+                                        'permissions'.format(value, curruser))
                         elif not checkaccess(curruser, value, pwent):
                             errstr = '{0} is not readable by {1}, check the file and parent directory ownership and permissions'.format(
                                 value, curruser)
