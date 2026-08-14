@@ -898,6 +898,13 @@ class Command(object):
             raise Exception("Unable to identify system url")
         targinfo = await self._do_web_request(targurl)
         if ('IndicatorLED' not in targinfo
+                and 'LocationIndicatorActive' not in targinfo):
+            # Reading already knows when there is no indicator to speak of, so
+            # do not go on to write a property the platform never offered and
+            # let it answer with whatever it makes of that
+            raise exc.UnsupportedFunctionality(
+                'Indicator LED state is not reported by this platform')
+        if ('IndicatorLED' not in targinfo
                 and 'LocationIndicatorActive' in targinfo):
             # IndicatorLED is deprecated in favour of a boolean, which has no
             # way to ask for blinking, so blinking becomes simply lit
