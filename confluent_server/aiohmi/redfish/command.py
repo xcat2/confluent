@@ -1349,7 +1349,12 @@ class Command(object):
         fwurls = [x['@odata.id'] for x in fwlist.get('Members', [])]
         wantcategory = category if category not in (None, 'all') else None
         entries = []
-        results = [res async for res in self._do_bulk_requests(fwurls)]
+        # Every entry has to be in hand before any can be named, since a name is
+        # only ambiguous in relation to the others.  An entry that answered with
+        # nothing has nothing to report and must not take the naming of the rest
+        # with it.
+        results = [res async for res in self._do_bulk_requests(fwurls)
+                   if res[0]]
         labels = self._firmware_labels(results)
         for res in results:
             entries.append((self._fwcategory(res[0]),
