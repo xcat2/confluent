@@ -543,6 +543,9 @@ def get_input_message(path, operation, inputdata, nodes=None, multinode=False,
     elif (path[:3] == ['configuration', 'management_controller', 'domain_name']
             and operation != 'retrieve'):
         return InputDomainName(path, nodes, inputdata)
+    elif (path[:3] == ['configuration', 'management_controller', 'location']
+            and operation != 'retrieve'):
+        return InputAttributes(path, inputdata, nodes)
     elif (path[:4] == ['configuration', 'management_controller', 'ntp',
             'enabled'] and operation != 'retrieve'):
         return InputNTPEnabled(path, nodes, inputdata)
