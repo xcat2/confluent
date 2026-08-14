@@ -251,6 +251,18 @@ async def _poller(timeout=0):
     return sessionqueue
 
 
+def _credkey(value):
+    """A credential in the form a session keeps it, so callers can be compared
+
+    A session encodes what it was given, while the checks for sharing one are
+    built from whatever the caller passed.  Put both through here.
+    """
+    try:
+        return value.encode('utf-8')
+    except AttributeError:
+        return value
+
+
 def _aespad(data):
     """ipmi demands a certain pad scheme, per table 13-20 AES-CBC encrypted
 
@@ -450,7 +462,7 @@ class Session(object):
                 keepalive=True):
         trueself = None
         forbidsock = []
-        sesskey = (bmc, userid, password, port, kg)
+        sesskey = (bmc, _credkey(userid), _credkey(password), port, kg)
         for res in socket.getaddrinfo(bmc, port, 0, socket.SOCK_DGRAM):
             sockaddr = res[4]
             if ipv6support and res[0] == socket.AF_INET:
@@ -466,8 +478,8 @@ class Session(object):
                         del cls.bmc_handlers[sockaddr][portself[0]]
                         continue
                     if (self.bmc == bmc
-                            and self.userid == userid
-                            and self.password == password
+                            and self.userid == _credkey(userid)
+                            and self.password == _credkey(password)
                             and self.kgo == kg):
                         trueself = self
                         break
