@@ -687,11 +687,15 @@ class SDR(object):
                 # The device has sensor device support, so in theory we should
                 # be able to proceed
                 # However at the moment, we haven't done so
-                raise NotImplementedError
-            return
+                raise exc.UnsupportedFunctionality(
+                    'This bmc keeps its sensor data records on the sensor '
+                    'device rather than in a repository, which is not '
+                    'supported')
             # We have Device SDR, without SDR Repository device, but
             # also without sensor device support, no idea how to
             # continue
+            raise exc.UnsupportedFunctionality(
+                'This bmc offers no way to read its sensor data records')
         await self.get_sdr()
 
     async def get_sdr_reservation(self):
@@ -706,7 +710,9 @@ class SDR(object):
         if (repinfo['data'][0] != 0x51):
             # we only understand SDR version 51h, the only version defined
             # at time of this writing
-            raise NotImplementedError
+            raise exc.UnsupportedFunctionality(
+                'This bmc reports sensor data record version {0:#x}, and only '
+                '0x51 is understood'.format(repinfo['data'][0]))
         # NOTE(jbjohnso): we actually don't need to care about 'numrecords'
         # since FFFF marks the end explicitly
         # numrecords = (rsp['data'][2] << 8) + rsp['data'][1]
