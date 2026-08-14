@@ -710,8 +710,8 @@ class IpmiHandler:
                     v6gw = config.get('static_v6_gateway', None)
                     await self.ipmicmd.set_net6_configuration(static_addresses=v6addrs, static_gateway=v6gw)
                 except socket.error as se:
-                    await self.output.put(msg.ConfluentNodeError(self.node,
-                                                           se.message))
+                    msg = se.strerror if hasattr(se, 'strerror') else str(se)
+                    await self.output.put(msg.ConfluentNodeError(self.node, msg))
                 except ValueError as e:
                     if e.message == 'negative shift count':
                         await self.output.put(msg.ConfluentNodeError(
