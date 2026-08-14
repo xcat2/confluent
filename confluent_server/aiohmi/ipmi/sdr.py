@@ -635,6 +635,13 @@ class SDREntry(object):
                 tstr += chr(((data[1] & 0b1111) << 2) + (data[0] >> 6) + 0x20)
                 tstr += chr(((data[2] & 0b11) << 4) + (data[1] >> 4) + 0x20)
                 tstr += chr((data[2] >> 2) + 0x20)
+                data = data[3:]
+            # A trailing byte or two is a short group rather than padding, and
+            # still carries a character each, so dropping it truncates the name
+            if len(data) >= 1:
+                tstr += chr((data[0] & 0b111111) + 0x20)
+            if len(data) == 2:
+                tstr += chr(((data[1] & 0b1111) << 2) + (data[0] >> 6) + 0x20)
             if not isinstance(tstr, str):
                 tstr = tstr.decode('utf-8')
             ret = tstr
