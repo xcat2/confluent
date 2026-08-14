@@ -825,7 +825,9 @@ class SDR(object):
                 rqdata = [rsvid & 0xff, rsvid >> 8,
                           recid & 0xff, recid >> 8,
                           offset, size]
-                sdrrec = await self.ipmicmd.raw_command(
+                # Not raw_command: it raises on the completion codes below,
+                # which are the ones this loop exists to act on
+                sdrrec = await self.ipmicmd.oldraw_command(
                     netfn=4, command=0x21, data=rqdata, rslun=lun)
                 if sdrrec['code'] == 0xca:
                     if size == 0xff:  # get just 5 to get header to know length
