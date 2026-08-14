@@ -1945,11 +1945,17 @@ class Command(object):
         :param return_none_on_error: return None on error
             TODO: investigate return code on error
         """
-        response = await self.raw_command(netfn=0x06, command=0x46, data=(uid,))
-        if 'error' in response:
-            if return_none_on_error:
+        try:
+            response = await self.raw_command(netfn=0x06, command=0x46,
+                                              data=(uid,))
+        except exc.IpmiException as ie:
+            # A completion code is the bmc answering about this slot, and some
+            # leave a slot in a state where that answer is an error rather than
+            # an empty name.  A timeout or a lost session is not an answer, and
+            # reading one as an empty slot would quietly shorten a user list.
+            if return_none_on_error and 0 < ie.ipmicode <= 0xff:
                 return None
-            raise Exception(response['error'])
+            raise
         name = None
         if 'data' in response:
             data = response['data']
@@ -2091,15 +2097,11 @@ class Command(object):
         names = {}
         max_ids = await self.get_channel_max_user_count(channel)
         for uid in range(1, max_ids + 1):
-            # A single slot that the bmc refuses to describe must not take the
-            # whole user list with it, as some bmcs leave a slot in a state
-            # where reading it returns an error rather than an empty name
-            try:
-                name = await self.get_user_name(uid=uid)
-                if await self._oem.is_valid(name):
-                    names[uid] = await self.get_user(uid=uid, channel=channel)
-            except exc.IpmiException:
-                continue
+            # A slot the bmc refuses to describe reads as no name at all, so it
+            # is skipped here the same way an empty one is
+            name = await self.get_user_name(uid=uid)
+            if await self._oem.is_valid(name):
+                names[uid] = await self.get_user(uid=uid, channel=channel)
         return names
 
     async def create_user(self, uid, name, password, channel=None, callback=False,
