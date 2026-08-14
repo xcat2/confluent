@@ -1046,7 +1046,7 @@ def main():
     capturep.add_argument('node', help='Node to capture image from')
     capturep.add_argument('profilename', help='Profile name for captured image')
     args = parser.parse_args()
-    if args.scratchdir:
+    if hasattr(args, 'scratchdir') and args.scratchdir:
         args.scratchdir = os.path.abspath(args.scratchdir)
     if not args or not args.subcommand:
         parser.print_usage()
