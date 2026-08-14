@@ -2233,7 +2233,10 @@ class Command(object):
         await self.oem_init()
         mcinfo = await self.raw_command(netfn=6, command=1)
         major, minor = struct.unpack('BB', mcinfo['data'][2:4])
-        bmcver = '{0}.{1}'.format(major, hex(minor)[2:])
+        # The top bit of the major byte says the device is still initialising
+        # or taking an update, and is not part of the revision, so mask it off
+        # the way sdr.py does rather than reporting 131.11 for 3.11
+        bmcver = '{0}.{1}'.format(major & 0b1111111, hex(minor)[2:])
         async for x in self._oem.get_oem_firmware(bmcver, components, category):
             yield x
 
