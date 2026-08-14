@@ -1586,6 +1586,7 @@ class OEMHandler(object):
             deadline = None
             if getattr(self, '_updateresetsbmc', False):
                 deadline = time.monotonic() + self._resetgracetime
+            wentaway = False
             while not complete and retry > 0:
                 try:
                     pgress = await self._do_web_request(monitorurl, cache=False)
@@ -1595,11 +1596,17 @@ class OEMHandler(object):
                     if deadline is not None:
                         if time.monotonic() > deadline:
                             raise Exception(
-                                'The bmc did not return within {0} seconds of '
-                                'starting to apply its firmware'.format(
+                                'The bmc did not finish applying its firmware '
+                                'within {0} seconds'.format(
                                     self._resetgracetime))
                         await asyncio.sleep(10)
-                        if await self._bmc_is_back():
+                        if not await self._bmc_is_back():
+                            # Going away is what taking the update looks like,
+                            # so only a bmc that went away can come back with
+                            # it applied.  Losing the task while it answers is
+                            # a fault, reported at the deadline.
+                            wentaway = True
+                        elif wentaway:
                             progress({'phase': phase, 'progress': 100.0})
                             return 'pending'
                         continue
