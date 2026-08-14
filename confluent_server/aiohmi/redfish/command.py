@@ -899,6 +899,21 @@ class Command(object):
         targinfo = await self._do_web_request(targurl)
         if ('IndicatorLED' not in targinfo
                 and 'LocationIndicatorActive' not in targinfo):
+            # The indicator belongs to the chassis and may be described only
+            # there, which is where reading looks too.  A shared chassis is
+            # somebody else's indicator, as in get_identify.
+            for chassis in targinfo.get('Links', {}).get('Chassis', []):
+                chassisinfo = await self._do_web_request(chassis['@odata.id'])
+                if len(chassisinfo.get('Links', {}).get(
+                        'ComputerSystems', [])) > 1:
+                    continue
+                if ('IndicatorLED' in chassisinfo
+                        or 'LocationIndicatorActive' in chassisinfo):
+                    targurl = chassis['@odata.id']
+                    targinfo = chassisinfo
+                    break
+        if ('IndicatorLED' not in targinfo
+                and 'LocationIndicatorActive' not in targinfo):
             # Reading already knows when there is no indicator to speak of, so
             # do not go on to write a property the platform never offered and
             # let it answer with whatever it makes of that
