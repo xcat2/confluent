@@ -68,6 +68,23 @@ _healthmap = {
     None: const.Health.Ok,
 }
 
+# A sensor from the modern Sensors collection describes itself by its redfish
+# reading type, while a sensor from the older Thermal and Power documents, and
+# every sensor over ipmi, is described by the ipmi sensor type.  Callers ask
+# for a category by the latter, so translate, and a sensor means the same thing
+# whichever document it was read from.
+_readingtypes = {
+    'Temperature': 'Temperature',
+    'Rotational': 'Fan',
+    'AirFlow': 'Cooling Device',
+    'Voltage': 'Voltage',
+    'Current': 'Current',
+    'Power': 'Power',
+    'EnergyJoules': 'Energy',
+    'EnergykWh': 'Energy',
+    'EnergyWh': 'Energy',
+}
+
 
 def _mask_to_cidr(mask):
     maskn = socket.inet_pton(socket.AF_INET, mask)
@@ -719,6 +736,7 @@ class Command(object):
                 sensedata = await self._do_web_request(sensor['@odata.id'])
                 if 'Name' in sensedata:
                     sensetype = sensedata.get('ReadingType', 'Unknown')
+                    sensetype = _readingtypes.get(sensetype, sensetype)
                     self._varsensormap[sensedata['Name']] = {
                         'name': sensedata['Name'], 'type': sensetype,
                         'url': sensor['@odata.id'], 'generic': True}
