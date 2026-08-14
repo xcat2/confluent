@@ -550,7 +550,9 @@ class Session(object):
             while self.logging and not self.broken:
                 await Session.wait_for_rsp()
         if self.broken:
-            raise exc.IpmiException(self.errormsg)
+            # Never leave the caller with an exception carrying no reason at all
+            raise exc.IpmiException(
+                self.errormsg or 'Unable to establish a session with the bmc')
 
     async def _mark_broken(self, error=None):
         # since our connection has failed retries
@@ -781,7 +783,7 @@ class Session(object):
                     waiter({'success': True})
                 await self.process_pktqueue()
                 if _monotonic_time() > alltimeout:
-                    await self._mark_broken()
+                    await self._mark_broken('Session no longer connected')
                     raise exc.IpmiException('Session no longer connected')
                 await WAITING_SESSIONS.acquire()
                 try:
@@ -815,7 +817,7 @@ class Session(object):
         if not self.logged:
             if (self.logoutexpiry is not None
                     and _monotonic_time() > self.logoutexpiry):
-                await self._mark_broken()
+                await self._mark_broken('Session no longer connected')
             raise exc.IpmiException('Session no longer connected')
         await self.atomicop.acquire()
         try:
@@ -1372,7 +1374,7 @@ class Session(object):
                 else:
                     await self.logout()
         except exc.IpmiException:
-            await self._mark_broken()
+            await self._mark_broken('Session keepalive failed')
 
     async def process_pktqueue(self):
         while self.pktqueue:
@@ -1810,7 +1812,7 @@ class Session(object):
                 if self.ipmicallback:
                     await self.ipmicallback(response)
                 self.nowait = False
-                await self._mark_broken()
+                await self._mark_broken('timeout')
                 return
             else:
                 self.maxtimeout = 2
@@ -1847,7 +1849,7 @@ class Session(object):
                 if self.ipmicallback:
                     await self.ipmicallback(response)
                 self.nowait = False
-                await self._mark_broken()
+                await self._mark_broken('timeout')
                 return
         else:  # in IPMI case, the only recourse is to act as if the packet is
             # idempotent.  SOL has more sophisticated retry handling
