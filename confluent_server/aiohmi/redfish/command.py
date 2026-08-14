@@ -1329,8 +1329,11 @@ class Command(object):
         fwurls = [x['@odata.id'] for x in fwlist.get('Members', [])]
         wantcategory = category if category not in (None, 'all') else None
         entries = []
-        async for res in self._do_bulk_requests(fwurls):
-            entries.append((self._fwcategory(res[0]), self._extract_fwinfo(res)))
+        results = [res async for res in self._do_bulk_requests(fwurls)]
+        labels = self._firmware_labels(results)
+        for res in results:
+            entries.append((self._fwcategory(res[0]),
+                            self._extract_fwinfo(res, labels)))
         categorised = any(x[0] for x in entries)
         for fwcategory, res in entries:
             if res[0] is None:
@@ -1346,10 +1349,32 @@ class Command(object):
                     continue
             yield res
 
-    def _extract_fwinfo(self, inf):
+    def _firmware_labels(self, results):
+        """Pick something to call each firmware entry.
+
+        A platform is free to give every entry the same Name, which then tells
+        them apart from nothing, so where that happens look for a description
+        that does, and fall back to the id.
+        """
+        names = [x[0].get('Name', 'Unknown') for x in results]
+        descs = [x[0].get('Description', '') for x in results]
+        labels = {}
+        for idx, (fwi, url) in enumerate(results):
+            label = names[idx]
+            if names.count(label) > 1:
+                if descs[idx] and descs.count(descs[idx]) == 1:
+                    label = descs[idx]
+                else:
+                    label = fwi.get('Id', label)
+            labels[url] = label
+        return labels
+
+    def _extract_fwinfo(self, inf, labels=None):
         currinf = self._oem._extract_fwinfo(inf)
         fwi, url = inf
         fwname = fwi.get('Name', 'Unknown')
+        if labels:
+            fwname = labels.get(url, fwname)
         if fwname in self._fwnamemap:
             fwname = fwi.get('Id', fwname)
         if fwname in self._fwnamemap:
