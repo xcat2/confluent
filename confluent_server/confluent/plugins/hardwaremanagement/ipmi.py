@@ -826,7 +826,9 @@ class IpmiHandler:
             # A list of users
             await self.output.put(msg.ChildCollection('all'))
             for user in await self.ipmicmd.get_users():
-                await self.output.put(msg.ChildCollection(user, candelete=True))
+                # The uids are numbers, and a link relation needs a string
+                await self.output.put(
+                    msg.ChildCollection(str(user), candelete=True))
             return
         # List all users
         elif len(self.element) == 4 and self.element[-1] == 'all':
