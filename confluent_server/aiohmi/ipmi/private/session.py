@@ -506,10 +506,6 @@ class Session(object):
                  kg=None,
                  privlevel=None,
                  keepalive=True):
-        if hasattr(self, 'initialized'):
-            # new found an existing session, do not corrupt it
-            while self.logging and not self.broken:
-                await Session.wait_for_rsp()
         self.awaitingresponse = False
         self.lastresponse = None
         self.atomicop = asyncio.Lock()
