@@ -838,7 +838,14 @@ class IpmiHandler:
             return
         # Update user
         elif len(self.element) == 4:
-            user = int(self.element[-1])
+            # ipmi users really are numbered slots, unlike redfish accounts, so
+            # say that rather than letting the conversion fail as a surprise
+            try:
+                user = int(self.element[-1])
+            except ValueError:
+                raise pygexc.InvalidParameterValue(
+                    'ipmi users are numbered, and "{0}" is not a user '
+                    'number'.format(self.element[-1]))
             if self.op == 'read':
                 data = await self.ipmicmd.get_user(uid=user)
                 await self.output.put(msg.User(

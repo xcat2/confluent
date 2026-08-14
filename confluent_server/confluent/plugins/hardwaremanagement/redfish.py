@@ -734,7 +734,10 @@ class IpmiHandler:
             return
         # Update user
         elif len(self.element) == 4:
-            user = int(self.element[-1])
+            # A redfish account is identified by a string, and an
+            # implementation is free to use the account name as one, so take it
+            # as given rather than assuming a number
+            user = self.element[-1]
             if self.op == 'read':
                 data = await self.ipmicmd.get_user(uid=user)
                 await self.output.put(msg.User(
