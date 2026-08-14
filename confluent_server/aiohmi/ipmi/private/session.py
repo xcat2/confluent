@@ -1987,16 +1987,19 @@ class Session(object):
         self.onlogpayload = None
         self.logging = False
         if self._customkeepalives:
-            for ka in list(self._customkeepalives):
-                # Be thorough and notify parties through their custom
-                # keepalives.  In practice, this *should* be the same, but
-                # if a code somehow makes duplicate SOL handlers,
-                # this would notify all the handlers rather than just the
-                # last one to take ownership
-                if self._customkeepalives[ka][1] is None:
+            # Be thorough and notify parties through their custom
+            # keepalives.  In practice, this *should* be the same, but
+            # if a code somehow makes duplicate SOL handlers,
+            # this would notify all the handlers rather than just the
+            # last one to take ownership
+            # Take the callbacks and give this up first: notifying one can
+            # come back round through here and clear it mid walk
+            callbacks = [ka[1] for ka in self._customkeepalives.values()]
+            self._customkeepalives = None
+            for callback in callbacks:
+                if callback is None:
                     continue
-                await self._customkeepalives[ka][1](
-                    {'error': 'Session Disconnected'})
+                await callback({'error': 'Session Disconnected'})
         self._customkeepalives = None
         if not self.broken:
             self.broken = True
