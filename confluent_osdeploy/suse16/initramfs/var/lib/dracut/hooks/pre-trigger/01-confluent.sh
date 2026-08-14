@@ -194,7 +194,12 @@ if [ -z "$confluent_apikey" ]; then
     confluent_apikey=$(cat /etc/confluent/confluent.apikey)
 fi
 
-while ! curl -sgf -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $confluent_apikey" https://[$confluentmgr]/confluent-api/self/deploycfg2 > /etc/confluent/confluent.deploycfg; do
+urlmgr=$confluentmgr
+case "$confluentmgr" in
+    *:*) urlmgr="[$confluentmgr]" ;;
+esac
+
+while ! curl -sgf -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $confluent_apikey" https://$urlmgr/confluent-api/self/deploycfg2 > /etc/confluent/confluent.deploycfg; do
         sleep 10
 done
 ifidx=$(cat /tmp/confluent.ifidx 2> /dev/null)
