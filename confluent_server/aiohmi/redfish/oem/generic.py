@@ -1356,7 +1356,24 @@ class OEMHandler(object):
             if onlynames:
                 yield name
                 continue
-            cpuinfo = {'Model': currcpuinfo.get('Model', None)}
+            # Only when the bmc says so, since a processor that does not
+            # describe its state at all is not thereby missing
+            if currcpuinfo.get('Status', {}).get('State', '') == 'Absent':
+                yield (name, None)
+                continue
+            # A model alone leaves nothing to report on a platform that does
+            # not give one, and the rest of this is what a caller asking after
+            # a processor wants to know anyway
+            cpuinfo = {
+                'Model': currcpuinfo.get('Model', None),
+                'Manufacturer': currcpuinfo.get('Manufacturer', None),
+                'Socket': currcpuinfo.get('Socket', None),
+                'Cores': currcpuinfo.get('TotalCores', None),
+                'Threads': currcpuinfo.get('TotalThreads', None),
+                'Max Speed MHz': currcpuinfo.get('MaxSpeedMHz', None),
+                'Serial Number': currcpuinfo.get('SerialNumber', None),
+                'Part Number': currcpuinfo.get('PartNumber', None),
+            }
             yield name, cpuinfo
 
     async def _get_disk_urls(self):
