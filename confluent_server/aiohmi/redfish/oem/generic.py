@@ -32,6 +32,19 @@ from datetime import timedelta
 from dateutil import tz
 import socket
 
+
+def _maybe_transient(theexc):
+    """Whether a request might succeed if it were simply asked again.
+
+    A bmc that answered and refused has given its answer.  Only one that did
+    not answer, or said it ran out of time, is worth asking twice.
+    """
+    if isinstance(theexc, (asyncio.TimeoutError, OSError)):
+        return True
+    text = str(theexc).lower()
+    return 'timeout' in text or 'timed out' in text
+
+
 def _pem_to_dict(pemdata, uefi=False):
     """Pull PEM into a dict
 
@@ -777,6 +790,10 @@ class OEMHandler(object):
             except Exception as de:
                 if delerr is None:
                     delerr = de
+                if not _maybe_transient(de):
+                    # It answered and refused, and the fallback below is what
+                    # that is for
+                    break
             await asyncio.sleep(3)
             if not await fishclient._account_url_info_by_id(uid):
                 return True
