@@ -532,6 +532,9 @@ class Session(object):
         self.servermode = False
         self.initialized = True
         self.cleaningup = False
+        # Whether this session still holds the socket pool count it took.
+        # Set before anything can fail, so releasing is safe either way.
+        self._socketclaimed = False
         self.lastpayload = None
         self._customkeepalives = None
         # queue of events denoting line to run a cmd
@@ -567,6 +570,7 @@ class Session(object):
         await self.socketchecking.acquire()
         try:
             self.socket = await self._assignsocket(forbiddensockets=self.forbidsock)
+            self._socketclaimed = True
         finally:
             self.socketchecking.release()
         await self.login()
@@ -577,6 +581,18 @@ class Session(object):
             # Never leave the caller with an exception carrying no reason at all
             raise exc.IpmiException(
                 self.errormsg or 'Unable to establish a session with the bmc')
+
+    def _release_socket(self):
+        """Give back the socket pool count this session took, exactly once
+
+        More than one path ended a session and decremented, so the count fell
+        below zero.  _assignsocket picks the least used socket and refuses one
+        at MAX_BMCS_PER_SOCKET, and both read this number.
+        """
+        if not self._socketclaimed:
+            return
+        self._socketclaimed = False
+        self.socketpool[self.socket] -= 1
 
     async def _mark_broken(self, error=None):
         # since our connection has failed retries
@@ -598,8 +614,7 @@ class Session(object):
         self.errormsg = error
         if not self.broken:
             self.broken = True
-            if self.socket:
-                self.socketpool[self.socket] -= 1
+            self._release_socket()
         while self.logonwaiters:
             waiter = self.logonwaiters.pop()
             try:
@@ -1961,7 +1976,6 @@ class Session(object):
                     {'error': 'Session Disconnected'})
         self._customkeepalives = None
         if not self.broken:
-            self.socketpool[self.socket] -= 1
             self.broken = True
             # since this session is broken, remove it from the handler list
             # This allows constructor to create a new, functional object to
@@ -1974,7 +1988,7 @@ class Session(object):
                     if Session.bmc_handlers[sockaddr] == {}:
                         del Session.bmc_handlers[sockaddr]
         self.nowait = False
-        self.socketpool[self.socket] -= 1
+        self._release_socket()
         return {'success': True}
 
 
