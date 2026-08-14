@@ -255,8 +255,12 @@ class Command(object):
             self._oem = await genericoem.OEMHandler.create(None, None)
             self._oemknown = True
             return
-        self._oem, self._oemknown = await get_oem_handler(await self._get_device_id(),
-                                                    self)
+        self._oem, _ = await get_oem_handler(await self._get_device_id(), self)
+        # Settling for the generic handler is an answer too.  The device id
+        # cannot change within a session, so asking again only buys a round
+        # trip to the bmc and a fresh handler with none of the state the last
+        # one had cached.
+        self._oemknown = True
 
     async def get_bootdev(self):
         """Get current boot device override information.
