@@ -1648,6 +1648,20 @@ class Command(object):
         """
         return self._oem.check_storage_configuration(cfgspec)
 
+    # How an implementation says an action it advertised is not there, as
+    # opposed to refusing what was asked of it
+    _absentmsgids = ('ActionNotSupported', 'ResourceMissingAtURI',
+                     'ResourceNotFound')
+
+    def _action_absent(self, theexc):
+        """Whether a failed action call means the action is not served."""
+        msgid = getattr(theexc, 'msgid', None)
+        if msgid is None:
+            # Not a redfish error at all, which is not how one that serves the
+            # action reports refusing
+            return True
+        return any(x in str(msgid) for x in self._absentmsgids)
+
     async def attach_remote_media(self, url, username=None, password=None):
         """Attach remote media by url
 
@@ -1704,7 +1718,11 @@ class Command(object):
                 try:
                     await self._do_web_request(inserturl, {'Image': url})
                     attached = True
-                except (exc.RedfishError, exc.PyghmiException):
+                except exc.PyghmiException as pe:
+                    if not self._action_absent(pe):
+                        # The action is there and refused; that reason is the
+                        # one worth passing on
+                        raise
                     # Some implementations advertise the insert action without
                     # serving it, so fall back to setting the properties
                     inserturl = None
