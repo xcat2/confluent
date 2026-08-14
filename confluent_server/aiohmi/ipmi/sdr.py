@@ -429,8 +429,19 @@ class SDREntry(object):
                     self.sensor_type = 'Energy'
         self.baseunit = unit_types[entry[16]]
         self.modunit = unit_types[entry[17]]
-        self.unit_suffix = self.percent + self.baseunit + self.unit_mod + \
-            self.modunit
+        # A sensor has a number for the unit fields to describe only if the
+        # record says how to read one, everything else is discrete and reports
+        # states alone (table 42-1).  This is the same question the reading
+        # path asks to decide whether to decode a number, asked once here so
+        # that the unit and the value cannot disagree about it.
+        self.has_numeric_reading = (
+            self.numeric_format in (1, 2)
+            or (self.numeric_format == 0
+                and (self.has_thresholds or self.reading_type == 1)))
+        self.unit_suffix = ''
+        if self.has_numeric_reading:
+            self.unit_suffix = self.percent + self.baseunit + self.unit_mod + \
+                self.modunit
 
     def full_decode(self, entry):
         # offsets are table from spec, minus 6
@@ -485,12 +496,13 @@ class SDREntry(object):
         if reading[1] & 0b100000 or not reading[1] & 0b1000000:
             output['unavailable'] = 1
             return SensorReading(output, self.unit_suffix)
-        if self.numeric_format == 2:
-            numeric = twos_complement(reading[0], 8)
-        elif self.numeric_format == 1:
-            numeric = ones_complement(reading[0], 8)
-        elif self.numeric_format == 0 and (self.has_thresholds or self.reading_type == 1):
-            numeric = reading[0]
+        if self.has_numeric_reading:
+            if self.numeric_format == 2:
+                numeric = twos_complement(reading[0], 8)
+            elif self.numeric_format == 1:
+                numeric = ones_complement(reading[0], 8)
+            else:
+                numeric = reading[0]
         discrete = True
         if numeric is not None:
             lowerbound = numeric - (0.5 + (self.tolerance / 2.0))
