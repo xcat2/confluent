@@ -604,6 +604,10 @@ class IpmiHandler:
             await self.handle_update()
         elif self.element[:3] == ['inventory', 'firmware', 'updatestatus']:
             await self.handle_update_status()
+        elif self.element[:3] == ['inventory', 'firmware', 'updatetypes']:
+            # Otherwise this falls through to the inventory handler and is read
+            # as the name of a firmware component
+            raise self._unsupported()
         elif self.element[0] == 'inventory':
             await self.handle_inventory()
         elif self.element == ['media', 'attach']:

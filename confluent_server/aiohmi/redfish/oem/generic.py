@@ -1525,6 +1525,16 @@ class OEMHandler(object):
         msgs = response.get('Messages', [])
         return ';'.join(self.format_message(x) for x in msgs)
 
+    async def get_update_types(self, fishclient):
+        """The kinds of firmware image this platform has to be told about.
+
+        A platform that reads the kind from the image has none to report, which
+        is not the same as failing to answer.
+        """
+        raise exc.UnsupportedFunctionality(
+            'This platform does not take a firmware image type, it reads the '
+            'kind of firmware from the image')
+
     async def update_firmware(self, filename, data=None, progress=None, bank=None, otherfields=()):
         # disable cache to make sure we trigger the token renewal logic if needed
         usd, upurl, ismultipart = await self.retrieve_firmware_upload_url()

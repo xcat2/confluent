@@ -3,7 +3,7 @@ nodefirmware(8) -- Report firmware information on confluent nodes
 
 ## SYNOPSIS
 
-`nodefirmware <noderange> [list][updatestatus][update [--backup] [--parameterfile <file>] <file>]|[<components>]`
+`nodefirmware <noderange> [list][updatestatus][updatetypes][update [--backup] [--parameterfile <file>] <file>]|[<components>]`
 
 ## DESCRIPTION
 
@@ -19,6 +19,10 @@ the FPGA version where applicable).
 
 The updatestatus argument will describe the state of firmware updates on the
 nodes.
+
+The updatetypes argument will name the kinds of firmware image the platform has
+to be told about, for use in a parameter file.  Platforms that read the kind of
+firmware from the image itself have none to name and say so.
 
 In the update form, it accepts a single file and attempts to update it using
 the out of band facilities.  Firmware updates can end in one of three states:
@@ -57,12 +61,20 @@ holds, and refuse the update rather than guess.  On an AMI MegaRAC that is an
 
     {"OemParameters": {"ImageType": "BIOS"}}
 
-Attempting the update without it names the types the platform accepts in the
-error, so there is no need to look them up first.  The value is checked against
-the same list before anything is uploaded, so a name the platform does not accept
-is refused rather than sent.
+`nodefirmware <noderange> updatetypes` names the accepted types without
+attempting an update.  The value is also checked against the same list before
+anything is uploaded, so a name the platform does not accept is refused rather
+than sent.
 
 ## EXAMPLES
+
+* Ask what kinds of firmware image a node has to be told about:
+`# nodefirmware n1 updatetypes`  
+`n1: BMC,BIOS,MB_CPLD,SCM_CPLD,BPB_CPLD,HPM_BMC,HPM_BIOS,HPM_SCP,HPM_BIOS2`  
+
+* Update the BIOS on a platform that has to be told:
+`# echo '{"OemParameters": {"ImageType": "BIOS"}}' > /tmp/bios.json`  
+`# nodefirmware n1 update -p /tmp/bios.json /tmp/image.bin`  
 
 * Pull firmware from a node:
 `# nodefirmware r1`  

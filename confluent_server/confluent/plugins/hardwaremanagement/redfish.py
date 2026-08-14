@@ -477,6 +477,8 @@ class IpmiHandler:
             await self.handle_update()
         elif self.element[:3] == ['inventory', 'firmware', 'updatestatus']:
             await self.handle_update_status()
+        elif self.element[:3] == ['inventory', 'firmware', 'updatetypes']:
+            await self.handle_update_types()
         elif self.element[0] == 'inventory':
             await self.handle_inventory()
         elif self.element == ['media', 'attach']:
@@ -922,6 +924,10 @@ class IpmiHandler:
         else:
             status = await self.ipmicmd.get_update_status()
             await self.output.put(msg.KeyValueData({'status': status}, self.node))
+
+    async def handle_update_types(self):
+        await self.output.put(msg.KeyValueData(
+            {'types': await self.ipmicmd.get_update_types()}, self.node))
 
     async def handle_inventory(self):
         if self.element[1] == 'firmware':

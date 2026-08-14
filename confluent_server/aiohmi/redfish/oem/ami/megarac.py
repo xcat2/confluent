@@ -108,13 +108,31 @@ class OEMHandler(generic.OEMHandler):
                     'PreserveConfiguration': preserve,
                 }}}, method='PATCH', etag='*')
 
+    # What the parameter naming the kind of firmware is called in the action
+    # info.  Builds differ, and the names it takes are the same vocabulary as
+    # the OemParameters ImageType a multipart push wants.
+    _imagetypeparams = ('ImageType', 'UpdateComponent')
+
     async def _allowed_imagetypes(self):
-        actinfo = await self._do_web_request(
-            '/redfish/v1/UpdateService/SimpleUpdateActionInfo')
+        try:
+            actinfo = await self._do_web_request(
+                '/redfish/v1/UpdateService/SimpleUpdateActionInfo')
+        except pygexc.PyghmiException:
+            # A build that does not publish the action info still wants an
+            # image type, it just cannot say which names it takes
+            return []
         for param in actinfo.get('Parameters', []):
-            if param.get('Name', None) == 'ImageType':
+            if param.get('Name', None) in self._imagetypeparams:
                 return param.get('AllowableValues', [])
         return []
+
+    async def get_update_types(self, fishclient):
+        allowed = await self._allowed_imagetypes()
+        if not allowed:
+            raise pygexc.UnsupportedFunctionality(
+                'This bmc has to be told what kind of firmware an image holds '
+                'but does not publish the names it accepts')
+        return allowed
 
     async def _checked_imagetype(self, imagetype, filename):
         """Check the image type the parameter file gave against what is accepted.

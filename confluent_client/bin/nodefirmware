@@ -56,7 +56,7 @@ components = ['all']
 
 argparser = optparse.OptionParser(
     usage="Usage: "
-          "%prog <noderange> [list][updatestatus][update [--backup] "
+          "%prog <noderange> [list][updatestatus][updatetypes][update [--backup] "
           "[--parameterfile <file>] <file>]|[<components>]")
 argparser.add_option('-b', '--backup', action='store_true',
                      help='Target a backup bank rather than primary')
@@ -71,6 +71,7 @@ argparser.add_option('-m', '--maxnodes', type='int',
 (options, args) = argparser.parse_args()
 upfile = None
 querystatus = False
+querytypes = False
 try:
     noderange = args[0]
     if len(args) > 1:
@@ -82,6 +83,8 @@ try:
                 comps = args[2:]
             elif args[1] == 'updatestatus':
                 querystatus = True
+            elif args[1] == 'updatetypes':
+                querytypes = True
             else:
                 comps = args[1:]
             components = []
@@ -207,6 +210,17 @@ def show_firmware(session):
             ','.join(components)))
 
 
+def show_update_types(session):
+    global exitcode
+    for res in session.read(
+            '/noderange/{0}/inventory/firmware/updatetypes'.format(noderange)):
+        exitcode |= client.printerror(res)
+        for node in res.get('databynode', {}):
+            types = res['databynode'][node].get('types', None)
+            if types:
+                print('{0}: {1}'.format(node, ','.join(types)))
+
+
 try:
     session = client.Command()
     if querystatus:
@@ -217,6 +231,8 @@ try:
                 currstat = res['databynode'][node].get('status', None)
                 if currstat:
                     print('{}: {}'.format(node, currstat))
+    elif querytypes:
+        show_update_types(session)
     elif upfile is None:
         show_firmware(session)
     else:

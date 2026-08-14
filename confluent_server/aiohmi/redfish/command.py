@@ -1811,6 +1811,15 @@ class Command(object):
         oem = await self.oem()
         return await oem.get_update_status()   
 
+    async def get_update_types(self):
+        """The kinds of firmware image this platform has to be told about
+
+        Only some implementations will not take an image without being told
+        which kind it is, and those are the ones with an answer here.
+        """
+        oem = await self.oem()
+        return await oem.get_update_types(self)
+
     async def update_firmware(self, file, data=None, progress=None, bank=None, otherfields=()):
         """Send file to BMC to perform firmware update
 
