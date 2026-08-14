@@ -390,7 +390,6 @@ class Session(object):
             # Rather than wait until send() to bind, bind now so that we have
             # a port number allocated no matter what
             tmpsocket.bind(('', 0))
-            cls.socketpool[tmpsocket] = 1
         else:
             tmpsocket.bind(server[4])
         iosockets.append(tmpsocket)
@@ -413,6 +412,10 @@ class Session(object):
             initevt = asyncio.Event()
             iothreadwaiters.append(initevt)
             await initevt.wait()
+        if server is None:
+            # Take the count last: one taken for a socket no session ever
+            # received is one nobody is left to give back
+            cls.socketpool[tmpsocket] = 1
         return tmpsocket
 
     def _sync_login(self, response):
@@ -462,7 +465,8 @@ class Session(object):
                 keepalive=True):
         trueself = None
         forbidsock = []
-        sesskey = (bmc, _credkey(userid), _credkey(password), port, kg)
+        sesskey = (bmc, _credkey(userid), _credkey(password), port,
+                   _credkey(kg))
         for res in socket.getaddrinfo(bmc, port, 0, socket.SOCK_DGRAM):
             sockaddr = res[4]
             if ipv6support and res[0] == socket.AF_INET:
@@ -480,7 +484,7 @@ class Session(object):
                     if (self.bmc == bmc
                             and self.userid == _credkey(userid)
                             and self.password == _credkey(password)
-                            and self.kgo == kg):
+                            and _credkey(self.kgo) == _credkey(kg)):
                         trueself = self
                         break
                     # ok, the candidate seems to be working, but does not match

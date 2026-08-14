@@ -217,7 +217,12 @@ class Console(object):
         self.ipmi_session = None
         if sess.sol_handler is not None and sess.sol_handler.__self__ is self:
             sess.sol_handler = None
-        await sess.logout()
+        try:
+            await sess.logout()
+        except exc.IpmiException:
+            # A bmc that has stopped answering must not be what makes
+            # closing a console fail, as for the deactivate above
+            pass
 
     async def close(self):
         """Shut down an SOL session"""
