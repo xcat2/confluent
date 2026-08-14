@@ -592,18 +592,21 @@ def get_input_message(path, operation, inputdata, nodes=None, multinode=False,
             'No known input handler for request')
 
 
-def checkaccess(user, filename, pwent):
-    """Check if a user has read access to a file.
+def checkaccess(user, filename, pwent, mode=os.R_OK):
+    """Check if a user has the given access to a path.
 
-    This function checks if the specified user has read access to the given
-    filename. It returns True if the user has read access, and False otherwise.
+    This function checks if the specified user has the access named by mode to
+    the given filename. It returns True if the user has it, False otherwise.
+    Use R_OK to ask whether the user could have read a file they want confluent
+    to send, and W_OK on a directory to ask whether they could have created a
+    file where they want confluent to save one.
     """
     child = os.fork()
     if child == 0:
         os.setgroups(os.getgrouplist(user, pwent.pw_gid))
         os.setgid(pwent.pw_gid)
         os.setuid(pwent.pw_uid)
-        if os.access(filename, os.R_OK):
+        if os.access(filename, mode):
             os._exit(0)
         os._exit(1)
     else:
@@ -617,6 +620,18 @@ def isurl(value):
     if '/' in prefix:
         return False
     return True if prefix else False
+
+
+def destdir(value):
+    """The directory a download will actually be written into.
+
+    A path that is already a directory is a destination directory and the file
+    gets created inside it; anything else names the file itself. This is the
+    same rule the code that writes the file goes by.
+    """
+    if os.path.isdir(value):
+        return value
+    return os.path.dirname(value) or '.'
 
 class InputFirmwareUpdate(ConfluentMessage):
     urlsupported = False
@@ -652,11 +667,24 @@ class InputFirmwareUpdate(ConfluentMessage):
                 if value.startswith('/var/log/confluent'):
                     raise Exception(
                         'File transfer with /var/log/confluent is not supported')
-                if (curruser and not self.isdownload
+                if (curruser
                         and not value.startswith('/var/lib/confluent/client_assets/')):
                     try:
                         pwent = pwd.getpwnam(curruser)
-                        if not checkaccess(curruser, value, pwent):
+                        if self.isdownload:
+                            # Asking whether a destination can be read fails for
+                            # every file that does not exist yet, which is most
+                            # of them.  The question that carries the same
+                            # meaning here is whether the user could have
+                            # created the file there themselves.
+                            target = destdir(value)
+                            if not checkaccess(curruser, target, pwent,
+                                               os.W_OK):
+                                raise Exception(
+                                    '{0} is not writable by {1}, check the '
+                                    'directory and parent directory ownership '
+                                    'and permissions'.format(target, curruser))
+                        elif not checkaccess(curruser, value, pwent):
                             errstr = '{0} is not readable by {1}, check the file and parent directory ownership and permissions'.format(
                                 value, curruser)
                             raise Exception(errstr)
