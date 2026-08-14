@@ -204,6 +204,26 @@ class Console(object):
         if not self.awaitingack:
             await self._sendpendingoutput()
 
+    async def _release_session(self):
+        """Give up this console's claim on the ipmi session
+
+        A console can be sharing one with whatever else is talking to the same
+        bmc, so let go of it rather than closing it.  Clearing the reference
+        first means it does not matter how many exits end up here.
+        """
+        sess = self.ipmi_session
+        if sess is None:
+            return
+        self.ipmi_session = None
+        if sess.sol_handler is not None and sess.sol_handler.__self__ is self:
+            sess.sol_handler = None
+        try:
+            await sess.logout()
+        except exc.IpmiException:
+            # A bmc that has stopped answering must not be what makes
+            # closing a console fail, as for the deactivate above
+            pass
+
     async def close(self):
         """Shut down an SOL session"""
 
@@ -217,6 +237,7 @@ class Console(object):
                 # if underlying ipmi session is not working, then
                 # run with the implicit success
                 pass
+        await self._release_session()
 
     async def send_data(self, data):
         if self.broken:
@@ -320,10 +341,8 @@ class Console(object):
         self.broken = True
         if self.ipmi_session:
             self.ipmi_session.unregister_keepalive(self.keepaliveid)
-            if (self.ipmi_session.sol_handler
-                    and self.ipmi_session.sol_handler.__self__ is self):
-                self.ipmi_session.sol_handler = None
-            self.ipmi_session = None
+            # A console that has given up is finished with the session too
+            await self._release_session()
         if type(error) == dict:
             await self._print_data(error)
         else:

@@ -251,6 +251,18 @@ async def _poller(timeout=0):
     return sessionqueue
 
 
+def _credkey(value):
+    """A credential in the form a session keeps it, so callers can be compared
+
+    A session encodes what it was given, while the checks for sharing one are
+    built from whatever the caller passed.  Put both through here.
+    """
+    try:
+        return value.encode('utf-8')
+    except AttributeError:
+        return value
+
+
 def _aespad(data):
     """ipmi demands a certain pad scheme, per table 13-20 AES-CBC encrypted
 
@@ -378,7 +390,6 @@ class Session(object):
             # Rather than wait until send() to bind, bind now so that we have
             # a port number allocated no matter what
             tmpsocket.bind(('', 0))
-            cls.socketpool[tmpsocket] = 1
         else:
             tmpsocket.bind(server[4])
         iosockets.append(tmpsocket)
@@ -401,6 +412,10 @@ class Session(object):
             initevt = asyncio.Event()
             iothreadwaiters.append(initevt)
             await initevt.wait()
+        if server is None:
+            # Take the count last: one taken for a socket no session ever
+            # received is one nobody is left to give back
+            cls.socketpool[tmpsocket] = 1
         return tmpsocket
 
     def _sync_login(self, response):
@@ -422,6 +437,24 @@ class Session(object):
             KEEPALIVE_SESSIONS.release()
         return not session.broken
 
+    @classmethod
+    async def _await_login(cls, session):
+        """Wait out a login that another caller has already started
+
+        A session handed out mid login is not usable yet, and the caller
+        receiving it cannot tell, so wait and give it the same answer as the
+        caller that built it.
+        """
+        while not (session.logged or session.broken):
+            # A ceiling, not a wait: with nothing registered to wait for,
+            # wait_for_rsp returns at once.  Traffic still ends it early.
+            await cls.wait_for_rsp(1)
+        if session.broken:
+            raise exc.IpmiException(
+                getattr(session, 'errormsg', None)
+                or 'Unable to establish a session with the bmc')
+        return session
+
     async def __new__(cls,
                 bmc,
                 userid,
@@ -432,6 +465,8 @@ class Session(object):
                 keepalive=True):
         trueself = None
         forbidsock = []
+        sesskey = (bmc, _credkey(userid), _credkey(password), port,
+                   _credkey(kg))
         for res in socket.getaddrinfo(bmc, port, 0, socket.SOCK_DGRAM):
             sockaddr = res[4]
             if ipv6support and res[0] == socket.AF_INET:
@@ -447,9 +482,9 @@ class Session(object):
                         del cls.bmc_handlers[sockaddr][portself[0]]
                         continue
                     if (self.bmc == bmc
-                            and self.userid == userid
-                            and self.password == password
-                            and self.kgo == kg):
+                            and self.userid == _credkey(userid)
+                            and self.password == _credkey(password)
+                            and _credkey(self.kgo) == _credkey(kg)):
                         trueself = self
                         break
                     # ok, the candidate seems to be working, but does not match
@@ -460,18 +495,28 @@ class Session(object):
                     # id, however it's easier this way
                     forbidsock.append(self.socket)
             if trueself:
+                await cls._await_login(trueself)
+                # Count the caller only once it is really getting the session
+                trueself.users += 1
                 return trueself
-            i = cls.initting_sessions.get(
-                (bmc, userid, password, port, kg), False)
+            i = cls.initting_sessions.get(sesskey, False)
             if i:
-                i.initialized = True
-                i.logging = True
+                await cls._await_login(i)
+                i.users += 1
                 return i
             self = super().__new__(cls)
             self.forbidsock = forbidsock
-            await self.__init__(
-                bmc, userid, password, port, kg, privlevel, keepalive)
-            cls.initting_sessions[(bmc, userid, password, port, kg)] = self
+            # Register before establishing, not after: this is where a caller
+            # asking for a session already on its way finds it, and leaving it
+            # to the end left the whole login uncovered
+            cls.initting_sessions[sesskey] = self
+            try:
+                await self.__init__(
+                    bmc, userid, password, port, kg, privlevel, keepalive)
+            finally:
+                # The only removal, and it has to happen whether the login
+                # worked or not, or the entry outlives the session
+                cls.initting_sessions.pop(sesskey, None)
             return self
 
     async def __init__(self,
@@ -482,10 +527,6 @@ class Session(object):
                  kg=None,
                  privlevel=None,
                  keepalive=True):
-        if hasattr(self, 'initialized'):
-            # new found an existing session, do not corrupt it
-            while self.logging and not self.broken:
-                await Session.wait_for_rsp()
         self.awaitingresponse = False
         self.lastresponse = None
         self.atomicop = asyncio.Lock()
@@ -508,6 +549,11 @@ class Session(object):
         self.servermode = False
         self.initialized = True
         self.cleaningup = False
+        # Whether this session still holds the socket pool count it took.
+        # Set before anything can fail, so releasing is safe either way.
+        self._socketclaimed = False
+        # How many callers hold this session; the last one out closes it
+        self.users = 1
         self.lastpayload = None
         self._customkeepalives = None
         # queue of events denoting line to run a cmd
@@ -543,6 +589,7 @@ class Session(object):
         await self.socketchecking.acquire()
         try:
             self.socket = await self._assignsocket(forbiddensockets=self.forbidsock)
+            self._socketclaimed = True
         finally:
             self.socketchecking.release()
         await self.login()
@@ -550,7 +597,21 @@ class Session(object):
             while self.logging and not self.broken:
                 await Session.wait_for_rsp()
         if self.broken:
-            raise exc.IpmiException(self.errormsg)
+            # Never leave the caller with an exception carrying no reason at all
+            raise exc.IpmiException(
+                self.errormsg or 'Unable to establish a session with the bmc')
+
+    def _release_socket(self):
+        """Give back the socket pool count this session took, exactly once
+
+        More than one path ended a session and decremented, so the count fell
+        below zero.  _assignsocket picks the least used socket and refuses one
+        at MAX_BMCS_PER_SOCKET, and both read this number.
+        """
+        if not self._socketclaimed:
+            return
+        self._socketclaimed = False
+        self.socketpool[self.socket] -= 1
 
     async def _mark_broken(self, error=None):
         # since our connection has failed retries
@@ -567,19 +628,12 @@ class Session(object):
             Session.waiting_sessions.pop(self, None)
         finally:
             WAITING_SESSIONS.release()
-        try:
-            del Session.initting_sessions[(self.bmc, self.userid,
-                                           self.password, self.port,
-                                           self.kgo)]
-        except KeyError:
-            pass
         await self.logout(False)
         # self.logging = False
         self.errormsg = error
         if not self.broken:
             self.broken = True
-            if self.socket:
-                self.socketpool[self.socket] -= 1
+            self._release_socket()
         while self.logonwaiters:
             waiter = self.logonwaiters.pop()
             try:
@@ -781,7 +835,7 @@ class Session(object):
                     waiter({'success': True})
                 await self.process_pktqueue()
                 if _monotonic_time() > alltimeout:
-                    await self._mark_broken()
+                    await self._mark_broken('Session no longer connected')
                     raise exc.IpmiException('Session no longer connected')
                 await WAITING_SESSIONS.acquire()
                 try:
@@ -815,7 +869,7 @@ class Session(object):
         if not self.logged:
             if (self.logoutexpiry is not None
                     and _monotonic_time() > self.logoutexpiry):
-                await self._mark_broken()
+                await self._mark_broken('Session no longer connected')
             raise exc.IpmiException('Session no longer connected')
         await self.atomicop.acquire()
         try:
@@ -1372,7 +1426,7 @@ class Session(object):
                 else:
                     await self.logout()
         except exc.IpmiException:
-            await self._mark_broken()
+            await self._mark_broken('Session keepalive failed')
 
     async def process_pktqueue(self):
         while self.pktqueue:
@@ -1810,7 +1864,7 @@ class Session(object):
                 if self.ipmicallback:
                     await self.ipmicallback(response)
                 self.nowait = False
-                await self._mark_broken()
+                await self._mark_broken('timeout')
                 return
             else:
                 self.maxtimeout = 2
@@ -1847,7 +1901,7 @@ class Session(object):
                 if self.ipmicallback:
                     await self.ipmicallback(response)
                 self.nowait = False
-                await self._mark_broken()
+                await self._mark_broken('timeout')
                 return
         else:  # in IPMI case, the only recourse is to act as if the packet is
             # idempotent.  SOL has more sophisticated retry handling
@@ -1888,12 +1942,6 @@ class Session(object):
                         Session.bmc_handlers[sockaddr] = {}
                     Session.bmc_handlers[sockaddr][myport] = self
                     _io_sendto(self.socket, self.netpacket, sockaddr)
-                try:
-                    del Session.initting_sessions[(self.bmc, self.userid,
-                                                   self.password, self.port,
-                                                   self.kgo)]
-                except KeyError:
-                    pass
             except socket.gaierror:
                 raise exc.IpmiException(
                     "Unable to transmit to specified address")
@@ -1911,7 +1959,15 @@ class Session(object):
                 WAITING_SESSIONS.release()
 
     async def logout(self, sessionok=True):
-
+        if (sessionok and self.users > 1
+                and not self.broken and not self.cleaningup):
+            # A caller finished with a working session gives up its claim and
+            # leaves it to whoever else holds it; closing it here would hand
+            # them one that answers as though it had been lost.  sessionok is
+            # false when it is no longer usable, and then it comes down anyway.
+            self.users -= 1
+            return {'success': True}
+        self.users = 0
         if self.cleaningup:
             self.nowait = True
         if self.logged:
@@ -1935,19 +1991,21 @@ class Session(object):
         self.onlogpayload = None
         self.logging = False
         if self._customkeepalives:
-            for ka in list(self._customkeepalives):
-                # Be thorough and notify parties through their custom
-                # keepalives.  In practice, this *should* be the same, but
-                # if a code somehow makes duplicate SOL handlers,
-                # this would notify all the handlers rather than just the
-                # last one to take ownership
-                if self._customkeepalives[ka][1] is None:
+            # Be thorough and notify parties through their custom
+            # keepalives.  In practice, this *should* be the same, but
+            # if a code somehow makes duplicate SOL handlers,
+            # this would notify all the handlers rather than just the
+            # last one to take ownership
+            # Take the callbacks and give this up first: notifying one can
+            # come back round through here and clear it mid walk
+            callbacks = [ka[1] for ka in self._customkeepalives.values()]
+            self._customkeepalives = None
+            for callback in callbacks:
+                if callback is None:
                     continue
-                await self._customkeepalives[ka][1](
-                    {'error': 'Session Disconnected'})
+                await callback({'error': 'Session Disconnected'})
         self._customkeepalives = None
         if not self.broken:
-            self.socketpool[self.socket] -= 1
             self.broken = True
             # since this session is broken, remove it from the handler list
             # This allows constructor to create a new, functional object to
@@ -1960,7 +2018,7 @@ class Session(object):
                     if Session.bmc_handlers[sockaddr] == {}:
                         del Session.bmc_handlers[sockaddr]
         self.nowait = False
-        self.socketpool[self.socket] -= 1
+        self._release_socket()
         return {'success': True}
 
 
