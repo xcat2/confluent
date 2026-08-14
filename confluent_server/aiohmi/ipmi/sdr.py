@@ -620,12 +620,12 @@ class SDREntry(object):
             return ""
         if ipmitype == 0:  # Unicode per 43.15 in ipmi 2.0 spec
             # the spec is not specific about encoding, assuming utf8
-            return struct.pack("%dB" % len(data), *data).decode("utf-8")
+            ret = struct.pack("%dB" % len(data), *data).decode("utf-8")
         elif ipmitype == 1:  # BCD '+'
             tmpl = "%02X" * len(data)
             tstr = tmpl % tuple(data)
             tstr = tstr.replace("A", " ").replace("B", "-").replace("C", ".")
-            return tstr.replace("D", ":").replace("E", ",").replace("F", "_")
+            ret = tstr.replace("D", ":").replace("E", ",").replace("F", "_")
         elif ipmitype == 2:  # 6 bit ascii, start at 0x20
             # the ordering is very peculiar and is best understood from
             # IPMI SPEC "6-bit packed ascii example
@@ -637,12 +637,14 @@ class SDREntry(object):
                 tstr += chr((data[2] >> 2) + 0x20)
             if not isinstance(tstr, str):
                 tstr = tstr.decode('utf-8')
-            return tstr
-        elif ipmitype == 3:  # ACSII+LATIN1
+            ret = tstr
+        else:  # ipmitype == 3, ASCII+LATIN1
             ret = struct.pack("%dB" % len(data), *data)
             if not isinstance(ret, str):
                 ret = ret.decode('utf-8')
-            return ret
+        # A fixed width field is padded out with nulls.  They are not part of
+        # the name, and would stop a caller ever matching on it.
+        return ret.rstrip('\x00')
 
 
 class SDR(object):
@@ -684,13 +686,9 @@ class SDR(object):
             # device, so we are meant to use an alternative mechanism to get
             # SDR data
             if rsp['data'][5] & 1:
-                # The device has sensor device support, so in theory we should
-                # be able to proceed
-                # However at the moment, we haven't done so
-                raise exc.UnsupportedFunctionality(
-                    'This bmc keeps its sensor data records on the sensor '
-                    'device rather than in a repository, which is not '
-                    'supported')
+                # The device has sensor device support, so the records are
+                # read from the sensor device a lun at a time instead
+                return await self.get_device_sdr()
             # We have Device SDR, without SDR Repository device, but
             # also without sensor device support, no idea how to
             # continue
@@ -703,6 +701,151 @@ class SDR(object):
         if rsp['code'] != 0:
             raise exc.IpmiException(rsp['error'])
         return rsp['data'][0] + (rsp['data'][1] << 8)
+
+    async def get_device_sdr_reservation(self):
+        rsp = await self.ipmicmd.raw_command(netfn=4, command=0x22)
+        if rsp['code'] != 0:
+            raise exc.IpmiException(rsp['error'])
+        return rsp['data'][0] + (rsp['data'][1] << 8)
+
+    async def get_device_sdr_info(self):
+        """Ask the sensor device about its records
+
+        Answers the luns that have sensors and a change indicator to cache on,
+        which is only present when the device says its sensors are populated
+        dynamically.
+        """
+        rsp = await self.ipmicmd.raw_command(netfn=4, command=0x20, data=(1,))
+        if rsp['code'] != 0:
+            raise exc.IpmiException(rsp['error'])
+        data = bytearray(rsp['data'])
+        luns = [lun for lun in range(4) if data[1] & (1 << lun)]
+        if not luns:
+            # A device that names no lun still has to answer for lun 0, and
+            # some do not set the bit for it
+            luns = [0]
+        modtime = 0
+        if data[1] & 0b10000000 and len(data) >= 6:
+            modtime = struct.unpack('<I', bytes(data[2:6]))[0]
+        return luns, modtime
+
+    async def get_device_sdr(self):
+        """Read the sensor data records from the sensor device
+
+        For a bmc with no sdr repository.  The records themselves are the same,
+        so only the fetching differs: a different command, a reservation of its
+        own, and the records are held per lun rather than in one place.
+        """
+        luns, modtime = await self.get_device_sdr_info()
+        self.broken_sensor_ids = {}
+        cachekey = (self.fw_major, self.fw_minor, self.mfg_id, self.prod_id,
+                    self.device_id, 'device', modtime)
+        cachefilename = None
+        if modtime:
+            # Without a change indicator there is nothing to notice a change
+            # by, so such a device is read afresh every time
+            try:
+                csdrs = shared_sdrs[cachekey]
+                self.sensors = csdrs['sensors']
+                self.fru = csdrs['fru']
+                return
+            except KeyError:
+                pass
+            if self.cachedir:
+                cachefilename = os.path.join(
+                    self.cachedir,
+                    'sdrcache-2.device.{0}.{1}.{2}.{3}.{4}.{5}'.format(
+                        self.mfg_id, self.prod_id, self.device_id,
+                        self.fw_major, self.fw_minor, modtime))
+        if cachefilename and os.path.isfile(cachefilename):
+            with open(cachefilename, 'rb') as cfile:
+                csdrlen = cfile.read(2)
+                while csdrlen:
+                    csdrlen = struct.unpack('!H', csdrlen)[0]
+                    await self.add_sdr(cfile.read(csdrlen))
+                    csdrlen = cfile.read(2)
+        else:
+            sdrraw = [] if cachefilename else None
+            for lun in luns:
+                await self._read_device_sdr_lun(lun, sdrraw)
+            if cachefilename:
+                self._write_sdr_cache(cachefilename, sdrraw)
+        for sid in self.broken_sensor_ids:
+            try:
+                del self.sensors[sid]
+            except KeyError:
+                pass
+        if modtime:
+            shared_sdrs[cachekey] = {
+                'sensors': self.sensors,
+                'fru': self.fru,
+            }
+
+    def _write_sdr_cache(self, cachefilename, sdrraw):
+        suffix = ''.join(
+            random.choice(string.ascii_lowercase) for _ in range(12))
+        with open(cachefilename + '.' + suffix, 'wb') as cfile:
+            for csdr in sdrraw:
+                cfile.write(struct.pack('!H', len(csdr)))
+                cfile.write(csdr)
+        os.rename(cachefilename + '.' + suffix, cachefilename)
+
+    async def _read_device_sdr_lun(self, lun, sdrraw=None):
+        recid = 0
+        rsvid = 0
+        offset = 0
+        size = 0xff
+        chunksize = 128
+        while recid != 0xffff:  # per 35.3 Get Device SDR, 0xffff marks the end
+            newrecid = 0
+            currlen = 0
+            sdrdata = bytearray()
+            while True:  # loop until SDR fetched wholly
+                if size != 0xff and rsvid == 0:
+                    rsvid = await self.get_device_sdr_reservation()
+                rqdata = [rsvid & 0xff, rsvid >> 8,
+                          recid & 0xff, recid >> 8,
+                          offset, size]
+                sdrrec = await self.ipmicmd.raw_command(
+                    netfn=4, command=0x21, data=rqdata, rslun=lun)
+                if sdrrec['code'] == 0xca:
+                    if size == 0xff:  # get just 5 to get header to know length
+                        size = 5
+                    elif size > 5:
+                        size //= 2
+                        # push things over such that it's less
+                        # likely to be just 1 short of a read
+                        # and incur a whole new request
+                        size += 2
+                        chunksize = size
+                    continue
+                if sdrrec['code'] == 0xc5:  # need a new reservation id
+                    rsvid = 0
+                    continue
+                if sdrrec['code'] != 0:
+                    raise exc.IpmiException(sdrrec['error'])
+                if newrecid == 0:
+                    newrecid = (sdrrec['data'][1] << 8) + sdrrec['data'][0]
+                if currlen == 0:
+                    currlen = sdrrec['data'][6] + 5  # compensate for header
+                sdrdata.extend(sdrrec['data'][2:])
+                offset += size
+                if offset >= currlen:
+                    break
+                if size == 5 and offset == 5:
+                    # bump up size after header retrieval
+                    size = chunksize
+                if (offset + size) > currlen:
+                    size = currlen - offset
+            await self.add_sdr(sdrdata)
+            if sdrraw is not None:
+                sdrraw.append(bytes(sdrdata))
+            offset = 0
+            if size != 0xff:
+                size = 5
+            if newrecid == recid:
+                raise exc.BmcErrorException("Incorrect SDR record id from BMC")
+            recid = newrecid
 
     async def get_sdr(self):
         repinfo = await self.ipmicmd.raw_command(netfn=0x0a, command=0x20)
