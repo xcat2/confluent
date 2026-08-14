@@ -697,8 +697,13 @@ class Command(object):
                 # than passing the bmc's complaint on as an unexpected error.
                 try:
                     await self._do_web_request(biosurl)
-                except exc.RedfishError as re:
-                    if 'ResourceNotFound' not in str(re.msgid):
+                except exc.PyghmiException:
+                    # A link that is not served need not answer with a redfish
+                    # error, and the exception cannot say what the status was,
+                    # so ask.  Anything else is a fault, not an answer.
+                    _, status = await self.wc.grab_json_response_with_status(
+                        biosurl)
+                    if status not in (404, 405, 501):
                         raise
                     biosurl = ''
             # '' is remembered as 'asked, and there is none'
