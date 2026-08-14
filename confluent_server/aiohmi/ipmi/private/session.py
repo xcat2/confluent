@@ -479,10 +479,15 @@ class Session(object):
                     # id, however it's easier this way
                     forbidsock.append(self.socket)
             if trueself:
-                return await cls._await_login(trueself)
+                await cls._await_login(trueself)
+                # Count the caller only once it is really getting the session
+                trueself.users += 1
+                return trueself
             i = cls.initting_sessions.get(sesskey, False)
             if i:
-                return await cls._await_login(i)
+                await cls._await_login(i)
+                i.users += 1
+                return i
             self = super().__new__(cls)
             self.forbidsock = forbidsock
             # Register before establishing, not after: this is where a caller
@@ -531,6 +536,8 @@ class Session(object):
         # Whether this session still holds the socket pool count it took.
         # Set before anything can fail, so releasing is safe either way.
         self._socketclaimed = False
+        # How many callers hold this session; the last one out closes it
+        self.users = 1
         self.lastpayload = None
         self._customkeepalives = None
         # queue of events denoting line to run a cmd
@@ -1936,7 +1943,15 @@ class Session(object):
                 WAITING_SESSIONS.release()
 
     async def logout(self, sessionok=True):
-
+        if (sessionok and self.users > 1
+                and not self.broken and not self.cleaningup):
+            # A caller finished with a working session gives up its claim and
+            # leaves it to whoever else holds it; closing it here would hand
+            # them one that answers as though it had been lost.  sessionok is
+            # false when it is no longer usable, and then it comes down anyway.
+            self.users -= 1
+            return {'success': True}
+        self.users = 0
         if self.cleaningup:
             self.nowait = True
         if self.logged:
