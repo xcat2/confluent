@@ -1306,6 +1306,10 @@ class Command(object):
         state = None
         for chassis in sysinfo.get('Links', {}).get('Chassis', []):
             chassisinfo = await self._do_web_request(chassis['@odata.id'])
+            if len(chassisinfo.get('Links', {}).get('ComputerSystems', [])) > 1:
+                # A chassis shared with other systems has the enclosure's
+                # indicator rather than this node's, as in get_identify
+                continue
             state = self._indicator_state(chassisinfo)
             if state is not None:
                 break
