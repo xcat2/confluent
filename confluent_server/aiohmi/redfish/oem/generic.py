@@ -611,9 +611,10 @@ class OEMHandler(object):
 
     async def get_event_log(self, clear=False, fishclient=None, extraurls=[]):
         bmcinfo = await self._do_web_request(await fishclient.get_bmcurl())
+        # A manager need not publish log services at all, and one that does not
+        # is the clearest case of a platform keeping its event log elsewhere, so
+        # carry on to the fallback below rather than answering with nothing
         lsurl = bmcinfo.get('LogServices', {}).get('@odata.id', None)
-        if not lsurl:
-            return
         currtime = bmcinfo.get('DateTime', None)
         correction = timedelta(0)
         utz = tz.tzoffset('', 0)
@@ -644,7 +645,7 @@ class OEMHandler(object):
                     found.append(candidate)
             return found
 
-        lurls = await eventlogurls(lsurl)
+        lurls = await eventlogurls(lsurl) if lsurl else []
         if not lurls or not clear:
             # Some implementations keep no event log under the manager and put
             # it under the system instead, so fall back to looking there rather
