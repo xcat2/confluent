@@ -1935,6 +1935,11 @@ class Command(object):
         await self.raw_command(netfn=0x06, command=0x45, data=data, timeout=2)
         return True
 
+    # Parameter out of range, requested record not present, and invalid data
+    # field: the three ways a bmc says the user slot asked about is not one it
+    # has.  Anything else it answers is about the bmc, not about the slot.
+    _absentusercodes = (0xc9, 0xcb, 0xcc)
+
     async def get_user_name(self, uid, return_none_on_error=True):
         """Get user name
 
@@ -1946,11 +1951,11 @@ class Command(object):
             response = await self.raw_command(netfn=0x06, command=0x46,
                                               data=(uid,))
         except exc.IpmiException as ie:
-            # A completion code is the bmc answering about this slot, and some
-            # leave a slot in a state where that answer is an error rather than
-            # an empty name.  A timeout or a lost session is not an answer, and
-            # reading one as an empty slot would quietly shorten a user list.
-            if return_none_on_error and 0 < ie.ipmicode <= 0xff:
+            # Only the codes that say there is no such slot to describe.  A
+            # timeout, a lost session, or a bmc that is merely busy or still
+            # starting up is not an answer about the slot, and reading one as
+            # an empty slot would quietly shorten a user list.
+            if return_none_on_error and ie.ipmicode in self._absentusercodes:
                 return None
             raise
         name = None
