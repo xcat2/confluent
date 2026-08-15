@@ -908,6 +908,11 @@ class Command(object):
             # The indicator belongs to the chassis and may be described only
             # there, which is where reading looks too.  A shared chassis is
             # somebody else's indicator, as in get_identify.
+            # Only when the system describes none of its own: reading prefers
+            # the chassis, but writing cannot follow it there, because a
+            # platform is free to publish the chassis copy read only.  A
+            # ThinkSystem SD665-N V3 answers PropertyValueFormatError to every
+            # value on Chassis.IndicatorLED and takes all of them on the system.
             for chassis in targinfo.get('Links', {}).get('Chassis', []):
                 chassisinfo = await self._do_web_request(chassis['@odata.id'])
                 if len(chassisinfo.get('Links', {}).get(
