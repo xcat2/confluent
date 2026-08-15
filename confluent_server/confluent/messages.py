@@ -681,8 +681,12 @@ class InputFirmwareUpdate(ConfluentMessage):
                             # meaning here is whether the user could have
                             # created the file there themselves.
                             target = destdir(value)
+                            # Search as well as write: a directory the user can
+                            # write but not enter is one they cannot create a
+                            # file in, and os.access says nothing about that on
+                            # its own
                             if not checkaccess(curruser, target, pwent,
-                                               os.W_OK):
+                                               os.W_OK | os.X_OK):
                                 raise Exception(
                                     '{0} is not writable by {1}, check the '
                                     'directory and parent directory ownership '
