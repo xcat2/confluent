@@ -824,20 +824,17 @@ class Command(object):
     async def _fetch_lancfg_data(self, channel, param, selector=0):
         """Internal helper for fetching a lan cfg parameter's raw data
 
-        Answers None if the bmc does not have the parameter.  Such a bmc says
-        so in the completion code and sends no data at all, so the code has to
-        be read before the payload is, and oldraw_command reports the code
-        rather than raising on it, which is why this cannot be done by
-        catching something.
+        Answers None if the bmc does not have the parameter, which such a bmc
+        reports in the completion code, sending no data at all.
         """
         fetchcmd = bytearray((channel, param, selector, 0))
-        fetched = await self.oldraw_command(0xc, 2, data=fetchcmd)
-        if fetched['code'] in (0x80, 0xc9):
+        try:
+            fetched = await self.raw_command(0xc, 2, data=fetchcmd)
+        except exc.IpmiException as ie:
             # parameter not supported, and parameter out of range
-            return None
-        if fetched['code']:
-            raise exc.IpmiException(util.get_ipmi_error(fetched),
-                                    fetched['code'])
+            if ie.ipmicode in (0x80, 0xc9):
+                return None
+            raise
         return bytearray(fetched['data'])
 
     async def _fetch_lancfg_param(self, channel, param, prefixlen=False):
