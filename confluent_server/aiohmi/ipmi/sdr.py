@@ -832,16 +832,21 @@ class SDR(object):
                 if sdrrec['code'] == 0xca:
                     if size == 0xff:  # get just 5 to get header to know length
                         size = 5
-                    elif size > 5:
-                        size //= 2
-                        # push things over such that it's less
-                        # likely to be just 1 short of a read
-                        # and incur a whole new request
-                        size += 2
-                        chunksize = size
-                    continue
+                        continue
+                    # push things over such that it's less
+                    # likely to be just 1 short of a read
+                    # and incur a whole new request
+                    smaller = size // 2 + 2
+                    # Asking again unchanged would never end, and a header read
+                    # under 5 bytes could not carry the record length, so fall
+                    # through to the raise below rather than retry either
+                    if smaller < size and (currlen != 0 or smaller >= 5):
+                        size = chunksize = smaller
+                        continue
                 if sdrrec['code'] == 0xc5:  # need a new reservation id
-                    rsvid = 0
+                    # Take one here rather than leaving it to the top of the
+                    # loop, which only reserves for a partial read
+                    rsvid = await self.get_device_sdr_reservation()
                     continue
                 if sdrrec['code'] != 0:
                     raise exc.IpmiException(sdrrec['error'])
