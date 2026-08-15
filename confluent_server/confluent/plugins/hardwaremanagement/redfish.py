@@ -1438,6 +1438,13 @@ class IpmiHandler:
                 raise exc.InvalidArgumentException(
                     'Location accepts only: {0}'.format(
                         ', '.join(self._locationfields)))
+            contacts = locargs.get('contactnames', None)
+            if isinstance(contacts, str):
+                # A read answers with a list of names, but a caller setting one
+                # gives a string, and iterating that would make a contact of
+                # every letter
+                locargs['contactnames'] = [x.strip() for x in
+                                           contacts.split(',') if x.strip()]
             await self.ipmicmd.set_location_information(**locargs)
             return
 
