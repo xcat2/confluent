@@ -230,3 +230,5 @@ if options.lines and not listmode:
                             print('{0}: {1}'.format(node, format_event(evt)))
                 else:
                     print('{0}: {1}'.format(node, format_event(evt)))
+
+sys.exit(exitcode)
