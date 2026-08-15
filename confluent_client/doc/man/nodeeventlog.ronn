@@ -3,7 +3,7 @@ nodeeventlog(8) -- Pull eventlog from confluent nodes
 
 ## SYNOPSIS
 
-`nodeeventlog [options] [-s <sources>] <noderange> [clear]`  
+`nodeeventlog [options] [-s <sources>] <noderange> [clear]`
 
 ## DESCRIPTION
 
