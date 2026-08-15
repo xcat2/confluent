@@ -721,8 +721,11 @@ class SDR(object):
             raise exc.IpmiException(rsp['error'])
         return rsp['data'][0] + (rsp['data'][1] << 8)
 
-    async def get_device_sdr_reservation(self):
-        rsp = await self.ipmicmd.raw_command(netfn=4, command=0x22)
+    async def get_device_sdr_reservation(self, lun=0):
+        # To the lun whose records are about to be read: a device holds its
+        # sensor records per lun, and a bmc that scopes the reservation the
+        # same way answers 0xc5 to a token taken against a different one
+        rsp = await self.ipmicmd.raw_command(netfn=4, command=0x22, rslun=lun)
         if rsp['code'] != 0:
             raise exc.IpmiException(rsp['error'])
         return rsp['data'][0] + (rsp['data'][1] << 8)
@@ -818,10 +821,11 @@ class SDR(object):
         while recid != 0xffff:  # per 35.3 Get Device SDR, 0xffff marks the end
             newrecid = 0
             currlen = 0
+            rsvattempts = 0
             sdrdata = bytearray()
             while True:  # loop until SDR fetched wholly
                 if size != 0xff and rsvid == 0:
-                    rsvid = await self.get_device_sdr_reservation()
+                    rsvid = await self.get_device_sdr_reservation(lun)
                 rqdata = [rsvid & 0xff, rsvid >> 8,
                           recid & 0xff, recid >> 8,
                           offset, size]
@@ -845,8 +849,15 @@ class SDR(object):
                         continue
                 if sdrrec['code'] == 0xc5:  # need a new reservation id
                     # Take one here rather than leaving it to the top of the
-                    # loop, which only reserves for a partial read
-                    rsvid = await self.get_device_sdr_reservation()
+                    # loop, which only reserves for a partial read.  Bounded,
+                    # because a bmc that will not honour a token we can take
+                    # would otherwise answer 0xc5 to every retry for ever.
+                    if rsvattempts >= 3:
+                        raise exc.IpmiException(
+                            'The bmc kept rejecting the sensor record '
+                            'reservation for lun {0}'.format(lun))
+                    rsvattempts += 1
+                    rsvid = await self.get_device_sdr_reservation(lun)
                     continue
                 if sdrrec['code'] != 0:
                     raise exc.IpmiException(sdrrec['error'])
