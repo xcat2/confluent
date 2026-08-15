@@ -321,17 +321,18 @@ class Command(object):
                         }
         return names
 
-    async def _account_url_info_by_id(self, uid):
+    async def _account_url_info_by_id(self, uid, cache=True):
         srvurl = await self._accountserviceurl()
         oem = await self.oem()
         if srvurl:
-            srvinfo = await self._do_web_request(srvurl)
+            srvinfo = await self._do_web_request(srvurl, cache=cache)
             srvurl = srvinfo.get('Accounts', {}).get('@odata.id', None)
             if srvurl:
-                srvinfo = await self._do_web_request(srvurl)
+                srvinfo = await self._do_web_request(srvurl, cache=cache)
                 accounts = srvinfo.get('Members', [])
                 for account in accounts:
-                    accinfo = await self._do_web_request(account['@odata.id'])
+                    accinfo = await self._do_web_request(account['@odata.id'],
+                                                         cache=cache)
                     currid = accinfo.get('Id', None)
                     if str(currid) == str(uid):
                         accinfo['expiration'] = await oem.get_user_expiration(

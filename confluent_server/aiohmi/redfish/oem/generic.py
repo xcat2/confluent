@@ -795,7 +795,10 @@ class OEMHandler(object):
                     # that is for
                     break
             await asyncio.sleep(3)
-            if not await fishclient._account_url_info_by_id(uid):
+            # Uncached: a delete that failed left the account collection in the
+            # url cache as it was before, and answering this from that snapshot
+            # could only ever say the account is still there
+            if not await fishclient._account_url_info_by_id(uid, cache=False):
                 return True
         try:
             await fishclient.set_user_password(uid, base64.b64encode(os.urandom(15)))
