@@ -1620,9 +1620,11 @@ class OEMHandler(object):
             # watching, away for minutes. That is the update working, not the
             # monitoring failing, so wait it out and take the bmc coming back
             # with the task gone as the update having landed.
+            expectsreset = getattr(self, '_updateresetsbmc', False)
+            # Started when the bmc actually goes, not now: a flash that keeps
+            # answering for longer than the grace period would otherwise have
+            # spent it all before the reboot it is meant to cover.
             deadline = None
-            if getattr(self, '_updateresetsbmc', False):
-                deadline = time.monotonic() + self._resetgracetime
             wentaway = False
             while not complete and retry > 0:
                 try:
@@ -1630,8 +1632,10 @@ class OEMHandler(object):
                 except (socket.timeout, exc.PyghmiException, OSError):
                     pgress = None
                 if not pgress:
-                    if deadline is not None:
-                        if time.monotonic() > deadline:
+                    if expectsreset:
+                        if deadline is None:
+                            deadline = time.monotonic() + self._resetgracetime
+                        elif time.monotonic() > deadline:
                             raise Exception(
                                 'The bmc did not finish applying its firmware '
                                 'within {0} seconds'.format(
