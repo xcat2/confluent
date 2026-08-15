@@ -1360,19 +1360,15 @@ class Command(object):
         for res in results:
             entries.append((self._fwcategory(res[0]),
                             self._extract_fwinfo(res, labels)))
-        categorised = any(x[0] for x in entries)
         for fwcategory, res in entries:
             if res[0] is None:
                 continue
-            if wantcategory:
-                if categorised:
-                    if fwcategory != wantcategory:
-                        continue
-                elif wantcategory != 'core':
-                    # This platform does not say what any of its firmware
-                    # belongs to, and an uncategorised inventory on a bmc is
-                    # system firmware, so it can only answer for 'core'
-                    continue
+            # An entry that says nothing about what it belongs to is system
+            # firmware, which is what firmware on a bmc is unless it points at
+            # something else.  This holds for a whole inventory that names no
+            # relations and for the odd entry among ones that do.
+            if wantcategory and (fwcategory or 'core') != wantcategory:
+                continue
             yield res
 
     def _firmware_labels(self, results):
