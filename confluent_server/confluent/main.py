@@ -207,6 +207,12 @@ def request_stop():
         _stopevent.set()
 
 
+def _finish_shutdown():
+    """Say the service is going and get the configuration on disk."""
+    log.log({'info': 'Confluent management service shutting down'}, flush=True)
+    configmanager.ConfigManager.wait_for_sync()
+
+
 def terminate(signalname, frame):
     # Only for platforms where the event loop cannot deliver signals for us.
     # Raising SystemExit from a handler while the loop runs escapes run_forever
@@ -369,14 +375,26 @@ async def asyncrun(args):
         pass
     webservice = httpapi.HttpApi(http_bind_host, http_bind_port, http_bind_group, http_bind_perms)
     webservice.start()
-    while len(list(configmanager.list_collective())) >= 2:
+    while not _stopevent.is_set() and len(
+            list(configmanager.list_collective())) >= 2:
         # If in a collective, stall automatic startup activity
         # until we establish quorum
         try:
             configmanager.check_quorum()
             break
         except Exception:
-            await asyncio.sleep(0.5)
+            # Waiting on the stop event rather than sleeping through it.  A
+            # member that cannot reach quorum stalls here for as long as that
+            # lasts, and asking it to stop has to be answered in that state
+            # rather than after quorum returns.
+            try:
+                await asyncio.wait_for(_stopevent.wait(), 0.5)
+            except asyncio.TimeoutError:
+                pass
+    if _stopevent.is_set():
+        # Asked to stop before startup got as far as serving anything, so
+        # there is nothing to unwind beyond what stopping normally does
+        return _finish_shutdown()
     disco.start_detection()
     await asyncio.sleep(1)
     await consoleserver.start_console_sessions()
@@ -400,8 +418,7 @@ async def asyncrun(args):
             break
         if notifysock:
             sock.send(b'WATCHDOG=1')
-    log.log({'info': 'Confluent management service shutting down'}, flush=True)
-    configmanager.ConfigManager.wait_for_sync()
+    _finish_shutdown()
 
 def _get_connector_config(session):
     host = conf.get_option(session, 'bindhost')
