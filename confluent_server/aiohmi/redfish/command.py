@@ -1316,27 +1316,66 @@ class Command(object):
 
     # A firmware inventory entry says what it belongs to with RelatedItem, so
     # map the collections that turn up there onto the categories confluent asks
-    # for
+    # for.  Only the collections that mean one thing: a Storage resource is the
+    # subsystem rather than a drive, and a Processor is a cpu as readily as an
+    # accelerator, so both are decided further down instead.
     _fwcategorybyurl = (
         ('/Drives/', 'disks'),
-        ('/Storage/', 'disks'),
         ('/PCIeDevices/', 'adapters'),
         ('/NetworkAdapters/', 'adapters'),
         ('/NetworkInterfaces/', 'adapters'),
+        ('/Storage/', 'adapters'),
+        ('/PowerSubsystem/', 'misc'),
+        ('/PowerSupplies/', 'misc'),
+        ('/ThermalSubsystem/', 'misc'),
+        ('/Fans/', 'misc'),
+        ('/Memory/', 'misc'),
     )
 
-    def _fwcategory(self, fwi):
+    # The legacy chassis power and thermal documents, which are a whole path
+    # segment rather than a collection, so they are matched as one.  A bare
+    # substring would also catch a chassis that merely happens to be called
+    # something like PowerShelf1.
+    _fwcategorybysegment = (
+        ('Power', 'misc'),
+        ('Thermal', 'misc'),
+    )
+
+    # What a Processor has to say it is before its firmware counts as a card in
+    # the machine rather than as part of the system
+    _acceleratortypes = ('GPU', 'FPGA', 'Accelerator', 'DSP')
+
+    async def _fwcategory(self, fwi):
         """Which category a firmware inventory entry belongs to.
 
         Returns None when the entry gives nothing to judge by.
         """
-        related = fwi.get('RelatedItem', [])
-        for item in related:
-            url = item.get('@odata.id', '')
+        related = [x.get('@odata.id', '') for x in fwi.get('RelatedItem', [])]
+        for url in related:
             for frag, category in self._fwcategorybyurl:
                 if frag in url:
                     return category
+            lastsegment = url.rstrip('/').rpartition('/')[2]
+            for segment, category in self._fwcategorybysegment:
+                if lastsegment == segment:
+                    return category
+            if '/Processors/' in url:
+                return await self._processorcategory(url)
         return 'core' if related else None
+
+    async def _processorcategory(self, url):
+        """A cpu is system firmware, an accelerator is a card in the machine.
+
+        The url cannot tell them apart, so the processor is asked.  A processor
+        that will not say counts as a cpu, which is the common case and the
+        answer this gave before the distinction was drawn.
+        """
+        try:
+            procinfo = await self._do_web_request(url)
+        except exc.PyghmiException:
+            return 'core'
+        proctype = procinfo.get('ProcessorType', None)
+        return 'adapters' if proctype in self._acceleratortypes else 'core'
 
     async def get_firmware(self, components=(), category=None):
         self._fwnamemap = {}
@@ -1358,7 +1397,7 @@ class Command(object):
                    if res[0]]
         labels = self._firmware_labels(results)
         for res in results:
-            entries.append((self._fwcategory(res[0]),
+            entries.append((await self._fwcategory(res[0]),
                             self._extract_fwinfo(res, labels)))
         for fwcategory, res in entries:
             if res[0] is None:
