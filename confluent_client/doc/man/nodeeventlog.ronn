@@ -3,12 +3,22 @@ nodeeventlog(8) -- Pull eventlog from confluent nodes
 
 ## SYNOPSIS
 
-`nodeeventlog [options] <noderange> [clear]`  
+`nodeeventlog [options] [-s <sources>] <noderange> [clear]`  
 
 ## DESCRIPTION
 
 `nodeeventlog` pulls and optionally clears the event log from the requested
 noderange.
+
+A platform may keep its events in more than one log, and some of those are
+noisier than others.  Reading gathers every log the platform describes as an
+event log, wherever it keeps them, and `-s` narrows the output to the ones
+asked for.  `-s list` names the logs a node offers rather than showing entries.
+
+Clearing is deliberately narrower than reading: it only touches the logs the
+platform's own manager publishes, so a log that only a read reaches is never
+destroyed by one.  A selection cannot be cleared, so `-s` and `clear` are
+refused together.
 
 ## OPTIONS
 
@@ -25,10 +35,24 @@ noderange.
    entries from within the last one hour.
                            
   
+* `-s SOURCES`, `--source=SOURCES`:
+   only show entries from the named logs, comma delimited and matched without
+   regard to case. `-s list` names the logs the node offers instead of showing
+   entries. A platform that named a log "list" would be shadowed by that.
+
 * `-h`, `--help`:
   Show help message and exit  
 
 ## EXAMPLES
+* Ask which logs a node keeps:
+  `# nodeeventlog n2 -s list`  
+  `n2: AuditLog,EventLog,Logs,SEL`  
+
+* Pull only the sel and the chassis log, leaving the audit noise out:
+  `# nodeeventlog n2 -s SEL,Logs`  
+  `n2: 07/23/2026 13:03:12 SEL: Processor - Thermal Trip`  
+  `n2: 08/05/2026 04:30:26 Logs: PowerUnit - Power Off`  
+
 * Pull the event log from n2 and n3:
   `# nodeeventlog n2,n3`  
   `n2: 05/03/2017 11:44:25 Event Log Disabled - SEL Fullness - Log clear`  

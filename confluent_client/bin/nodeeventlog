@@ -53,7 +53,13 @@ argparser.add_option('-t', '--timeframe', type='string',
                           'entries from the last hours or days. '
                           '1h would be one hour, 4d would be four days. '
                           'format <num>h or <num>d'
-                          )  
+                          )
+
+
+argparser.add_option('-s', '--source', type='string',
+                     help='only show entries from the named logs, comma '
+                          'delimited. "-s list" names the logs this node '
+                          'offers instead of showing entries')
 (options, args) = argparser.parse_args()
 try:
     noderange = args[0]
@@ -71,6 +77,19 @@ if len(args) == 2:
     else:
         argparser.print_help()
         sys.exit(1)
+
+listmode = bool(options.source) and options.source.lower() == 'list'
+wantsources = None
+if options.source and not listmode:
+    wantsources = set(x.strip().lower() for x in options.source.split(',')
+                      if x.strip())
+if options.source and deletemode:
+    # Clearing a subset is not something the platforms offer, and clearing more
+    # than was asked for is not something to do quietly
+    sys.stderr.write(
+        'Clearing a selection of logs is not supported, so --source cannot be '
+        'combined with clear\n')
+    sys.exit(1)
 
 session = client.Command()
 exitcode = 0
@@ -125,6 +144,7 @@ if options.timeframe:
         sys.exit(1)
     timeframe = dt.now() - tdelta
 
+sources_seen = {}
 event_dict = {}
 nodes = []
 for res in session.read('/noderange/{0}/nodes/'.format(args[0])):
@@ -145,6 +165,17 @@ for rsp in func('/noderange/{0}/events/hardware/log'.format(noderange)):
                exitcode |= 1
             if 'events' in thisdata:
                 evtdata = thisdata['events']
+                for evt in evtdata:
+                    if evt.get('log_id', None):
+                        sources_seen.setdefault(node, set()).add(evt['log_id'])
+                if listmode:
+                    continue
+                if wantsources is not None:
+                    # Filter before any tail is taken, or asking for the last
+                    # few entries of one log would answer with fewer
+                    evtdata = [x for x in evtdata if (x.get('log_id', '')
+                                                      or '').lower()
+                               in wantsources]
                 if options.lines:
                     event_dict[node].extend(evtdata)
                 else:
@@ -158,7 +189,24 @@ for rsp in func('/noderange/{0}/events/hardware/log'.format(noderange)):
                         else:
                             print('{0}: {1}'.format(node, format_event(evt))) 
 
-if options.lines:
+if listmode:
+    for node in nodes:
+        found = sorted(sources_seen.get(node, ()))
+        if found:
+            print('{0}: {1}'.format(node, ','.join(found)))
+        else:
+            sys.stderr.write(
+                'No event log sources reported for "{0}"\n'.format(node))
+elif wantsources is not None:
+    for node in nodes:
+        found = set(x.lower() for x in sources_seen.get(node, ()))
+        missing = wantsources - found
+        if missing and found:
+            sys.stderr.write('{0}: no such log source: {1}, this node has {2}\n'
+                             .format(node, ','.join(sorted(missing)),
+                                     ','.join(sorted(sources_seen[node]))))
+
+if options.lines and not listmode:
     for node in nodes:
         evtdata_list = event_dict[node]
         if len(evtdata_list) != 0:
