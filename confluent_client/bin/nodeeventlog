@@ -201,10 +201,20 @@ elif wantsources is not None:
     for node in nodes:
         found = set(x.lower() for x in sources_seen.get(node, ()))
         missing = wantsources - found
-        if missing and found:
+        if not missing:
+            continue
+        if found:
             sys.stderr.write('{0}: no such log source: {1}, this node has {2}\n'
                              .format(node, ','.join(sorted(missing)),
                                      ','.join(sorted(sources_seen[node]))))
+        else:
+            # A log that holds no entries names no source, so an empty answer
+            # here is as often a quiet platform as a wrong name.  Either way
+            # saying nothing would look like the log simply had nothing in it.
+            sys.stderr.write(
+                '{0}: no entries from any log source, so nothing could match '
+                '{1}\n'.format(node, ','.join(sorted(missing))))
+        exitcode |= 1
 
 if options.lines and not listmode:
     for node in nodes:
