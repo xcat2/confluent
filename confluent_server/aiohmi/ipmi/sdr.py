@@ -769,24 +769,35 @@ class SDR(object):
                 rqdata = [rsvid & 0xff, rsvid >> 8,
                           recid & 0xff, recid >> 8,
                           offset, size]
-                sdrrec = await self.ipmicmd.raw_command(netfn=0x0a, command=0x23,
-                                                  data=rqdata)
-                if sdrrec['code'] == 0xca:
-                    if size == 0xff:  # get just 5 to get header to know length
-                        size = 5
-                    elif size > 5:
-                        size //= 2
+                try:
+                    sdrrec = await self.ipmicmd.raw_command(
+                        netfn=0x0a, command=0x23, data=rqdata)
+                except exc.IpmiException as ie:
+                    # The two codes this loop negotiates with, rather than
+                    # failures: more asked for than the bmc will return at once,
+                    # and a reservation that has gone stale
+                    if ie.ipmicode == 0xca:
+                        if size == 0xff:  # get just 5 to get header to know length
+                            size = 5
+                            continue
                         # push things over such that it's less
                         # likely to be just 1 short of a read
                         # and incur a whole new request
-                        size += 2
-                        chunksize = size
-                    continue
-                if sdrrec['code'] == 0xc5:  # need a new reservation id
-                    rsvid = 0
-                    continue
-                if sdrrec['code'] != 0:
-                    raise exc.IpmiException(sdrrec['error'])
+                        smaller = size // 2 + 2
+                        if smaller >= size or (currlen == 0 and smaller < 5):
+                            # Nothing left to give up, and asking again
+                            # unchanged would never end.  A header read has to
+                            # be 5 bytes to carry the record length, so a
+                            # smaller one could not be parsed either
+                            raise
+                        size = chunksize = smaller
+                        continue
+                    if ie.ipmicode == 0xc5:  # need a new reservation id
+                        # Take one here rather than leaving it to the top of
+                        # the loop, which only reserves for a partial read
+                        rsvid = await self.get_sdr_reservation()
+                        continue
+                    raise
                 if newrecid == 0:
                     newrecid = (sdrrec['data'][1] << 8) + sdrrec['data'][0]
                 if currlen == 0:

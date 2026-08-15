@@ -150,8 +150,6 @@ class FRU(object):
     async def fetch_fru(self, fruid):
         response = await self.ipmicmd.raw_command(
             netfn=0xa, command=0x10, data=[fruid])
-        if 'error' in response:
-            raise iexc.IpmiException(response['error'], code=response['code'])
         frusize = response['data'][0] | (response['data'][1] << 8)
         # In our case, we don't need to think too hard about whether
         # the FRU is word or byte, we just process what we get back in the
@@ -165,20 +163,21 @@ class FRU(object):
         offset = 0
         self.rawfru = bytearray([])
         while chunksize:
-            response = await self.ipmicmd.raw_command(
-                netfn=0xa, command=0x11, data=[fruid, offset & 0xff,
-                                               offset >> 8, chunksize])
-            if response['code'] in (201, 202):
+            try:
+                response = await self.ipmicmd.raw_command(
+                    netfn=0xa, command=0x11, data=[fruid, offset & 0xff,
+                                                   offset >> 8, chunksize])
+            except iexc.IpmiException as ie:
                 # if it was too big, back off and try smaller
                 # Try just over half to mitigate the chance of
                 # one request becoming three rather than just two
-                if chunksize == 3:
-                    raise iexc.IpmiException(response['error'])
-                chunksize //= 2
-                chunksize += 2
+                smaller = chunksize // 2 + 2
+                if ie.ipmicode not in (201, 202) or smaller >= chunksize:
+                    # Nothing left to give up, and asking again unchanged would
+                    # never end
+                    raise
+                chunksize = smaller
                 continue
-            elif 'error' in response:
-                raise iexc.IpmiException(response['error'], response['code'])
             offset += response['data'][0]
             if response['data'][0] == 0:
                 break

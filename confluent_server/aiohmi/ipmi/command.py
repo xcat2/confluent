@@ -453,9 +453,11 @@ class Command(object):
                      retry=True, timeout=None, rslun=0):
         """Send raw ipmi command to BMC, raising exception on error
 
-        This is identical to raw_command, except it raises exceptions
+        This is identical to oldraw_command, except it raises exceptions
         on IPMI errors and returns data as a buffer.  This is the recommend
-        function to use.  The response['data'] being a buffer allows
+        function to use, and a caller that has to act on a particular
+        completion code reads it from the exception's ipmicode.  The
+        response['data'] being a buffer allows
         traditional indexed access as well as works nicely with
         struct.unpack_from when certain data is coming back.
 
@@ -1089,13 +1091,14 @@ class Command(object):
         await self.init_sdr()
         for sensor in self._sdr.get_sensor_numbers():
             currsensor = self._sdr.sensors[sensor]
-            rsp = await self.raw_command(command=0x2d, netfn=4,
-                                          rslun=currsensor.sensor_lun,
-                                          data=(currsensor.sensor_number,))
-            if 'error' in rsp:
-                if rsp['code'] == 203:  # Sensor does not exist, optional dev
+            try:
+                rsp = await self.raw_command(command=0x2d, netfn=4,
+                                              rslun=currsensor.sensor_lun,
+                                              data=(currsensor.sensor_number,))
+            except exc.IpmiException as ie:
+                if ie.ipmicode == 203:  # Sensor does not exist, optional dev
                     continue
-                raise exc.IpmiException(rsp['error'], code=rsp['code'])
+                raise
             yield await self._sdr.sensors[sensor].\
                 decode_sensor_reading(self, rsp['data'])
         await self.oem_init()
@@ -1304,9 +1307,18 @@ class Command(object):
         # handler of commands
         lanchan = await self.get_network_channel()
         if self._ipv6support is None:
-            rsp = await self.raw_command(netfn=0xc, command=0x2, data=(2, lanchan,
-                                                                 0x32, 0, 0))
-            self._ipv6support = rsp['code'] == 0
+            try:
+                await self.raw_command(netfn=0xc, command=0x2,
+                                       data=(2, lanchan, 0x32, 0, 0))
+                self._ipv6support = True
+            except exc.IpmiException as ie:
+                # A platform without the standard parameter says so in the
+                # completion code, which is the answer.  Anything else, a
+                # timeout or a lost session, is not, and must not be remembered
+                # as the platform's answer for the rest of the session.
+                if not 0 < ie.ipmicode <= 0xff:
+                    raise
+                self._ipv6support = False
         return self._ipv6support
 
     async def set_alert_destination(self, ip=None, acknowledge_required=None,
