@@ -262,14 +262,37 @@ def get_conn_params(node, configdata):
         kg = configdata['secret.ipmikg']['value']
     else:
         kg = passphrase
-    # TODO(jbjohnso): check if the end has some number after a : without []
-    # for non default port
+    # Read a port off the address, as the redfish plugin does. Brackets come
+    # off, unlike there: this address goes to socket.getaddrinfo, which rejects
+    # a bracketed literal, rather than into a URL where one is required.
+    bmc = bmc.strip()
+    port = 623
+    if bmc.startswith('['):
+        bracket_end = bmc.find(']')
+        if bracket_end > 0:
+            if len(bmc) > bracket_end + 1 and bmc[bracket_end + 1] == ':':
+                try:
+                    port = int(bmc[bracket_end + 2:])
+                except (ValueError, TypeError):
+                    pass
+            bmc = bmc[1:bracket_end]
+    elif bmc.count(':') == 1:
+        hostpart, _, portstr = bmc.rpartition(':')
+        try:
+            port = int(portstr)
+        except (ValueError, TypeError):
+            pass
+        bmc = hostpart
+    if not 0 < port <= 65535:
+        # NOTE: Fallback to 623 if port read is not valid
+        port = 623
+
     return {
         'username': username,
         'passphrase': passphrase,
         'kg': kg,
         'bmc': bmc,
-        'port': 623,
+        'port': port,
     }
 
 
@@ -287,6 +310,11 @@ def _donothing(data):
 class IpmiConsole(conapi.Console):
     configattributes = frozenset(_configattributes)
     bmctonodemapping = {}
+    # Whether this instance is the one that put its endpoint in the mapping
+    # above. False until it does, so that an instance rejected as a duplicate,
+    # or one that failed earlier in __init__, does not remove on the way out an
+    # entry that belongs to the node holding the endpoint.
+    claimedbmc = False
 
     def __init__(self, node, config):
         self.error = None
@@ -303,20 +331,26 @@ class IpmiConsole(conapi.Console):
         self.kg = connparams['kg']
         self.bmc = connparams['bmc']
         self.port = connparams['port']
+        # The port is part of the identity: several bmcs may sit behind one
+        # address on different ports, and they are distinct devices.
+        self.bmckey = (self.bmc, self.port)
         self.connected = False
-        # ok, is self.bmc unique among nodes already
+        # ok, is this bmc unique among nodes already
         # Cannot actually create console until 'connect', when we get callback
-        if (self.bmc in self.bmctonodemapping and
-                self.bmctonodemapping[self.bmc] != node):
+        if (self.bmckey in self.bmctonodemapping and
+                self.bmctonodemapping[self.bmckey] != node):
             raise Exception(
                 "Duplicate hardwaremanagement.manager attribute for {0} and {1}".format(
-                    node, self.bmctonodemapping[self.bmc]))
-        self.bmctonodemapping[self.bmc] = node
+                    node, self.bmctonodemapping[self.bmckey]))
+        self.bmctonodemapping[self.bmckey] = node
+        self.claimedbmc = True
 
     def __del__(self):
         self.solconnection = None
+        if not self.claimedbmc:
+            return
         try:
-            del self.bmctonodemapping[self.bmc]
+            del self.bmctonodemapping[self.bmckey]
         except KeyError:
             pass
 
