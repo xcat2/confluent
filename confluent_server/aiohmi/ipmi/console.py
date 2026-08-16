@@ -148,7 +148,11 @@ class Console(object):
         # some BMCs disagree on the endianness, so do both
         valid_ports = (self.port, struct.unpack(
             '<H', struct.pack('>H', self.port))[0])
-        if (data[8] + (data[9] << 8)) not in valid_ports:
+        solport = data[8] + (data[9] << 8)
+        # A bmc behind a port forward answers with the port it listens on
+        # rather than the one it was reached through; payloads ride the
+        # session, never the advertised port.
+        if solport not in valid_ports and self.port == 623:
             # TODO(jbjohnso): support atypical SOL port number
             raise NotImplementedError("Non-standard SOL Port Number")
         # ignore data[10:11] for now, the vlan detail, shouldn't matter to this
