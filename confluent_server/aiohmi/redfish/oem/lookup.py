@@ -17,6 +17,7 @@ import aiohmi.redfish.oem.generic as generic
 import aiohmi.redfish.oem.lenovo.main as lenovo
 import aiohmi.redfish.oem.ami.main as ami
 import aiohmi.redfish.oem.megware.main as megware
+import aiohmi.redfish.oem.openbmc.main as openbmc
 
 OEMMAP = {
     'Lenovo': lenovo,
@@ -24,6 +25,9 @@ OEMMAP = {
     'AMI': ami,
     'Ami': ami,
     'Megware': megware,
+    # bmcweb spells its oem key OpenBmc on the manager and OpenBMC elsewhere
+    'OpenBMC': openbmc,
+    'OpenBmc': openbmc,
 }
 
 

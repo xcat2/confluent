@@ -562,12 +562,10 @@ class OEMHandler(object):
                     }
                     yield certdesc
 
-    # A log service whose id or name says one of these is not an event log:
-    # the bmc's own systemd journal, dumps of several kinds, and firmware boot
-    # progress.  Reading them buries the events that were asked for, and
-    # clearing them destroys diagnostic data that has nothing to do with the
-    # event log.
-    noneventlogwords = ('journal', 'dump', 'postcode', 'hostlogger', 'crash')
+    # Words in a log service's id or name that say it holds something other than
+    # events.  Redfish does not settle what a log service is called, so each
+    # handler names its platform's and generic reads every service it finds.
+    noneventlogwords = ()
 
     @classmethod
     def is_event_log(cls, loginfo):
