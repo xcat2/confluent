@@ -160,6 +160,9 @@ class OEMHandler(generic.OEMHandler):
             oemparams.get('ImageType', None), filename)
         oemparams['ImageType'] = imagetype
         otherfields['OemParameters'] = oemparams
+        # This firmware rejects a multipart push carrying the image alone.
+        # Empty Targets means "whatever this image is for".
+        otherfields.setdefault('UpdateParameters', {'Targets': []})
         # Updating the bmc takes the bmc away mid flight, which is expected
         # rather than a failure to watch the update
         self._updateresetsbmc = imagetype == 'BMC'

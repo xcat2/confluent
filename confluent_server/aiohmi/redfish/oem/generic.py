@@ -1548,14 +1548,6 @@ class OEMHandler(object):
     async def update_firmware(self, filename, data=None, progress=None, bank=None, otherfields=()):
         # disable cache to make sure we trigger the token renewal logic if needed
         usd, upurl, ismultipart = await self.retrieve_firmware_upload_url()
-        if ismultipart:
-            # A multipart push has to carry an UpdateParameters part beside the
-            # image, and implementations are entitled to reject the request
-            # when it is missing. Targets empty means "whatever this image is
-            # for", and OperationApplyTime is left out because it is optional
-            # and some implementations refuse the ones they do not implement.
-            otherfields = dict(otherfields) if otherfields else {}
-            otherfields.setdefault('UpdateParameters', {'Targets': []})
         try:
             uploadthread = await webclient.make_uploader(
                 self.webclient, upurl, filename, data, formname='UpdateFile', formwrap=ismultipart,
