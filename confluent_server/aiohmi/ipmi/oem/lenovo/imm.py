@@ -1028,7 +1028,7 @@ class XCCClient(IMMClient):
         return {'height': int(dsc['u-height']), 'slot': int(dsc['slot'])}
 
     async def get_extended_bmc_configuration(self, hideadvanced=True):
-        immsettings = await self.get_system_configuration(fetchimm=True)
+        immsettings = await self.get_system_configuration(hideadvanced=hideadvanced, fetchimm=True)
         for setting in list(immsettings):
             if not setting.startswith('IMM.'):
                 del immsettings[setting]
