@@ -17,6 +17,7 @@
 # This SCGI server provides a http wrap to confluent api
 # It additionally manages httprequest console sessions
 import base64
+import ipaddress
 import shutil
 
 import aiohttp
@@ -839,19 +840,52 @@ async def resourcehandler_backend(req, make_response):
                 await rsp.write(b'hardwaremanagement.manager definition could not be resolved')
                 return rsp
             # this is just to future proof just in case the indexes of the address family change in future
+            url = None
+            link_local_only = True
             for i in range(len(ip_info)):
                 if ip_info[i][0] == socket.AF_INET:
+                    link_local_only = False
                     url = 'https://{0}/'.format(ip_info[i][-1][0])
                     rsp = await make_response('text/plain', 302, headers={'Location': url})
                     await rsp.write(b'Our princess is in another castle!')
                     return rsp
                 elif ip_info[i][0] == socket.AF_INET6:
+                    address = ip_info[i][-1][0].split('%', 1)[0]
+                    if ipaddress.ip_address(address).is_link_local:
+                        continue
+                    link_local_only = False
                     url = 'https://[{0}]/'.format(ip_info[i][-1][0])
-            if url.startswith('https://[fe80'):
-                rsp = await make_response('text/plain', 405)
-                await rsp.write(b'link local ipv6 address cannot be used in browser')
+            if link_local_only and ip_info:
+                # A link-local manager address is not usable by the browser;
+                # use the address reported by the controller instead.
+                v6addr = None
+                v4addr = None
+                try:
+                    netpath = '/nodes/{}/configuration/management_controller/' \
+                              'net_interfaces/management'.format(nodename)
+                    nethdlr = pluginapi.handle_path(netpath, 'retrieve', cfgmgr,
+                                                    {})
+                    async for datum in pluginapi.iterate_responses(nethdlr):
+                        if isinstance(datum, confluent.messages.NetworkConfiguration):
+                            v4addr = datum.kvpairs.get('ipv4_address', {}).get('value')
+                            v6addr = datum.kvpairs.get('static_v6_addresses', {}).get('value')
+                except Exception:
+                    pass
+                if v4addr:
+                    url = 'https://{0}/'.format(str(v4addr).split('/', 1)[0])
+                else:
+                    if isinstance(v6addr, str):
+                        v6addr = v6addr.split(',', 1)[0]
+                    elif isinstance(v6addr, list):
+                        v6addr = v6addr[0] if v6addr else None
+                    if v6addr:
+                        v6addr = v6addr.split('/', 1)[0]
+                        url = 'https://[{0}]/'.format(v6addr)
+            if not url:
+                rsp = await make_response('text/plain', 404)
+                await rsp.write(b'No usable management controller address found')
                 return rsp
-            rsp = await make_response('text/plain', 302, {'Location': url})
+            rsp = await make_response('text/plain', 302, headers={'Location': url})
             await rsp.write(b'Our princess is in another castle!')
             return rsp
         funport = forwarder.get_port(targip, req.headers.get('X-Forwarded-For', None),
