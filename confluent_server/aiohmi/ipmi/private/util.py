@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
 import ctypes
 import functools
 import os
@@ -70,12 +71,12 @@ def urlsplit(url):
     return proto, host, rest
 
 
-def get_ipv4(hostname):
+async def get_ipv4(hostname):
     """Get list of ipv4 addresses for hostname
 
     """
-    addrinfo = socket.getaddrinfo(hostname, None, socket.AF_INET,
-                                  socket.SOCK_STREAM)
+    addrinfo = await asyncio.get_running_loop().getaddrinfo(
+        hostname, None, socket.AF_INET, socket.SOCK_STREAM)
     return [addrinfo[x][4][0] for x in range(len(addrinfo))]
 
 

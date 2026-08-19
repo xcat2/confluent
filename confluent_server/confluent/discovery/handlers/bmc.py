@@ -21,7 +21,7 @@ import confluent.netutil as netutil
 import aiohmi.exceptions as pygexc
 import aiohmi.ipmi.command as ipmicommand
 
-import socket
+import asyncio
 
 class NodeHandler(generic.NodeHandler):
     DEFAULT_USER = 'USERID'
@@ -156,7 +156,8 @@ class NodeHandler(generic.NodeHandler):
                     'fe80::')):
             newip = cd['hardwaremanagement.manager']['value']
             newip = newip.split('/', 1)[0]
-            newipinfo = socket.getaddrinfo(newip, 0)[0]
+            newipinfo = (await asyncio.get_running_loop().getaddrinfo(
+                newip, 0))[0]
             # This getaddrinfo is repeated in get_nic_config, could be
             # optimized, albeit with a more convoluted api..
             newip = newipinfo[-1][0]

@@ -20,8 +20,6 @@ import confluent.util as util
 import json
 
 
-from socket import getaddrinfo
-
 import aiohmi.util.webclient as webclient
 
 async def get_host_interface_urls(wc, mginfo):
@@ -259,7 +257,7 @@ class NodeHandler(generic.NodeHandler):
                     'fe80::')):
             newip = cd['hardwaremanagement.manager']['value']
             newip = newip.split('/', 1)[0]
-            newipinfo = getaddrinfo(newip, 0)[0]
+            newipinfo = (await asyncio.get_running_loop().getaddrinfo(newip, 0))[0]
             newip = newipinfo[-1][0]
             if ':' in newip:
                 raise exc.NotImplementedException('IPv6 remote config TODO')
@@ -342,7 +340,7 @@ async def remote_nodecfg(nodename, cfm):
     ipaddr = cfg.get(nodename, {}).get('hardwaremanagement.manager', {}).get(
         'value', None)
     ipaddr = ipaddr.split('/', 1)[0]
-    ipaddr = getaddrinfo(ipaddr, 0)[0][-1]
+    ipaddr = (await asyncio.get_running_loop().getaddrinfo(ipaddr, 0))[0][-1]
     if not ipaddr:
         raise Exception('Cannot remote configure a system without known '
                          'address')

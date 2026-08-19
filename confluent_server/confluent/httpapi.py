@@ -834,7 +834,8 @@ async def resourcehandler_backend(req, make_response):
         targip = targip.split('/', 1)[0]
         if default:
             try:
-                ip_info = socket.getaddrinfo(targip, 0, 0, socket.SOCK_STREAM)
+                loop = asyncio.get_running_loop()
+                ip_info = await loop.getaddrinfo(targip, 0, 0, socket.SOCK_STREAM)
             except socket.gaierror:
                 rsp = await make_response('text/plain', 404)
                 await rsp.write(b'hardwaremanagement.manager definition could not be resolved')
@@ -1244,7 +1245,7 @@ async def serve(bind_host, bind_port, bind_group, bind_perms):
                 os.umask(oldumask)
                 bind_arg = bind_host
             else:
-                bindinfo = socket.getaddrinfo(
+                bindinfo = await asyncio.get_running_loop().getaddrinfo(
                     bind_host, bind_port, 0, socket.SOCK_STREAM)
                 if bindinfo[0][0] == socket.AF_INET:
                     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

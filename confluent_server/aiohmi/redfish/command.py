@@ -181,7 +181,9 @@ class Command(object):
         self._bmcv4ip = None
         self._bmcv6ip = None
         self.xauthtoken = None
-        for addrinf in socket.getaddrinfo(bmc, 0, 0, socket.SOCK_STREAM):
+        addrinfo = await asyncio.get_running_loop().getaddrinfo(
+            bmc, 0, family=0, type=socket.SOCK_STREAM)
+        for addrinf in addrinfo:
             if addrinf[0] == socket.AF_INET:
                 self._bmcv4ip = socket.inet_pton(addrinf[0], addrinf[-1][0])
             elif addrinf[0] == socket.AF_INET6:

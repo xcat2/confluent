@@ -1509,7 +1509,8 @@ async def discover_node(cfg, handler, info, nodename, manual):
                 else:
                     bmcaddr = bmcaddr.split('/', 1)[0]
                     await wait_for_connection(bmcaddr)
-                    socket.getaddrinfo(bmcaddr, 443)
+                    loop = asyncio.get_running_loop()
+                    await loop.getaddrinfo(bmcaddr, 443)
             if nodeconfig:
                     await util.check_call(['/opt/confluent/bin/nodeconfig', nodename] + nodeconfig)
                     log.log({'info': 'Configured {0} ({1})'.format(nodename,

@@ -1930,10 +1930,11 @@ class Session(object):
             self.allsockaddrs = []
             myport = self.socket.getsockname()[1]
             try:
-                for res in socket.getaddrinfo(self.bmc,
-                                              self.port,
-                                              0,
-                                              socket.SOCK_DGRAM):
+                loop = asyncio.get_running_loop()
+                addrinfo = await loop.getaddrinfo(self.bmc,
+                                                   self.port,
+                                                   type=socket.SOCK_DGRAM)
+                for res in addrinfo:
                     sockaddr = res[4]
                     if ipv6support and res[0] == socket.AF_INET:
                         # convert the sockaddr to AF_INET6

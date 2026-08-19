@@ -1,3 +1,4 @@
+import asyncio
 import os
 if __name__ == '__main__':
     import sys
@@ -363,7 +364,8 @@ async def create_certificate(keyout=None, certout=None, csrfile=None, subj=None,
                     dnsnames.add(longname)
                     break
         for currip in ipaddrs:
-            currname = socket.getnameinfo((currip, 0), 0)[0]
+            currname = (await asyncio.get_running_loop().getnameinfo(
+                (currip, 0), 0))[0]
             for suffix in permitdomains:
                 if currname.endswith(suffix):
                     dnsnames.add(currname)

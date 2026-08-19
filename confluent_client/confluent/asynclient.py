@@ -400,8 +400,8 @@ class Command(object):
 
     async def _connect_tls(self):
         server, port = _parseserver(self.serverloc)
-        for res in socket.getaddrinfo(server, port, socket.AF_UNSPEC,
-                                      socket.SOCK_STREAM):
+        for res in await asyncio.get_running_loop().getaddrinfo(
+            server, port, socket.AF_UNSPEC, socket.SOCK_STREAM):
             af, socktype, proto, canonname, sa = res
             try:
                 self.connection = socket.socket(af, socktype, proto)

@@ -1158,7 +1158,7 @@ class OEMHandler(generic.OEMHandler):
         if domain is not None:
             await self._set_ris_string(6, domain)
         await self._set_ris_string(1, path)
-        ip = util.get_ipv4(host)[0]
+        ip = await util.get_ipv4(host)[0]
         await self._set_short_ris_string(2, ip)
         await self._set_short_ris_string(5, proto)
         # now to restart RIS to have changes take effect...
