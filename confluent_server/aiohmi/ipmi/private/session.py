@@ -468,7 +468,7 @@ class Session(object):
         sesskey = (bmc, _credkey(userid), _credkey(password), port,
                    _credkey(kg))
         loop = asyncio.get_running_loop()
-        addrinfos = await loop.getaddrinfo(bmc, port, 0, socket.SOCK_DGRAM)
+        addrinfos = await loop.getaddrinfo(bmc, port, type=socket.SOCK_DGRAM)
         for res in addrinfos:
             sockaddr = res[4]
             if ipv6support and res[0] == socket.AF_INET:
