@@ -367,7 +367,10 @@ class IpmiConsole(conapi.Console):
                                                  password=self.password,
                                                  kg=self.kg, force=True,
                                                  iohandler=self.handle_data)
-            await self.solconnection.connect()
+            try:
+                await self.solconnection.connect()
+            except pygexc.IpmiException as e:
+                raise exc.TargetEndpointUnreachable(str(e))
             if (self.broken or not self.solconnection or
                     self.solconnection.broken or
                     self.solconnection.ipmi_session.broken):
