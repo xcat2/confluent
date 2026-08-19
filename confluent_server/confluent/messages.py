@@ -238,10 +238,14 @@ class ConfluentMessage(object):
 
 class ConfluentNodeError(object):
     apicode = 500
+    # What to say when the caller had no text to offer.  An error that reads
+    # "None" tells a user nothing, and every route out of here, the api body,
+    # the html and the exception strip_node raises, wants something to print.
+    defaulterror = 'Unknown error'
 
-    def __init__(self, node, errorstr):
+    def __init__(self, node, errorstr=None):
         self.node = node
-        self.error = errorstr
+        self.error = errorstr if errorstr else self.defaulterror
 
     def serialize(self):
         return msgpack.packb(
@@ -267,10 +271,7 @@ class ConfluentNodeError(object):
 
 class NotImplemented(ConfluentNodeError):
     apicode = 501
-
-    def __init__(self, node, errorstr='Not implemented'):
-        self.node = node
-        self.error = errorstr
+    defaulterror = 'Not implemented'
 
 class Generic(ConfluentMessage):
 
@@ -289,10 +290,7 @@ class Generic(ConfluentMessage):
 
 class ConfluentResourceUnavailable(ConfluentNodeError):
     apicode = 503
-
-    def __init__(self, node, errstr='Unavailable'):
-        self.node = node
-        self.error = errstr
+    defaulterror = 'Unavailable'
 
     def strip_node(self, node):
         raise exc.TargetResourceUnavailable()
@@ -300,11 +298,7 @@ class ConfluentResourceUnavailable(ConfluentNodeError):
 
 class ConfluentTargetTimeout(ConfluentNodeError):
     apicode = 504
-
-    def __init__(self, node, errstr='timeout'):
-        self.node = node
-        self.error = errstr
-
+    defaulterror = 'timeout'
 
     def strip_node(self, node):
         raise exc.TargetEndpointUnreachable(self.error)
@@ -312,10 +306,7 @@ class ConfluentTargetTimeout(ConfluentNodeError):
 
 class ConfluentTargetNotFound(ConfluentNodeError):
     apicode = 404
-
-    def __init__(self, node, errorstr='not found'):
-        self.node = node
-        self.error = errorstr
+    defaulterror = 'not found'
 
     def strip_node(self, node):
         raise exc.NotFoundException(self.error)
@@ -323,9 +314,7 @@ class ConfluentTargetNotFound(ConfluentNodeError):
 
 class ConfluentTargetInvalidCredentials(ConfluentNodeError):
     apicode = 502
-    def __init__(self, node, errstr='bad credentials'):
-        self.node = node
-        self.error = errstr
+    defaulterror = 'bad credentials'
 
     def strip_node(self, node):
         raise exc.TargetEndpointBadCredentials
@@ -554,6 +543,9 @@ def get_input_message(path, operation, inputdata, nodes=None, multinode=False,
     elif (path[:3] == ['configuration', 'management_controller', 'domain_name']
             and operation != 'retrieve'):
         return InputDomainName(path, nodes, inputdata)
+    elif (path[:3] == ['configuration', 'management_controller', 'location']
+            and operation != 'retrieve'):
+        return InputAttributes(path, inputdata, nodes)
     elif (path[:4] == ['configuration', 'management_controller', 'ntp',
             'enabled'] and operation != 'retrieve'):
         return InputNTPEnabled(path, nodes, inputdata)
@@ -584,9 +576,9 @@ def get_input_message(path, operation, inputdata, nodes=None, multinode=False,
     elif '/'.join(path).startswith('media/') and inputdata:
         return InputMedia(path, nodes, inputdata, configmanager)
     elif '/'.join(path).startswith('support/servicedata') and inputdata:
-        return InputMedia(path, nodes, inputdata, configmanager)
+        return InputDownloadTarget(path, nodes, inputdata, configmanager)
     elif '/'.join(path).startswith('configuration/management_controller/save_licenses') and inputdata:
-        return InputMedia(path, nodes, inputdata, configmanager)
+        return InputDownloadTarget(path, nodes, inputdata, configmanager)
     elif '/'.join(path).startswith(
             'configuration/management_controller/licenses') and inputdata:
         return InputLicense(path, nodes, inputdata, configmanager)
@@ -603,18 +595,21 @@ def get_input_message(path, operation, inputdata, nodes=None, multinode=False,
             'No known input handler for request')
 
 
-def checkaccess(user, filename, pwent):
-    """Check if a user has read access to a file.
+def checkaccess(user, filename, pwent, mode=os.R_OK):
+    """Check if a user has the given access to a path.
 
-    This function checks if the specified user has read access to the given
-    filename. It returns True if the user has read access, and False otherwise.
+    This function checks if the specified user has the access named by mode to
+    the given filename. It returns True if the user has it, False otherwise.
+    Use R_OK to ask whether the user could have read a file they want confluent
+    to send, and W_OK on a directory to ask whether they could have created a
+    file where they want confluent to save one.
     """
     child = os.fork()
     if child == 0:
         os.setgroups(os.getgrouplist(user, pwent.pw_gid))
         os.setgid(pwent.pw_gid)
         os.setuid(pwent.pw_uid)
-        if os.access(filename, os.R_OK):
+        if os.access(filename, mode):
             os._exit(0)
         os._exit(1)
     else:
@@ -629,8 +624,23 @@ def isurl(value):
         return False
     return True if prefix else False
 
+
+def destdir(value):
+    """The directory a download will actually be written into.
+
+    A path that is already a directory is a destination directory and the file
+    gets created inside it; anything else names the file itself. This is the
+    same rule the code that writes the file goes by.
+    """
+    if os.path.isdir(value):
+        return value
+    return os.path.dirname(value) or '.'
+
 class InputFirmwareUpdate(ConfluentMessage):
     urlsupported = False
+    # Whether the named file is something confluent will read from the caller,
+    # or somewhere confluent is being asked to write to
+    isdownload = False
     def __init__(self, path, nodes, inputdata, configmanager):
         self._filename = inputdata.get('filename', inputdata.get('url', inputdata.get('dirname', None)))
         self.bank = inputdata.get('bank', None)
@@ -660,10 +670,37 @@ class InputFirmwareUpdate(ConfluentMessage):
                 if value.startswith('/var/log/confluent'):
                     raise Exception(
                         'File transfer with /var/log/confluent is not supported')
-                if curruser and not value.startswith('/var/lib/confluent/client_assets/'):
+                if (curruser
+                        and not value.startswith('/var/lib/confluent/client_assets/')):
                     try:
                         pwent = pwd.getpwnam(curruser)
-                        if not checkaccess(curruser, value, pwent):
+                        if self.isdownload:
+                            # Asking whether a destination can be read fails for
+                            # every file that does not exist yet, which is most
+                            # of them.  The question that carries the same
+                            # meaning here is whether the user could have
+                            # created the file there themselves.
+                            target = destdir(value)
+                            # Search as well as write: a directory the user can
+                            # write but not enter is one they cannot create a
+                            # file in, and os.access says nothing about that on
+                            # its own
+                            if not checkaccess(curruser, target, pwent,
+                                               os.W_OK | os.X_OK):
+                                raise Exception(
+                                    '{0} is not writable by {1}, check the '
+                                    'directory and parent directory ownership '
+                                    'and permissions'.format(target, curruser))
+                            if target != value and os.path.exists(value):
+                                # /tmp lets anyone create a file, which says
+                                # nothing about one already sitting there
+                                if not checkaccess(curruser, value, pwent,
+                                                   os.W_OK):
+                                    raise Exception(
+                                        '{0} already exists and is not writable '
+                                        'by {1}, check the file ownership and '
+                                        'permissions'.format(value, curruser))
+                        elif not checkaccess(curruser, value, pwent):
                             errstr = '{0} is not readable by {1}, check the file and parent directory ownership and permissions'.format(
                                 value, curruser)
                             raise Exception(errstr)
@@ -699,6 +736,12 @@ class InputFirmwareUpdate(ConfluentMessage):
             raise Exception(
                 'File transfer with /var/log/confluent is not supported')
         return self.filebynode[node]
+
+class InputDownloadTarget(InputFirmwareUpdate):
+    # Where to save something confluent fetches, so the path is a destination
+    # rather than a file that has to exist and be readable already
+    isdownload = True
+
 
 class InputMedia(InputFirmwareUpdate):
     # Use InputFirmwareUpdate

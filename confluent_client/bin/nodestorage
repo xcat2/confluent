@@ -244,6 +244,8 @@ def main():
             sys.stdout.write('Aborting\n')
             sys.exit(1)
     handler(noderange, options, args[2:])
+    # The handlers record failures in exitcode, so let a caller see them
+    sys.exit(exitcode)
 
 
 if __name__ == '__main__':

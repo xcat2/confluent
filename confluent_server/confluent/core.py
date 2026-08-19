@@ -557,6 +557,10 @@ def _init_core():
                     'pluginattrs': ['hardwaremanagement.method'],
                     'default': 'null',
                 }),
+                'updatetypes': PluginRoute({
+                    'pluginattrs': ['hardwaremanagement.method'],
+                    'default': 'null',
+                }),
                 'updates': {
                     'active': PluginCollection({
                             'pluginattrs': ['hardwaremanagement.method'],

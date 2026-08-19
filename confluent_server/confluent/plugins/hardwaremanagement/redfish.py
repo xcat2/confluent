@@ -17,6 +17,7 @@ import json
 import asyncio
 import confluent.vinzmanager as vinzmanager
 import confluent.exceptions as exc
+from confluent.exceptions import exc_text
 import confluent.firmwaremanager as firmwaremanager
 import confluent.messages as msg
 import confluent.util as util
@@ -333,19 +334,18 @@ async def perform_request(operator, node, element,
             realop)
         return await ih.handle_request()
     except socket.error as se:
-        if hasattr(se, 'strerror'):
-            await results.put(msg.ConfluentTargetTimeout(node, se.strerror))
-        else:
-            await results.put(msg.ConfluentTargetTimeout(node, str(se)))
+        # Every OSError has a strerror, but it is None on plenty of them, so
+        # ask for the text the same way as everywhere else rather than trust it
+        await results.put(msg.ConfluentTargetTimeout(node, exc_text(se)))
     except pygexc.IpmiException as ipmiexc:
-        excmsg = str(ipmiexc)
+        excmsg = exc_text(ipmiexc)
         if excmsg in ('Session no longer connected', 'timeout'):
             await results.put(msg.ConfluentTargetTimeout(node))
         else:
             await results.put(msg.ConfluentNodeError(node, excmsg))
             raise
     except exc.TargetEndpointUnreachable as tu:
-        await results.put(msg.ConfluentTargetTimeout(node, str(tu)))
+        await results.put(msg.ConfluentTargetTimeout(node, exc_text(tu)))
     except exc.TargetEndpointBadCredentials:
         await results.put(msg.ConfluentTargetInvalidCredentials(node))
     except ssl.SSLEOFError:
@@ -357,10 +357,15 @@ async def perform_request(operator, node, element,
             node,
             'Mismatch detected between target certificate fingerprint '
             'and pubkeys.tls_hardwaremanager attribute'))
+    except pygexc.UnsupportedFunctionality as ue:
+        # Not an unexpected error, just something this target cannot do, so say
+        # so plainly and without a traceback in the log
+        await results.put(msg.ConfluentNodeError(node, exc_text(ue)))
     except (pygexc.InvalidParameterValue, pygexc.RedfishError) as e:
-        await results.put(msg.ConfluentNodeError(node, str(e)))
+        await results.put(msg.ConfluentNodeError(node, exc_text(e)))
     except Exception as e:
-        await results.put(msg.ConfluentNodeError(node, 'Unexpected Error: {0}'.format(str(e))))
+        await results.put(msg.ConfluentNodeError(
+            node, 'Unexpected Error: {0}'.format(exc_text(e))))
         traceback.print_exc()
     finally:
         await results.put('Done')
@@ -422,6 +427,17 @@ class IpmiHandler:
     }
 
 
+    def _unsupported(self):
+        """Say that the requested resource has no redfish implementation.
+
+        Falling through to a bare exception would be reported as an unexpected
+        error and logged with a traceback, when all that happened is that this
+        transport does not offer the resource.
+        """
+        return pygexc.UnsupportedFunctionality(
+            '"{0}" is not implemented for redfish'.format(
+                '/'.join([str(x) for x in self.element])))
+
     async def handle_request(self):
         if self.broken:
             if (self.error == 'timeout' or
@@ -461,6 +477,8 @@ class IpmiHandler:
             await self.handle_update()
         elif self.element[:3] == ['inventory', 'firmware', 'updatestatus']:
             await self.handle_update_status()
+        elif self.element[:3] == ['inventory', 'firmware', 'updatetypes']:
+            await self.handle_update_types()
         elif self.element[0] == 'inventory':
             await self.handle_inventory()
         elif self.element == ['media', 'attach']:
@@ -488,14 +506,21 @@ class IpmiHandler:
         elif self.element == ['console', 'ikvm']:
             await self.handle_ikvm()
         else:
-            raise Exception('Not Implemented')
+            raise self._unsupported()
 
     async def update_firmware(self, filename, progress, data, bank):
         params=()
         if self.inputdata.parameterdata:
             params = self.inputdata.parameterdata
         if params and isinstance(params, str):
-            params = json.loads(params)
+            try:
+                params = json.loads(params)
+            except ValueError as ve:
+                raise pygexc.InvalidParameterValue(
+                    'The parameter file is not valid json: {0}'.format(ve))
+        if params and not isinstance(params, dict):
+            raise pygexc.InvalidParameterValue(
+                'The parameter file must hold a json object, see nodefirmware(8)')
         return await self.ipmicmd.update_firmware(filename, progress=progress, data=data, bank=bank, otherfields=params)
 
     async def handle_update(self):
@@ -584,10 +609,11 @@ class IpmiHandler:
             return await self.handle_licenses()
         elif self.element[1:3] == ['management_controller', 'save_licenses']:
             return await self.save_licenses()
-        raise Exception('Not implemented')
+        raise self._unsupported()
 
     def decode_alert(self):
-        raise Exception("Decode Alert not implemented for redfish")
+        raise pygexc.UnsupportedFunctionality(
+            'Decoding an alert is not implemented for redfish')
 
     async def handle_cert_authorities(self):
         if len(self.element) == 3:
@@ -638,43 +664,13 @@ class IpmiHandler:
             await self.ipmicmd.install_bmc_certificate(cert)
 
     async def handle_alerts(self):
-        if self.element[3] == 'destinations':
-            if len(self.element) == 4:
-                # A list of destinations
-                maxdest = await self.ipmicmd.get_alert_destination_count()
-                for alertidx in range(0, maxdest + 1):
-                    await self.output.put(msg.ChildCollection(alertidx))
-                return
-            elif len(self.element) == 5:
-                alertidx = int(self.element[-1])
-                if self.op == 'read':
-                    destdata = await self.ipmicmd.get_alert_destination(alertidx)
-                    await self.output.put(msg.AlertDestination(
-                        ip=destdata['address'],
-                        acknowledge=destdata['acknowledge_required'],
-                        acknowledge_timeout=destdata.get('acknowledge_timeout', None),
-                        retries=destdata['retries'],
-                        name=self.node))
-                    return
-                elif self.op == 'update':
-                    alertparms = self.inputdata.alert_params_by_node(
-                        self.node)
-                    alertargs = {}
-                    if 'acknowledge' in alertparms:
-                        alertargs['acknowledge_required'] = alertparms['acknowledge']
-                    if 'acknowledge_timeout' in alertparms:
-                        alertargs['acknowledge_timeout'] = alertparms['acknowledge_timeout']
-                    if 'ip' in alertparms:
-                        alertargs['ip'] = alertparms['ip']
-                    if 'retries' in alertparms:
-                        alertargs['retries'] = alertparms['retries']
-                    await self.ipmicmd.set_alert_destination(destination=alertidx,
-                                                       **alertargs)
-                    return
-                elif self.op == 'delete':
-                    await self.ipmicmd.clear_alert_destination(alertidx)
-                    return
-        raise Exception('Not implemented')
+        # Redfish describes where to send events with the EventService
+        # subscription collection, which is a different model from the numbered
+        # ipmi PET destinations this resource was built around, so say so rather
+        # than calling methods the redfish client does not have
+        raise pygexc.UnsupportedFunctionality(
+            'Alert destinations are not implemented for redfish, use the '
+            'EventService subscriptions on the bmc directly')
 
     async def handle_nets(self):
         if len(self.element) == 3:
@@ -747,7 +743,10 @@ class IpmiHandler:
             return
         # Update user
         elif len(self.element) == 4:
-            user = int(self.element[-1])
+            # A redfish account is identified by a string, and an
+            # implementation is free to use the account name as one, so take it
+            # as given rather than assuming a number
+            user = self.element[-1]
             if self.op == 'read':
                 data = await self.ipmicmd.get_user(uid=user)
                 await self.output.put(msg.User(
@@ -881,8 +880,10 @@ class IpmiHandler:
                     await self.output.put(msg.ConfluentTargetTimeout(self.node))
 
     async def list_inventory(self):
+        components = []
         try:
-            components = await self.ipmicmd.get_inventory_descriptions()
+            async for component in self.ipmicmd.get_inventory_descriptions():
+                components.append(component)
         except pygexc.IpmiException:
             await self.output.put(msg.ConfluentTargetTimeout(self.node))
             return
@@ -930,6 +931,10 @@ class IpmiHandler:
         else:
             status = await self.ipmicmd.get_update_status()
             await self.output.put(msg.KeyValueData({'status': status}, self.node))
+
+    async def handle_update_types(self):
+        await self.output.put(msg.KeyValueData(
+            {'types': await self.ipmicmd.get_update_types()}, self.node))
 
     async def handle_inventory(self):
         if self.element[1] == 'firmware':
@@ -1418,9 +1423,30 @@ class IpmiHandler:
             await self.ipmicmd.set_domain_name(dn)
             return
 
+    _locationfields = ('room', 'location', 'building', 'rack', 'contactnames')
+
     async def handle_location_config(self):
         if 'read' == self.op:
-            lc = await self.ipmicmd.get_location_information()
+            await self.output.put(msg.KeyValueData(
+                await self.ipmicmd.get_location_information(), self.node))
+            return
+        elif 'update' == self.op:
+            attribs = self.inputdata.get_attributes(self.node)
+            locargs = {x: attribs[x] for x in self._locationfields
+                       if x in attribs}
+            if not locargs:
+                raise exc.InvalidArgumentException(
+                    'Location accepts only: {0}'.format(
+                        ', '.join(self._locationfields)))
+            contacts = locargs.get('contactnames', None)
+            if isinstance(contacts, str):
+                # A read answers with a list of names, but a caller setting one
+                # gives a string, and iterating that would make a contact of
+                # every letter
+                locargs['contactnames'] = [x.strip() for x in
+                                           contacts.split(',') if x.strip()]
+            await self.ipmicmd.set_location_information(**locargs)
+            return
 
     async def handle_bmcconfig(self, advanced=False, extended=False):
         if 'read' == self.op:

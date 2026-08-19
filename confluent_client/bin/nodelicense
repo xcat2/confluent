@@ -119,6 +119,7 @@ def show_licenses(session):
     for res in session.read(
             '/noderange/{0}/configuration/management_controller/licenses/'
             'all'.format(noderange)):
+        exitcode |= client.printerror(res)
         for node in res.get('databynode', {}):
             for license in res['databynode'][node].get('License', []):
                 msg = '{0}: {1}'.format(node, license.get('feature',

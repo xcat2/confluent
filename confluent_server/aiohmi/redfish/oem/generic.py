@@ -17,6 +17,7 @@ from fnmatch import fnmatch
 import json
 import os
 import re
+import time
 import uuid
 
 import base64
@@ -30,6 +31,19 @@ from datetime import datetime
 from datetime import timedelta
 from dateutil import tz
 import socket
+
+
+def _maybe_transient(theexc):
+    """Whether a request might succeed if it were simply asked again.
+
+    A bmc that answered and refused has given its answer.  Only one that did
+    not answer, or said it ran out of time, is worth asking twice.
+    """
+    if isinstance(theexc, (asyncio.TimeoutError, OSError)):
+        return True
+    text = str(theexc).lower()
+    return 'timeout' in text or 'timed out' in text
+
 
 def _pem_to_dict(pemdata, uefi=False):
     """Pull PEM into a dict
@@ -548,6 +562,21 @@ class OEMHandler(object):
                     }
                     yield certdesc
 
+    # Words in a log service's id or name that say it holds something other than
+    # events.  Redfish does not settle what a log service is called, so each
+    # handler names its platform's and generic reads every service it finds.
+    noneventlogwords = ()
+
+    @classmethod
+    def is_event_log(cls, loginfo):
+        """Say whether a log service holds events rather than something else"""
+        identity = '{0} {1}'.format(loginfo.get('Id', ''),
+                                    loginfo.get('Name', '')).lower()
+        for word in cls.noneventlogwords:
+            if word in identity:
+                return False
+        return True
+
     async def get_event_log(self, clear=False, fishclient=None, extraurls=[]):
         bmcinfo = await self._do_web_request(await fishclient.get_bmcurl())
         lsurl = bmcinfo.get('LogServices', {}).get('@odata.id', None)
@@ -565,10 +594,41 @@ class OEMHandler(object):
                 correction = now - currtime
             except TypeError:
                 correction = now - currtime.replace(tzinfo=utz)
-        lurls = (await self._do_web_request(lsurl)).get('Members', [])
-        lurls.extend(extraurls)
+
+        async def eventlogurls(lscollection):
+            """The log services in a collection that hold events"""
+            found = []
+            lscol = await self._do_web_request(lscollection)
+            for member in lscol.get('Members', []):
+                candidate = member['@odata.id']
+                try:
+                    loginfo = await self._do_web_request(candidate,
+                                                         cache=(not clear))
+                except Exception:
+                    # leave it in, so the loop below reports it as unreadable
+                    found.append(candidate)
+                    continue
+                if self.is_event_log(loginfo):
+                    found.append(candidate)
+            return found
+
+        lurls = await eventlogurls(lsurl)
+        if not lurls:
+            # Some implementations keep no event log under the manager and put
+            # it under the system instead, so fall back to looking there rather
+            # than answering with nothing at all.
+            for sysurl in self._allsysurls:
+                currsysinfo = await self._do_web_request(sysurl)
+                syslsurl = currsysinfo.get('LogServices', {}).get(
+                    '@odata.id', None)
+                if syslsurl:
+                    lurls.extend(await eventlogurls(syslsurl))
+        lurls.extend([x['@odata.id'] for x in extraurls])
+        seenurls = set()
         for lurl in lurls:
-            lurl = lurl['@odata.id']
+            if lurl in seenurls:
+                continue
+            seenurls.add(lurl)
             try:
                 loginfo = await self._do_web_request(lurl, cache=(not clear))
             except Exception:
@@ -579,7 +639,6 @@ class OEMHandler(object):
                 record['timestamp'] = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
                 yield record
                 continue
-            loginfo = await self._do_web_request(lurl, cache=(not clear))
             entriesurl = loginfo.get('Entries', {}).get('@odata.id', None)
             if not entriesurl:
                 continue
@@ -712,14 +771,47 @@ class OEMHandler(object):
         # Blanking the username seems to be the convention
         # First, set a bogus password in case the implementation does honor
         # blank user, at least render such an account harmless
+        accinfo = await fishclient._account_url_info_by_id(uid)
+        if not accinfo:
+            raise Exception("No such account found")
+        accounturl = accinfo[0]
+        delerr = None
+        # Some implementations take longer to delete an account than they allow
+        # themselves, and report a timeout for a delete that is really underway
+        # or that would work on a second ask, so give the delete another go and
+        # then check whether the account is actually gone before concluding that
+        # this implementation cannot delete at all
+        for _ in range(3):
+            try:
+                await self._do_web_request(accounturl, method='DELETE')
+                return True
+            except Exception as de:
+                if delerr is None:
+                    delerr = de
+                if not _maybe_transient(de):
+                    # It answered and refused, and the fallback below is what
+                    # that is for
+                    break
+            await asyncio.sleep(3)
+            try:
+                # Uncached: a delete that failed left the account collection in
+                # the url cache as it was before, and answering this from that
+                # snapshot could only ever say the account is still there
+                if not await fishclient._account_url_info_by_id(uid,
+                                                                cache=False):
+                    return True
+            except Exception:
+                # The check did not answer, which says nothing either way about
+                # the delete.  Ask again rather than letting the failure to
+                # look escape as though it were the failure to delete.
+                pass
         try:
-            accinfo = await fishclient._account_url_info_by_id(uid)
-            if not accinfo:
-                raise Exception("No such account found")
-            await self._do_web_request(accinfo[0], method='DELETE')
-        except Exception: # fall back to old ipmi-like behavior for such implementations
             await fishclient.set_user_password(uid, base64.b64encode(os.urandom(15)))
-            await fishclient.set_user_name(uid, '')        
+            await fishclient.set_user_name(uid, '')
+        except Exception:
+            # Report why deleting failed rather than why the fallback failed,
+            # since the delete is what was asked for
+            raise delerr
         return True
 
     async def set_bootdev(self, bootdev, persist=False, uefiboot=None,
@@ -990,8 +1082,8 @@ class OEMHandler(object):
     async def detach_remote_media(self):
         return None
 
-    async def get_description(self):
-        sysinfo = await self.sysinfo()
+    async def get_description(self, fishclient):
+        sysinfo = await fishclient.sysinfo()
         for chassis in sysinfo.get('Links', {}).get('Chassis', []):
             chassisurl = chassis['@odata.id']
             chassisinfo = await self._do_web_request(chassisurl)
@@ -1289,7 +1381,24 @@ class OEMHandler(object):
             if onlynames:
                 yield name
                 continue
-            cpuinfo = {'Model': currcpuinfo.get('Model', None)}
+            # Only when the bmc says so, since a processor that does not
+            # describe its state at all is not thereby missing
+            if currcpuinfo.get('Status', {}).get('State', '') == 'Absent':
+                yield (name, None)
+                continue
+            # A model alone leaves nothing to report on a platform that does
+            # not give one, and the rest of this is what a caller asking after
+            # a processor wants to know anyway
+            cpuinfo = {
+                'Model': currcpuinfo.get('Model', None),
+                'Manufacturer': currcpuinfo.get('Manufacturer', None),
+                'Socket': currcpuinfo.get('Socket', None),
+                'Cores': currcpuinfo.get('TotalCores', None),
+                'Threads': currcpuinfo.get('TotalThreads', None),
+                'Max Speed MHz': currcpuinfo.get('MaxSpeedMHz', None),
+                'Serial Number': currcpuinfo.get('SerialNumber', None),
+                'Part Number': currcpuinfo.get('PartNumber', None),
+            }
             yield name, cpuinfo
 
     async def _get_disk_urls(self):
@@ -1424,6 +1533,16 @@ class OEMHandler(object):
         msgs = response.get('Messages', [])
         return ';'.join(self.format_message(x) for x in msgs)
 
+    async def get_update_types(self, fishclient):
+        """The kinds of firmware image this platform has to be told about.
+
+        A platform that reads the kind from the image has none to report, which
+        is not the same as failing to answer.
+        """
+        raise exc.UnsupportedFunctionality(
+            'This platform does not take a firmware image type, it reads the '
+            'kind of firmware from the image')
+
     async def update_firmware(self, filename, data=None, progress=None, bank=None, otherfields=()):
         # disable cache to make sure we trigger the token renewal logic if needed
         usd, upurl, ismultipart = await self.retrieve_firmware_upload_url()
@@ -1458,11 +1577,26 @@ class OEMHandler(object):
             if 'HttpPushUriTargetsBusy' in usd:
                 await self._do_web_request(
                     '/redfish/v1/UpdateService',
-                    {'HttpPushUriTargetsBusy': False}, method='PATCH')
+                    {'HttpPushUriTargetsBusy': False}, method='PATCH',
+                    etag='*')
 
     async def continue_update(self, rsp, progress):
             monitorurl = rsp['@odata.id']
             return await self.monitor_update_progress(monitorurl, progress)
+
+    # How long to keep waiting for a bmc that is expected to restart while it
+    # applies an update to itself. Observed reset to serving again is a bit over
+    # three minutes, so this leaves generous room without hanging forever.
+    _resetgracetime = 300
+
+    async def _bmc_is_back(self):
+        """Check whether the redfish service is serving requests again."""
+        try:
+            rsp, status = await self.webclient.grab_json_response_with_status(
+                '/redfish/v1/')
+        except Exception:
+            return False
+        return status == 200 and bool(rsp)
 
     async def monitor_update_progress(self, monitorurl, progress):
             complete = False
@@ -1472,12 +1606,41 @@ class OEMHandler(object):
             # the validating phase; add a retry here so we don't exit the loop in this case
             retry = 3
             pct = 0.0
+            # Updating the bmc itself takes the bmc, and with it the task we are
+            # watching, away for minutes. That is the update working, not the
+            # monitoring failing, so wait it out and take the bmc coming back
+            # with the task gone as the update having landed.
+            expectsreset = getattr(self, '_updateresetsbmc', False)
+            # Started when the bmc actually goes, not now: a flash that keeps
+            # answering for longer than the grace period would otherwise have
+            # spent it all before the reboot it is meant to cover.
+            deadline = None
+            wentaway = False
             while not complete and retry > 0:
                 try:
                     pgress = await self._do_web_request(monitorurl, cache=False)
-                except socket.timeout:
+                except (socket.timeout, exc.PyghmiException, OSError):
                     pgress = None
                 if not pgress:
+                    if expectsreset:
+                        if deadline is None:
+                            deadline = time.monotonic() + self._resetgracetime
+                        elif time.monotonic() > deadline:
+                            raise Exception(
+                                'The bmc did not finish applying its firmware '
+                                'within {0} seconds'.format(
+                                    self._resetgracetime))
+                        await asyncio.sleep(10)
+                        if not await self._bmc_is_back():
+                            # Going away is what taking the update looks like,
+                            # so only a bmc that went away can come back with
+                            # it applied.  Losing the task while it answers is
+                            # a fault, reported at the deadline.
+                            wentaway = True
+                        elif wentaway:
+                            progress({'phase': phase, 'progress': 100.0})
+                            return 'pending'
+                        continue
                     retry -= 1
                     await asyncio.sleep(3)
                     continue
@@ -1524,7 +1687,8 @@ class OEMHandler(object):
                 raise exc.UnsupportedFunctionality('Redfish firmware update only supported for implementations with push update support')
             if 'HttpPushUriTargetsBusy' in usd:
                 await self._do_web_request('/redfish/v1/UpdateService',
-                    {'HttpPushUriTargetsBusy': True}, method='PATCH')
+                    {'HttpPushUriTargetsBusy': True}, method='PATCH',
+                    etag='*')
                     
         return usd,upurl,ismultipart
 
@@ -1618,15 +1782,18 @@ class OEMHandler(object):
         overview = await fishclient._do_web_request('/redfish/v1/')
         licsrv = overview.get('LicenseService', {}).get('@odata.id', None)
         if not licsrv:
-            raise exc.UnsupportedFunctionality()
+            raise exc.UnsupportedFunctionality(
+                'This platform does not implement the redfish license service')
         lcs = await fishclient._do_web_request(licsrv)
         licenses = lcs.get('Licenses', {}).get('@odata.id',None)
         if not licenses:
-            raise exc.UnsupportedFunctionality()
+            raise exc.UnsupportedFunctionality(
+                'This platform does not offer a redfish license collection')
         return licenses
 
-    def get_extended_bmc_configuration(self, fishclient, hideadvanced=True):
-        raise exc.UnsupportedFunctionality()
+    async def get_extended_bmc_configuration(self, fishclient, hideadvanced=True):
+        raise exc.UnsupportedFunctionality(
+            'Extended bmc configuration is not supported on this platform')
 
 
     async def _get_licenses(self, fishclient):

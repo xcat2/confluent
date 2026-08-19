@@ -144,7 +144,10 @@ def sensorpass(showout=True, appendtime=False):
                             showval = u' {0} '.format(floatformat(sensedata['value']))
                         else:
                             showval = u' {0} '.format(sensedata.get('value', ''))
-                        if sensedata.get('units', None) not in (None, u''):
+                        # A discrete sensor has no reading for a unit to apply
+                        # to, and printing the unit on its own says nothing
+                        if (showval
+                                and sensedata.get('units', None) not in (None, u'')):
                             showval += sensedata['units']
                         if sensedata.get('health', 'ok') != 'ok':
                             datadescription = [sensedata['health']]

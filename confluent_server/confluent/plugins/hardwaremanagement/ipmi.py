@@ -15,6 +15,7 @@
 
 import asyncio
 import confluent.exceptions as exc
+from confluent.exceptions import exc_text
 import confluent.firmwaremanager as firmwaremanager
 import confluent.interface.console as conapi
 import confluent.messages as msg
@@ -440,8 +441,12 @@ async def perform_request(operator, node, element,
             operator, node, element, configdata, inputdata, cfg, results,
             realop)
         return await ih.handle_request()
+    except pygexc.UnsupportedFunctionality as ue:
+        # Not an unexpected error, just something this target cannot do, so say
+        # so plainly and without a traceback in the log
+        await results.put(msg.ConfluentNodeError(node, exc_text(ue)))
     except pygexc.IpmiException as ipmiexc:
-        excmsg = str(ipmiexc)
+        excmsg = exc_text(ipmiexc)
         if excmsg in ('Session no longer connected', 'timeout'):
             await results.put(msg.ConfluentTargetTimeout(node))
         elif 'Unauthorized name' in excmsg or 'Incorrect password provided' in excmsg:
@@ -450,7 +455,7 @@ async def perform_request(operator, node, element,
             await results.put(msg.ConfluentNodeError(node, excmsg))
             #raise
     except exc.TargetEndpointUnreachable as tu:
-        await results.put(msg.ConfluentTargetTimeout(node, str(tu)))
+        await results.put(msg.ConfluentTargetTimeout(node, exc_text(tu)))
     except ssl.SSLEOFError:
         await results.put(msg.ConfluentNodeError(
             node, 'Unable to communicate with the https server on '
@@ -461,9 +466,10 @@ async def perform_request(operator, node, element,
             'Mismatch detected between target certificate fingerprint '
             'and pubkeys.tls_hardwaremanager attribute'))
     except pygexc.InvalidParameterValue as e:
-        await results.put(msg.ConfluentNodeError(node, str(e)))
+        await results.put(msg.ConfluentNodeError(node, exc_text(e)))
     except Exception as e:
-        await results.put(msg.ConfluentNodeError(node, 'Unexpected Error: {0}'.format(str(e))))
+        await results.put(msg.ConfluentNodeError(
+            node, 'Unexpected Error: {0}'.format(exc_text(e))))
         traceback.print_exc()
     finally:
         await results.put('Done')
@@ -548,6 +554,17 @@ class IpmiHandler:
             self.ipmicmd = ipmicmd
             self.loggedin = True
 
+    def _unsupported(self):
+        """Say that the requested resource has no ipmi implementation.
+
+        Falling through to a bare exception would be reported as an unexpected
+        error and logged with a traceback, when all that happened is that this
+        transport does not offer the resource.
+        """
+        return pygexc.UnsupportedFunctionality(
+            '"{0}" is not implemented for ipmi'.format(
+                '/'.join([str(x) for x in self.element])))
+
     async def handle_request(self):
         if self.broken:
             if (self.error == 'timeout' or
@@ -587,6 +604,10 @@ class IpmiHandler:
             await self.handle_update()
         elif self.element[:3] == ['inventory', 'firmware', 'updatestatus']:
             await self.handle_update_status()
+        elif self.element[:3] == ['inventory', 'firmware', 'updatetypes']:
+            # Otherwise this falls through to the inventory handler and is read
+            # as the name of a firmware component
+            raise self._unsupported()
         elif self.element[0] == 'inventory':
             await self.handle_inventory()
         elif self.element == ['media', 'attach']:
@@ -616,7 +637,7 @@ class IpmiHandler:
         elif self.element == ['console', 'ikvm']:
             await self.handle_ikvm()
         else:
-            raise Exception('Not Implemented')
+            raise self._unsupported()
 
     async def handle_update(self):
         u = firmwaremanager.Updater(self.node, self.ipmicmd.update_firmware,
@@ -697,7 +718,7 @@ class IpmiHandler:
             return await self.handle_licenses()
         elif self.element[1:3] == ['management_controller', 'save_licenses']:
             return await self.save_licenses()
-        raise Exception('Not implemented')
+        raise self._unsupported()
 
     async def decode_alert(self):
         inputdata = self.inputdata.get_alert(self.node)
@@ -748,7 +769,7 @@ class IpmiHandler:
                 elif self.op == 'delete':
                     await self.ipmicmd.clear_alert_destination(alertidx)
                     return
-        raise Exception('Not implemented')
+        raise self._unsupported()
 
     async def handle_nets(self):
         if len(self.element) == 3:
@@ -808,8 +829,10 @@ class IpmiHandler:
                                     privilege_level=user['privilege_level'])
             # A list of users
             await self.output.put(msg.ChildCollection('all'))
-            async for user in self.ipmicmd.get_users():
-                await self.output.put(msg.ChildCollection(user, candelete=True))
+            for user in await self.ipmicmd.get_users():
+                # The uids are numbers, and a link relation needs a string
+                await self.output.put(
+                    msg.ChildCollection(str(user), candelete=True))
             return
         # List all users
         elif len(self.element) == 4 and self.element[-1] == 'all':
@@ -821,7 +844,14 @@ class IpmiHandler:
             return
         # Update user
         elif len(self.element) == 4:
-            user = int(self.element[-1])
+            # ipmi users really are numbered slots, unlike redfish accounts, so
+            # say that rather than letting the conversion fail as a surprise
+            try:
+                user = int(self.element[-1])
+            except ValueError:
+                raise pygexc.InvalidParameterValue(
+                    'ipmi users are numbered, and "{0}" is not a user '
+                    'number'.format(self.element[-1]))
             if self.op == 'read':
                 data = await self.ipmicmd.get_user(uid=user)
                 await self.output.put(msg.User(
@@ -1542,6 +1572,11 @@ class IpmiHandler:
         if self.element[3] == 'enabled':
             if 'read' == self.op:
                 enabled = await self.ipmicmd.get_ntp_enabled()
+                if enabled is None:
+                    # None is how the platform says it cannot tell us, and
+                    # reporting that as the text "None" tells the caller nothing
+                    raise pygexc.UnsupportedFunctionality(
+                        'NTP state is not reported by this platform')
                 await self.output.put(msg.NTPEnabled(self.node, enabled))
                 return
             elif 'update' == self.op:

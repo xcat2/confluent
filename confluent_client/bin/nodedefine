@@ -49,6 +49,11 @@ async def main():
     exitcode = 0
     attribs = {'name': noderange}
     for arg in args[1:]:
+        if '=' not in arg:
+            sys.stderr.write(
+                'Attributes must be given as attribute=value, got "{0}"\n'.format(
+                    arg))
+            sys.exit(1)
         key, val = arg.split('=', 1)
         attribs[key] = val
     async for r in session.create('/noderange/', attribs):

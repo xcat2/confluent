@@ -3,7 +3,7 @@ nodefirmware(8) -- Report firmware information on confluent nodes
 
 ## SYNOPSIS
 
-`nodefirmware <noderange> [list][updatestatus][update [--backup <file>]]|[<components>]`
+`nodefirmware <noderange> [list][updatestatus][updatetypes][update [--backup] [--parameterfile <file>] <file>]|[<components>]`
 
 ## DESCRIPTION
 
@@ -19,6 +19,10 @@ the FPGA version where applicable).
 
 The updatestatus argument will describe the state of firmware updates on the
 nodes.
+
+The updatetypes argument will name the kinds of firmware image the platform has
+to be told about, for use in a parameter file.  Platforms that read the kind of
+firmware from the image itself have none to name and say so.
 
 In the update form, it accepts a single file and attempts to update it using
 the out of band facilities.  Firmware updates can end in one of three states:
@@ -37,12 +41,40 @@ the out of band facilities.  Firmware updates can end in one of three states:
   be affected  
 
 * `-p PARAMETERFILE`, `--parameterfile=PARAMETERFILE`:
-  For updating, a parameter file to provide along with the update payload
+  For updating, a parameter file to provide along with the update payload.  See
+  PARAMETER FILE below
 
 * `-h`, `--help`:
   Show help message and exit    
 
+## PARAMETER FILE
+
+The parameter file given with `-p` holds JSON that is sent alongside the image.
+Its keys are the parts a Redfish multipart update accepts, so `UpdateParameters`
+for the standard fields and `OemParameters` for whatever a vendor asks for on top
+of them.  Without one, an update names no targets, which means "whatever this
+image is for", and that is what most platforms want.
+
+Some platforms will not take an image without being told what kind of firmware it
+holds, and refuse the update rather than guess.  On an AMI MegaRAC that is an
+`ImageType` under `OemParameters`:
+
+    {"OemParameters": {"ImageType": "BIOS"}}
+
+`nodefirmware <noderange> updatetypes` names the accepted types without
+attempting an update.  The value is also checked against the same list before
+anything is uploaded, so a name the platform does not accept is refused rather
+than sent.
+
 ## EXAMPLES
+
+* Ask what kinds of firmware image a node has to be told about:
+`# nodefirmware n1 updatetypes`  
+`n1: BMC,BIOS,MB_CPLD,SCM_CPLD,BPB_CPLD,HPM_BMC,HPM_BIOS,HPM_SCP,HPM_BIOS2`  
+
+* Update the BIOS on a platform that has to be told:
+`# echo '{"OemParameters": {"ImageType": "BIOS"}}' > /tmp/bios.json`  
+`# nodefirmware n1 update -p /tmp/bios.json /tmp/image.bin`  
 
 * Pull firmware from a node:
 `# nodefirmware r1`  

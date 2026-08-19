@@ -702,7 +702,8 @@ class OEMHandler(generic.OEMHandler):
         elif await self.has_xcc():
             await self.immhandler.set_identify(on, duration, blink)
         else:
-            raise pygexc.UnsupportedFunctionality()
+            raise pygexc.UnsupportedFunctionality(
+                'Identify is not supported on this platform')
 
     async def process_fru(self, fru, name=None):
         if fru is None:
@@ -1223,10 +1224,12 @@ class OEMHandler(generic.OEMHandler):
             return {'height': self._fpc_variant & 0xf, 'slot': 0}
         return await super(OEMHandler, self).get_description()
 
-    async def get_extended_bmc_configuration(self):
+    async def get_extended_bmc_configuration(self, hideadvanced=True):
         if await self.has_xcc():
-            return await self.immhandler.get_extended_bmc_configuration()
-        return await super(OEMHandler, self).get_extended_bmc_configuration()
+            return await self.immhandler.get_extended_bmc_configuration(
+                hideadvanced=hideadvanced)
+        return await super(OEMHandler, self).get_extended_bmc_configuration(
+            hideadvanced=hideadvanced)
 
     async def get_bmc_configuration(self):
         if await self.has_xcc():

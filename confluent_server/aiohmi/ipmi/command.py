@@ -255,8 +255,12 @@ class Command(object):
             self._oem = await genericoem.OEMHandler.create(None, None)
             self._oemknown = True
             return
-        self._oem, self._oemknown = await get_oem_handler(await self._get_device_id(),
-                                                    self)
+        self._oem, _ = await get_oem_handler(await self._get_device_id(), self)
+        # Settling for the generic handler is an answer too.  The device id
+        # cannot change within a session, so asking again only buys a round
+        # trip to the bmc and a fresh handler with none of the state the last
+        # one had cached.
+        self._oemknown = True
 
     async def get_bootdev(self):
         """Get current boot device override information.
@@ -819,6 +823,22 @@ class Command(object):
         await self.oem_init()
         return await self._oem.get_sensor_reading(sensorname)
 
+    async def _fetch_lancfg_data(self, channel, param, selector=0):
+        """Internal helper for fetching a lan cfg parameter's raw data
+
+        Answers None if the bmc does not have the parameter, which such a bmc
+        reports in the completion code, sending no data at all.
+        """
+        fetchcmd = bytearray((channel, param, selector, 0))
+        try:
+            fetched = await self.raw_command(0xc, 2, data=fetchcmd)
+        except exc.IpmiException as ie:
+            # parameter not supported, and parameter out of range
+            if ie.ipmicode in (0x80, 0xc9):
+                return None
+            raise
+        return bytearray(fetched['data'])
+
     async def _fetch_lancfg_param(self, channel, param, prefixlen=False):
         """Internal helper for fetching lan cfg parameters
 
@@ -826,15 +846,8 @@ class Command(object):
         string with ipv4.  If 6 bytes, colon delimited hex (mac address).  If
         one byte, return the int value
         """
-        fetchcmd = bytearray((channel, param, 0, 0))
-        try:
-            fetched = await self.oldraw_command(0xc, 2, data=fetchcmd)
-        except exc.IpmiException as ie:
-            if ie.ipmicode == 0x80:
-                return None
-            raise
-        fetchdata = fetched['data']
-        if bytearray(fetchdata)[0] != 17:
+        fetchdata = await self._fetch_lancfg_data(channel, param)
+        if not fetchdata or fetchdata[0] != 17:
             return None
         if param == 0x14:
             vlaninfo = struct.unpack('<H', fetchdata[1:])[0]
@@ -861,9 +874,10 @@ class Command(object):
         else:
             raise Exception("Unrecognized data format " + repr(fetchdata))
 
-    async def get_extended_bmc_configuration(self):
+    async def get_extended_bmc_configuration(self, hideadvanced=True):
         await self.oem_init()
-        return await self._oem.get_extended_bmc_configuration()
+        return await self._oem.get_extended_bmc_configuration(
+            hideadvanced=hideadvanced)
 
     async def get_bmc_configuration(self):
         await self.oem_init()
@@ -1067,8 +1081,12 @@ class Command(object):
             3: 'BIOS',
             4: 'Other',
         }
-        retdata['ipv4_configuration'] = v4cfgmethods[await self._fetch_lancfg_param(
-            channel, 4)]
+        v4cfgmethod = await self._fetch_lancfg_param(channel, 4)
+        if v4cfgmethod is None:
+            retdata['ipv4_configuration'] = None
+        else:
+            retdata['ipv4_configuration'] = v4cfgmethods.get(
+                v4cfgmethod, 'Unknown ({0})'.format(v4cfgmethod))
         retdata['mac_address'] = await self._fetch_lancfg_param(channel, 5)
         retdata['ipv4_gateway'] = await self._fetch_lancfg_param(channel, 12)
         retdata['ipv4_backup_gateway'] = await self._fetch_lancfg_param(channel, 14)
@@ -1172,12 +1190,14 @@ class Command(object):
         """
         if channel is None:
             channel = await self.get_network_channel()
-        rqdata = (channel, 0x11, 0, 0)
-        rsp = await self.raw_command(netfn=0xc, command=2, data=rqdata)
+        rspdata = await self._fetch_lancfg_data(channel, 0x11)
+        if rspdata is None:
+            raise exc.UnsupportedFunctionality(
+                'This platform does not support alert destinations')
         await self.oem_init()
         if hasattr(self._oem, 'get_alert_destination_count'):
-            return await self._oem.get_alert_destination_count(ord(rsp['data'][1]))
-        return bytearray(rsp['data'])[1]
+            return await self._oem.get_alert_destination_count(rspdata[1])
+        return rspdata[1]
 
     async def get_alert_destination(self, destination=0, channel=None):
         """Get alert destination
@@ -1203,23 +1223,27 @@ class Command(object):
         destinfo = {}
         if channel is None:
             channel = await self.get_network_channel()
-        rqdata = (channel, 18, destination, 0)
-        rsp = await self.raw_command(netfn=0xc, command=2, data=rqdata)
-        dtype, acktimeout, retries = struct.unpack('BBB', rsp['data'][2:])
+        rspdata = await self._fetch_lancfg_data(channel, 18, destination)
+        if rspdata is None:
+            raise exc.UnsupportedFunctionality(
+                'This platform does not support alert destinations')
+        dtype, acktimeout, retries = struct.unpack('BBB', rspdata[2:])
         destinfo['acknowledge_required'] = dtype & 0b10000000 == 0b10000000
         # Ignore destination type for now...
         if destinfo['acknowledge_required']:
             destinfo['acknowledge_timeout'] = acktimeout
         destinfo['retries'] = retries
-        rqdata = (channel, 19, destination, 0)
-        rsp = await self.raw_command(netfn=0xc, command=2, data=rqdata)
-        if bytearray(rsp['data'])[2] & 0b11110000 == 0:
+        rspdata = await self._fetch_lancfg_data(channel, 19, destination)
+        if rspdata is None:
+            raise exc.UnsupportedFunctionality(
+                'This platform does not report alert destination addresses')
+        if rspdata[2] & 0b11110000 == 0:
             destinfo['address_format'] = 'ipv4'
-            destinfo['address'] = socket.inet_ntoa(rsp['data'][4:8])
-        elif bytearray(rsp['data'])[2] & 0b11110000 == 0b10000:
+            destinfo['address'] = socket.inet_ntoa(bytes(rspdata[4:8]))
+        elif rspdata[2] & 0b11110000 == 0b10000:
             destinfo['address_format'] = 'ipv6'
             destinfo['address'] = socket.inet_ntop(socket.AF_INET6,
-                                                   rsp['data'][3:])
+                                                   bytes(rspdata[3:]))
         return destinfo
 
     async def clear_alert_destination(self, destination=0, channel=None):
@@ -1399,7 +1423,13 @@ class Command(object):
         except exc.UnsupportedFunctionality:
             # Use the DCMI MCI field as a fallback, since it's the closest
             # thing in the IPMI Spec for this
-            return await self.get_mci()
+            try:
+                return await self.get_mci()
+            except exc.UnsupportedFunctionality:
+                # With neither an oem command nor DCMI there is nowhere left to
+                # look, and the caller asked about a hostname rather than DCMI
+                raise exc.UnsupportedFunctionality(
+                    'The bmc hostname is not reported by this platform')
 
     async def get_mci(self):
         """Set the management controller identifier.
@@ -1426,7 +1456,11 @@ class Command(object):
         try:
             return await self._oem.set_hostname(hostname)
         except exc.UnsupportedFunctionality:
-            return await self.set_mci(hostname)
+            try:
+                return await self.set_mci(hostname)
+            except exc.UnsupportedFunctionality:
+                raise exc.UnsupportedFunctionality(
+                    'The bmc hostname cannot be set on this platform')
 
     async def set_mci(self, mci):
         """Set the management controller identifier.
@@ -1460,9 +1494,26 @@ class Command(object):
             return await self._oem.set_asset_tag(tag)
         return await self._chunkwise_dcmi_set(8, tag)
 
+    async def _dcmi_command(self, command, data):
+        """Issue a DCMI command, telling a bmc without DCMI apart from a fault.
+
+        A bmc that does not implement the DCMI group at all rejects the command
+        outright, which is not the same thing as the request having been bad, and
+        the caller can offer something else or say plainly that the platform
+        cannot do it.
+        """
+        try:
+            return await self.raw_command(netfn=0x2c, command=command,
+                                          data=data)
+        except exc.IpmiException as ie:
+            # invalid command, and command disabled or unavailable
+            if ie.ipmicode in (0xc1, 0xd6):
+                raise exc.UnsupportedFunctionality(
+                    'This platform does not support the DCMI commands')
+            raise
+
     async def _chunkwise_dcmi_fetch(self, command):
-        szdata = await self.raw_command(
-            netfn=0x2c, command=command, data=(0xdc, 0, 0))
+        szdata = await self._dcmi_command(command, (0xdc, 0, 0))
         totalsize = bytearray(szdata['data'])[1]
         chksize = 0xf
         offset = 0
@@ -1470,8 +1521,8 @@ class Command(object):
         while offset < totalsize:
             if (offset + chksize) > totalsize:
                 chksize = totalsize - offset
-            chk = await self.raw_command(
-                netfn=0x2c, command=command, data=(0xdc, offset, chksize))
+            chk = await self._dcmi_command(command,
+                                           (0xdc, offset, chksize))
             retstr += chk['data'][2:]
             offset += chksize
         if not isinstance(retstr, str):
@@ -1488,7 +1539,7 @@ class Command(object):
             # set offset, otherwise the last setting will override
             # the previous setting
             offset += len(chunk)
-            await self.raw_command(netfn=0x2c, command=command, data=cmddata)
+            await self._dcmi_command(command, cmddata)
 
     async def set_channel_access(self, channel=None,
                            access_update_mode='non_volatile',
@@ -1896,6 +1947,11 @@ class Command(object):
         await self.raw_command(netfn=0x06, command=0x45, data=data, timeout=2)
         return True
 
+    # Parameter out of range, requested record not present, and invalid data
+    # field: the three ways a bmc says the user slot asked about is not one it
+    # has.  Anything else it answers is about the bmc, not about the slot.
+    _absentusercodes = (0xc9, 0xcb, 0xcc)
+
     async def get_user_name(self, uid, return_none_on_error=True):
         """Get user name
 
@@ -1903,11 +1959,17 @@ class Command(object):
         :param return_none_on_error: return None on error
             TODO: investigate return code on error
         """
-        response = await self.raw_command(netfn=0x06, command=0x46, data=(uid,))
-        if 'error' in response:
-            if return_none_on_error:
+        try:
+            response = await self.raw_command(netfn=0x06, command=0x46,
+                                              data=(uid,))
+        except exc.IpmiException as ie:
+            # Only the codes that say there is no such slot to describe.  A
+            # timeout, a lost session, or a bmc that is merely busy or still
+            # starting up is not an answer about the slot, and reading one as
+            # an empty slot would quietly shorten a user list.
+            if return_none_on_error and ie.ipmicode in self._absentusercodes:
                 return None
-            raise Exception(response['error'])
+            raise
         name = None
         if 'data' in response:
             data = response['data']
@@ -2049,6 +2111,8 @@ class Command(object):
         names = {}
         max_ids = await self.get_channel_max_user_count(channel)
         for uid in range(1, max_ids + 1):
+            # A slot the bmc refuses to describe reads as no name at all, so it
+            # is skipped here the same way an empty one is
             name = await self.get_user_name(uid=uid)
             if await self._oem.is_valid(name):
                 names[uid] = await self.get_user(uid=uid, channel=channel)
@@ -2185,7 +2249,10 @@ class Command(object):
         await self.oem_init()
         mcinfo = await self.raw_command(netfn=6, command=1)
         major, minor = struct.unpack('BB', mcinfo['data'][2:4])
-        bmcver = '{0}.{1}'.format(major, hex(minor)[2:])
+        # The top bit of the major byte says the device is still initialising
+        # or taking an update, and is not part of the revision, so mask it off
+        # the way sdr.py does rather than reporting 131.11 for 3.11
+        bmcver = '{0}.{1}'.format(major & 0b1111111, hex(minor)[2:])
         async for x in self._oem.get_oem_firmware(bmcver, components, category):
             yield x
 

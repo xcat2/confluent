@@ -56,11 +56,14 @@ components = ['all']
 
 argparser = optparse.OptionParser(
     usage="Usage: "
-          "%prog <noderange> [list][updatestatus][update [--backup <file>]]|[<components>]")
+          "%prog <noderange> [list][updatestatus][updatetypes][update [--backup] "
+          "[--parameterfile <file>] <file>]|[<components>]")
 argparser.add_option('-b', '--backup', action='store_true',
                      help='Target a backup bank rather than primary')
 argparser.add_option('-p', '--parameterfile', type='string',
-                     help='When updating, use the specified parameter file')
+                     help='When updating, use the specified parameter file; see '
+                          'nodefirmware(8), some platforms need it to say what '
+                          'kind of firmware the image holds')
 argparser.add_option('-m', '--maxnodes', type='int',
                      help='When updating, prompt if more than the specified '
                           'number of servers will be affected')
@@ -68,6 +71,7 @@ argparser.add_option('-m', '--maxnodes', type='int',
 (options, args) = argparser.parse_args()
 upfile = None
 querystatus = False
+querytypes = False
 try:
     noderange = args[0]
     if len(args) > 1:
@@ -79,6 +83,8 @@ try:
                 comps = args[2:]
             elif args[1] == 'updatestatus':
                 querystatus = True
+            elif args[1] == 'updatetypes':
+                querytypes = True
             else:
                 comps = args[1:]
             components = []
@@ -96,7 +102,7 @@ def get_update_progress(session, url):
     for res in session.read(url):
         status = res.get('phase', 'error')
         percent = res.get('progress', None)
-        detail = res.get('detail', repr(res)),
+        detail = res.get('detail', repr(res))
         if status == 'error':
             text = 'error!'
         else:
@@ -140,6 +146,11 @@ def update_firmware(session, filename):
                 pass
     for res in session.create(resource, upargs):
         if 'created' not in res:
+            if not res.get('databynode', None):
+                # A failure that is not attributed to any node still has to be
+                # reported, or the command looks like it quietly did nothing
+                exitcode |= client.printerror(res)
+                continue
             for nodename in res.get('databynode', ()):
                 output.set_output(nodename, 'error!')
                 noderrs[nodename] = res['databynode'][nodename].get(
@@ -193,7 +204,21 @@ def show_firmware(session):
     if not nodes_matched:
         sys.stderr.write('No matching nodes for noderange "{0}"\n'.format(noderange))
     elif not firmware_shown and not exitcode:
-        argparser.print_help()
+        # Asking about firmware the target does not describe is a legitimate
+        # question with an empty answer, not a mistake in how it was asked
+        sys.stderr.write('No firmware reported for "{0}"\n'.format(
+            ','.join(components)))
+
+
+def show_update_types(session):
+    global exitcode
+    for res in session.read(
+            '/noderange/{0}/inventory/firmware/updatetypes'.format(noderange)):
+        exitcode |= client.printerror(res)
+        for node in res.get('databynode', {}):
+            types = res['databynode'][node].get('types', None)
+            if types:
+                print('{0}: {1}'.format(node, ','.join(types)))
 
 
 try:
@@ -201,12 +226,13 @@ try:
     if querystatus:
         for res in session.read(
                 '/noderange/{0}/inventory/firmware/updatestatus'.format(noderange)):
+            exitcode |= client.printerror(res)
             for node in res.get('databynode', {}):
                 currstat = res['databynode'][node].get('status', None)
                 if currstat:
                     print('{}: {}'.format(node, currstat))
-                else:
-                    print(repr(res))
+    elif querytypes:
+        show_update_types(session)
     elif upfile is None:
         show_firmware(session)
     else:

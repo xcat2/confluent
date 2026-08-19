@@ -194,7 +194,30 @@ def _checkpidfile():
         pidfile.close()
 
 
+_stopevent = None
+
+
+def request_stop():
+    """Ask the service to shut down.
+
+    Called from the event loop, either by a signal handler or by a client
+    asking for a shutdown, so it only has to wake the main coroutine.
+    """
+    if _stopevent is not None:
+        _stopevent.set()
+
+
+def _finish_shutdown():
+    """Say the service is going and get the configuration on disk."""
+    log.log({'info': 'Confluent management service shutting down'}, flush=True)
+    configmanager.ConfigManager.wait_for_sync()
+
+
 def terminate(signalname, frame):
+    # Only for platforms where the event loop cannot deliver signals for us.
+    # Raising SystemExit from a handler while the loop runs escapes run_forever
+    # and leaves asyncio unable to close the loop, which is why the loop is
+    # asked to stop instead wherever that is possible.
     sys.exit(0)
 
 def dumptrace(signalname, frame):
@@ -213,10 +236,15 @@ def doexit():
         os.remove('/var/run/confluent/dbg.sock')
     except OSError:
         pass
-    pidfile = open('/var/run/confluent/pid')
-    pid = pidfile.read()
-    if pid == str(os.getpid()):
-        os.remove('/var/run/confluent/pid')
+    try:
+        with open('/var/run/confluent/pid') as pidfile:
+            pid = pidfile.read()
+        if pid == str(os.getpid()):
+            os.remove('/var/run/confluent/pid')
+    except OSError:
+        # Someone else already tidied it up, which is not worth a traceback out
+        # of an atexit callback
+        pass
 
 
 def _initsecurity(config):
@@ -319,8 +347,14 @@ async def asyncrun(args):
     if havefcntl:
         _updatepidfile()
     asyncio.get_running_loop().set_debug(True)
-    signal.signal(signal.SIGINT, terminate)
-    signal.signal(signal.SIGTERM, terminate)
+    global _stopevent
+    _stopevent = asyncio.Event()
+    for stopsig in (signal.SIGINT, signal.SIGTERM):
+        try:
+            asyncio.get_running_loop().add_signal_handler(stopsig, request_stop)
+        except NotImplementedError:  # silly windows
+            signal.signal(stopsig, terminate)
+    configmanager.set_shutdown_hook(request_stop)
     atexit.register(doexit)
     confluentuuid = configmanager.get_global('confluent_uuid')
     if not confluentuuid:
@@ -341,14 +375,26 @@ async def asyncrun(args):
         pass
     webservice = httpapi.HttpApi(http_bind_host, http_bind_port, http_bind_group, http_bind_perms)
     webservice.start()
-    while len(list(configmanager.list_collective())) >= 2:
+    while not _stopevent.is_set() and len(
+            list(configmanager.list_collective())) >= 2:
         # If in a collective, stall automatic startup activity
         # until we establish quorum
         try:
             configmanager.check_quorum()
             break
         except Exception:
-            await asyncio.sleep(0.5)
+            # Waiting on the stop event rather than sleeping through it.  A
+            # member that cannot reach quorum stalls here for as long as that
+            # lasts, and asking it to stop has to be answered in that state
+            # rather than after quorum returns.
+            try:
+                await asyncio.wait_for(_stopevent.wait(), 0.5)
+            except asyncio.TimeoutError:
+                pass
+    if _stopevent.is_set():
+        # Asked to stop before startup got as far as serving anything, so
+        # there is nothing to unwind beyond what stopping normally does
+        return _finish_shutdown()
     disco.start_detection()
     await asyncio.sleep(1)
     await consoleserver.start_console_sessions()
@@ -363,10 +409,16 @@ async def asyncrun(args):
     if not watchdogsecs:
         watchdogsecs = 200
     watchdogsecs = watchdogsecs / 2
-    while 1:
-        await asyncio.sleep(watchdogsecs)
+    while not _stopevent.is_set():
+        try:
+            await asyncio.wait_for(_stopevent.wait(), watchdogsecs)
+        except asyncio.TimeoutError:
+            pass
+        else:
+            break
         if notifysock:
             sock.send(b'WATCHDOG=1')
+    _finish_shutdown()
 
 def _get_connector_config(session):
     host = conf.get_option(session, 'bindhost')

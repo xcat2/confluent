@@ -68,6 +68,23 @@ _healthmap = {
     None: const.Health.Ok,
 }
 
+# A sensor from the modern Sensors collection describes itself by its redfish
+# reading type, while a sensor from the older Thermal and Power documents, and
+# every sensor over ipmi, is described by the ipmi sensor type.  Callers ask
+# for a category by the latter, so translate, and a sensor means the same thing
+# whichever document it was read from.
+_readingtypes = {
+    'Temperature': 'Temperature',
+    'Rotational': 'Fan',
+    'AirFlow': 'Cooling Device',
+    'Voltage': 'Voltage',
+    'Current': 'Current',
+    'Power': 'Power',
+    'EnergyJoules': 'Energy',
+    'EnergykWh': 'Energy',
+    'EnergyWh': 'Energy',
+}
+
 
 def _mask_to_cidr(mask):
     maskn = socket.inet_pton(socket.AF_INET, mask)
@@ -304,17 +321,18 @@ class Command(object):
                         }
         return names
 
-    async def _account_url_info_by_id(self, uid):
+    async def _account_url_info_by_id(self, uid, cache=True):
         srvurl = await self._accountserviceurl()
         oem = await self.oem()
         if srvurl:
-            srvinfo = await self._do_web_request(srvurl)
+            srvinfo = await self._do_web_request(srvurl, cache=cache)
             srvurl = srvinfo.get('Accounts', {}).get('@odata.id', None)
             if srvurl:
-                srvinfo = await self._do_web_request(srvurl)
+                srvinfo = await self._do_web_request(srvurl, cache=cache)
                 accounts = srvinfo.get('Members', [])
                 for account in accounts:
-                    accinfo = await self._do_web_request(account['@odata.id'])
+                    accinfo = await self._do_web_request(account['@odata.id'],
+                                                         cache=cache)
                     currid = accinfo.get('Id', None)
                     if str(currid) == str(uid):
                         accinfo['expiration'] = await oem.get_user_expiration(
@@ -606,6 +624,12 @@ class Command(object):
         if payload is None and method is None:
             self._urlcache[url] = {'contents': res[0],
                                    'vintage': os.times()[4]}
+        elif method != 'GET':
+            # A write may have changed anything, including documents other than
+            # the one written (an action url is not the resource it acts on), so
+            # do not let a cached read from before the write be handed out as
+            # the current state
+            self._urlcache.clear()
         return res[0]
 
     async def get_bootdev(self):
@@ -665,11 +689,27 @@ class Command(object):
         return await oem.set_bootdev(bootdev, persist, uefiboot, self)
 
     async def get_biosurl(self):
-        if not self._varbiosurl:
-            sysinfo = await self.sysinfo()
-            self._varbiosurl = sysinfo.get('Bios', {}).get('@odata.id',
-                                                          None)
         if self._varbiosurl is None:
+            sysinfo = await self.sysinfo()
+            biosurl = sysinfo.get('Bios', {}).get('@odata.id', '')
+            if biosurl:
+                # A link may be advertised and not served.  To a caller that is
+                # the same as not having one, so answer the same way rather
+                # than passing the bmc's complaint on as an unexpected error.
+                try:
+                    await self._do_web_request(biosurl)
+                except exc.PyghmiException:
+                    # A link that is not served need not answer with a redfish
+                    # error, and the exception cannot say what the status was,
+                    # so ask.  Anything else is a fault, not an answer.
+                    _, status = await self.wc.grab_json_response_with_status(
+                        biosurl)
+                    if status not in (404, 405, 501):
+                        raise
+                    biosurl = ''
+            # '' is remembered as 'asked, and there is none'
+            self._varbiosurl = biosurl
+        if not self._varbiosurl:
             raise exc.UnsupportedFunctionality(
                 'Bios management not detected on this platform')
         return self._varbiosurl
@@ -713,6 +753,7 @@ class Command(object):
                 sensedata = await self._do_web_request(sensor['@odata.id'])
                 if 'Name' in sensedata:
                     sensetype = sensedata.get('ReadingType', 'Unknown')
+                    sensetype = _readingtypes.get(sensetype, sensetype)
                     self._varsensormap[sensedata['Name']] = {
                         'name': sensedata['Name'], 'type': sensetype,
                         'url': sensor['@odata.id'], 'generic': True}
@@ -860,7 +901,43 @@ class Command(object):
                 if len(targurl.get('Members', [])) == 1:
                     targurl = targurl['Members'][0]['@odata.id']
         if not targurl:
-            raise Exception("Unable to identify system url")        
+            raise Exception("Unable to identify system url")
+        targinfo = await self._do_web_request(targurl)
+        if ('IndicatorLED' not in targinfo
+                and 'LocationIndicatorActive' not in targinfo):
+            # The indicator belongs to the chassis and may be described only
+            # there, which is where reading looks too.  A shared chassis is
+            # somebody else's indicator, as in get_identify.
+            # Only when the system describes none of its own: reading prefers
+            # the chassis, but writing cannot follow it there, because a
+            # platform is free to publish the chassis copy read only.  A
+            # ThinkSystem SD665-N V3 answers PropertyValueFormatError to every
+            # value on Chassis.IndicatorLED and takes all of them on the system.
+            for chassis in targinfo.get('Links', {}).get('Chassis', []):
+                chassisinfo = await self._do_web_request(chassis['@odata.id'])
+                if len(chassisinfo.get('Links', {}).get(
+                        'ComputerSystems', [])) > 1:
+                    continue
+                if ('IndicatorLED' in chassisinfo
+                        or 'LocationIndicatorActive' in chassisinfo):
+                    targurl = chassis['@odata.id']
+                    targinfo = chassisinfo
+                    break
+        if ('IndicatorLED' not in targinfo
+                and 'LocationIndicatorActive' not in targinfo):
+            # Reading already knows when there is no indicator to speak of, so
+            # do not go on to write a property the platform never offered and
+            # let it answer with whatever it makes of that
+            raise exc.UnsupportedFunctionality(
+                'Indicator LED state is not reported by this platform')
+        if ('IndicatorLED' not in targinfo
+                and 'LocationIndicatorActive' in targinfo):
+            # IndicatorLED is deprecated in favour of a boolean, which has no
+            # way to ask for blinking, so blinking becomes simply lit
+            await self._do_web_request(
+                targurl, {'LocationIndicatorActive': bool(blink or on)},
+                method='PATCH', etag='*')
+            return
         await self._do_web_request(
             targurl,
             {'IndicatorLED': 'Blinking' if blink else 'Lit' if on else 'Off'},
@@ -872,10 +949,42 @@ class Command(object):
         'Off': 'off',
     }
 
+    def _indicator_state(self, info):
+        """Read a location indicator, by either the old or the current property.
+
+        Returns None when the resource does not describe one.
+        """
+        ledstate = info.get('IndicatorLED', None)
+        if ledstate is not None:
+            if ledstate not in self._idstatemap:
+                raise exc.PyghmiException(
+                    'Unrecognized indicator LED state "{0}"'.format(ledstate))
+            return self._idstatemap[ledstate]
+        # IndicatorLED is deprecated in favour of a boolean, which cannot
+        # express blinking
+        active = info.get('LocationIndicatorActive', None)
+        if active is None:
+            return None
+        return 'on' if active else 'off'
+
     async def get_identify(self):
-        await self.sysinfo()
-        ledstate = self.sysinfo
-        return {'identifystate': self._idstatemap[ledstate]}
+        sysinfo = await self.sysinfo()
+        idstate = self._indicator_state(sysinfo)
+        # The physical indicator belongs to the chassis, and some
+        # implementations do not refresh the system copy of it when it
+        # changes, so prefer a chassis that describes this system alone.
+        for chassis in sysinfo.get('Links', {}).get('Chassis', []):
+            chassisinfo = await self._do_web_request(chassis['@odata.id'])
+            if len(chassisinfo.get('Links', {}).get('ComputerSystems', [])) > 1:
+                continue
+            chassisstate = self._indicator_state(chassisinfo)
+            if chassisstate is not None:
+                idstate = chassisstate
+                break
+        if idstate is None:
+            raise exc.UnsupportedFunctionality(
+                'Indicator LED state is not reported by this platform')
+        return {'identifystate': idstate}
 
     async def get_health(self, verbose=True):
         oem = await self.oem()
@@ -929,7 +1038,8 @@ class Command(object):
         netprotocols = bmcinfo.get('NetworkProtocol', {}).get('@odata.id', None)
         if netprotocols:
             request = {'NTP':{'ProtocolEnabled': enable}}
-            await self._do_web_request(netprotocols, request, method='PATCH')
+            await self._do_web_request(netprotocols, request, method='PATCH',
+                                       etag='*')
             await self._do_web_request(netprotocols, cache=0)
 
     async def get_ntp_servers(self):
@@ -959,7 +1069,8 @@ class Command(object):
                 else:
                     currntpservers[index] = server
         request = {'NTP':{'NTPServers': currntpservers}}
-        await self._do_web_request(netprotocols, request, method='PATCH')
+        await self._do_web_request(netprotocols, request, method='PATCH',
+                                   etag='*')
         await self._do_web_request(netprotocols, cache=0)
 
     async def clear_bmc_configuration(self):
@@ -1031,7 +1142,7 @@ class Command(object):
             }]
         if patch:
             nicurl = await self._get_bmc_nic_url(name)
-            await self._do_web_request(nicurl, patch, 'PATCH')
+            await self._do_web_request(nicurl, patch, 'PATCH', etag='*')
 
     async def set_net_configuration(self, ipv4_address=None, ipv4_configuration=None,
                               ipv4_gateway=None, vlan_id=None, name=None):
@@ -1069,14 +1180,14 @@ class Command(object):
         if patch:
             nicurl = await self._get_bmc_nic_url(name)
             try:
-                await self._do_web_request(nicurl, patch, 'PATCH')
+                await self._do_web_request(nicurl, patch, 'PATCH', etag='*')
             except exc.RedfishError:
                 patch = {'IPv4Addresses': [ipinfo]}
                 if dodhcp:
                     ipinfo['AddressOrigin'] = 'DHCP'
                 elif dodhcp is not None:
                     ipinfo['AddressOrigin'] = 'Static'
-                await self._do_web_request(nicurl, patch, 'PATCH')
+                await self._do_web_request(nicurl, patch, 'PATCH', etag='*')
 
     async def get_net6_configuration(self, name=None):
         nicurl = await self._get_bmc_nic_url(name)
@@ -1131,7 +1242,149 @@ class Command(object):
 
     async def set_hostname(self, hostname):
         await self._do_web_request(await self.get_bmcnicurl(),
-                             {'HostName': hostname}, 'PATCH')
+                             {'HostName': hostname}, 'PATCH', etag='*')
+
+    async def _netprotocolurl(self):
+        bmcinfo = await self._do_web_request(await self.get_bmcurl())
+        netprotocols = bmcinfo.get('NetworkProtocol', {}).get('@odata.id', None)
+        if not netprotocols:
+            raise exc.UnsupportedFunctionality(
+                'This platform does not describe its manager network protocols')
+        return netprotocols
+
+    async def get_mci(self):
+        """Get the management controller identifier
+
+        Redfish has no separate identifier for a management controller the way
+        ipmi does, and the platforms that offer both report the same string for
+        each, so use the name the manager answers to.
+        """
+        netcfg = await self._do_web_request(await self._netprotocolurl())
+        name = netcfg.get('HostName', None)
+        if name is None:
+            raise exc.UnsupportedFunctionality(
+                'This platform does not report a manager identifier')
+        return name
+
+    async def set_mci(self, mci):
+        await self._do_web_request(await self._netprotocolurl(),
+                                   {'HostName': mci}, method='PATCH', etag='*')
+
+    async def get_domain_name(self):
+        netcfg = await self._do_web_request(await self._netprotocolurl())
+        fqdn = netcfg.get('FQDN', None)
+        if not fqdn:
+            return ''
+        # The fqdn is the manager name with the domain appended, and only the
+        # domain part is wanted here
+        hostname = netcfg.get('HostName', None)
+        if hostname and fqdn.startswith(hostname + '.'):
+            return fqdn[len(hostname) + 1:]
+        return fqdn.partition('.')[2]
+
+    async def set_domain_name(self, domain):
+        netprotocols = await self._netprotocolurl()
+        netcfg = await self._do_web_request(netprotocols)
+        hostname = netcfg.get('HostName', '')
+        fqdn = '{0}.{1}'.format(hostname, domain) if domain else hostname
+        await self._do_web_request(netprotocols, {'FQDN': fqdn},
+                                   method='PATCH', etag='*')
+
+    async def get_remote_kvm_available(self):
+        bmcinfo = await self._do_web_request(await self.get_bmcurl())
+        gconsole = bmcinfo.get('GraphicalConsole', {})
+        return bool(gconsole.get('ServiceEnabled', False))
+
+    _ledstatusmap = {
+        'on': 'On',
+        'blink': 'Blink',
+        'off': 'Off',
+    }
+
+    async def get_leds(self):
+        """Get LED status information
+
+        Standard redfish only describes the identify indicator, so that is all a
+        platform without an oem specific view of its leds can report.
+        """
+        sysinfo = await self.sysinfo()
+        state = None
+        for chassis in sysinfo.get('Links', {}).get('Chassis', []):
+            chassisinfo = await self._do_web_request(chassis['@odata.id'])
+            if len(chassisinfo.get('Links', {}).get('ComputerSystems', [])) > 1:
+                # A chassis shared with other systems has the enclosure's
+                # indicator rather than this node's, as in get_identify
+                continue
+            state = self._indicator_state(chassisinfo)
+            if state is not None:
+                break
+        if state is None:
+            state = self._indicator_state(sysinfo)
+        if state is not None:
+            yield ('identify', {'status': self._ledstatusmap.get(state, state)})
+
+    # A firmware inventory entry says what it belongs to with RelatedItem, so
+    # map the collections that turn up there onto the categories confluent asks
+    # for.  Only the collections that mean one thing: a Storage resource is the
+    # subsystem rather than a drive, and a Processor is a cpu as readily as an
+    # accelerator, so both are decided further down instead.
+    _fwcategorybyurl = (
+        ('/Drives/', 'disks'),
+        ('/PCIeDevices/', 'adapters'),
+        ('/NetworkAdapters/', 'adapters'),
+        ('/NetworkInterfaces/', 'adapters'),
+        ('/Storage/', 'adapters'),
+        ('/PowerSubsystem/', 'misc'),
+        ('/PowerSupplies/', 'misc'),
+        ('/ThermalSubsystem/', 'misc'),
+        ('/Fans/', 'misc'),
+        ('/Memory/', 'misc'),
+    )
+
+    # The legacy chassis power and thermal documents, which are a whole path
+    # segment rather than a collection, so they are matched as one.  A bare
+    # substring would also catch a chassis that merely happens to be called
+    # something like PowerShelf1.
+    _fwcategorybysegment = (
+        ('Power', 'misc'),
+        ('Thermal', 'misc'),
+    )
+
+    # What a Processor has to say it is before its firmware counts as a card in
+    # the machine rather than as part of the system
+    _acceleratortypes = ('GPU', 'FPGA', 'Accelerator', 'DSP')
+
+    async def _fwcategory(self, fwi):
+        """Which category a firmware inventory entry belongs to.
+
+        Returns None when the entry gives nothing to judge by.
+        """
+        related = [x.get('@odata.id', '') for x in fwi.get('RelatedItem', [])]
+        for url in related:
+            for frag, category in self._fwcategorybyurl:
+                if frag in url:
+                    return category
+            lastsegment = url.rstrip('/').rpartition('/')[2]
+            for segment, category in self._fwcategorybysegment:
+                if lastsegment == segment:
+                    return category
+            if '/Processors/' in url:
+                return await self._processorcategory(url)
+        return 'core' if related else None
+
+    async def _processorcategory(self, url):
+        """A cpu is system firmware, an accelerator is a card in the machine.
+
+        The url cannot tell them apart, so the processor is asked.  A processor
+        that will not say counts as a cpu, which is the common case and the
+        answer this gave before the distinction was drawn.
+        """
+        try:
+            procinfo = await self._do_web_request(url)
+        except exc.PyghmiException:
+            return 'core'
+        proctype = procinfo.get('ProcessorType', None)
+        return 'adapters' if proctype in self._acceleratortypes else 'core'
 
     async def get_firmware(self, components=(), category=None):
         self._fwnamemap = {}
@@ -1143,16 +1396,55 @@ class Command(object):
             return
         fwlist = await self._do_web_request(await self.get_fwinventory())
         fwurls = [x['@odata.id'] for x in fwlist.get('Members', [])]
-        async for res in self._do_bulk_requests(fwurls):
-            res = self._extract_fwinfo(res)
+        wantcategory = category if category not in (None, 'all') else None
+        entries = []
+        # Every entry has to be in hand before any can be named, since a name is
+        # only ambiguous in relation to the others.  An entry that answered with
+        # nothing has nothing to report and must not take the naming of the rest
+        # with it.
+        results = [res async for res in self._do_bulk_requests(fwurls)
+                   if res[0]]
+        labels = self._firmware_labels(results)
+        for res in results:
+            entries.append((await self._fwcategory(res[0]),
+                            self._extract_fwinfo(res, labels)))
+        for fwcategory, res in entries:
             if res[0] is None:
+                continue
+            # An entry that says nothing about what it belongs to is system
+            # firmware, which is what firmware on a bmc is unless it points at
+            # something else.  This holds for a whole inventory that names no
+            # relations and for the odd entry among ones that do.
+            if wantcategory and (fwcategory or 'core') != wantcategory:
                 continue
             yield res
 
-    def _extract_fwinfo(self, inf):
+    def _firmware_labels(self, results):
+        """Pick something to call each firmware entry.
+
+        A platform is free to give every entry the same Name, which then tells
+        them apart from nothing, so where that happens look for a description
+        that does, and fall back to the id.
+        """
+        names = [x[0].get('Name', 'Unknown') for x in results]
+        descs = [x[0].get('Description', '') for x in results]
+        labels = {}
+        for idx, (fwi, url) in enumerate(results):
+            label = names[idx]
+            if names.count(label) > 1:
+                if descs[idx] and descs.count(descs[idx]) == 1:
+                    label = descs[idx]
+                else:
+                    label = fwi.get('Id', label)
+            labels[url] = label
+        return labels
+
+    def _extract_fwinfo(self, inf, labels=None):
         currinf = self._oem._extract_fwinfo(inf)
         fwi, url = inf
         fwname = fwi.get('Name', 'Unknown')
+        if labels:
+            fwname = labels.get(url, fwname)
         if fwname in self._fwnamemap:
             fwname = fwi.get('Id', fwname)
         if fwname in self._fwnamemap:
@@ -1248,7 +1540,7 @@ class Command(object):
             for chassis in sysinfo.get('Links', {}).get('Chassis', []):
                 chassisurl = chassis['@odata.id']
                 await self._do_web_request(chassisurl, {'Location': locationinfo},
-                                     method='PATCH')
+                                     method='PATCH', etag='*')
 
     async def oem(self):
         if not self._oem:
@@ -1411,6 +1703,20 @@ class Command(object):
         """
         return self._oem.check_storage_configuration(cfgspec)
 
+    # How an implementation says an action it advertised is not there, as
+    # opposed to refusing what was asked of it
+    _absentmsgids = ('ActionNotSupported', 'ResourceMissingAtURI',
+                     'ResourceNotFound')
+
+    def _action_absent(self, theexc):
+        """Whether a failed action call means the action is not served."""
+        msgid = getattr(theexc, 'msgid', None)
+        if msgid is None:
+            # Not a redfish error at all, which is not how one that serves the
+            # action reports refusing
+            return True
+        return any(x in str(msgid) for x in self._absentmsgids)
+
     async def attach_remote_media(self, url, username=None, password=None):
         """Attach remote media by url
 
@@ -1452,32 +1758,52 @@ class Command(object):
                 if 'Authorization' in self.wc.stdheaders:
                     del self.wc.stdheaders['Authorization']            
             return
+        attached = False
         for vmurl in vmurls:
             vminfo = await self._do_web_request(vmurl, cache=False)
-            if vminfo.get('ConnectedVia', None) != 'NotConnected':
+            # ConnectedVia describes how the device is wired to the host rather
+            # than whether anything is in it, and some implementations report a
+            # permanent value there, so judge free by whether an image is loaded
+            if vminfo.get('Image', None) or vminfo.get('Inserted', False):
                 continue
             inserturl = vminfo.get(
                 'Actions', {}).get(
                     '#VirtualMedia.InsertMedia', {}).get('target', None)
             if inserturl:
-                await self._do_web_request(inserturl, {'Image': url})
-            else:
+                try:
+                    await self._do_web_request(inserturl, {'Image': url})
+                    attached = True
+                except exc.PyghmiException as pe:
+                    if not self._action_absent(pe):
+                        # The action is there and refused; that reason is the
+                        # one worth passing on
+                        raise
+                    # Some implementations advertise the insert action without
+                    # serving it, so fall back to setting the properties
+                    inserturl = None
+            if not inserturl:
                 try:
                     await self._do_web_request(vmurl,
                                                {'Image': url, 'Inserted': True},
-                                               'PATCH')
+                                               'PATCH', etag='*')
                 except exc.RedfishError as re:
                     if re.msgid.endswith(u'PropertyUnknown'):
-                        await self._do_web_request(vmurl, {'Image': url}, 'PATCH')
+                        await self._do_web_request(vmurl, {'Image': url}, 'PATCH',
+                                                   etag='*')
                     else:
                         raise
+                attached = True
             break
         if suspendedxauth:
                 self.wc.stdheaders['X-Auth-Token'] = self.xauthtoken
                 if 'Authorization' in self.wc.stdheaders:
-                    del self.wc.stdheaders['Authorization']    
+                    del self.wc.stdheaders['Authorization']
+        if not attached:
+            raise exc.UnsupportedFunctionality(
+                'No virtual media device on this platform was able to accept '
+                'the image')
         async for res in oem.list_media(self, cache=False):
-            pass          
+            pass
 
     async def detach_remote_media(self):
         oem = await self.oem()
@@ -1506,11 +1832,11 @@ class Command(object):
                             await self._do_web_request(currl,
                                                        {'Image': None,
                                                         'Inserted': False},
-                                                       method='PATCH')
+                                                       method='PATCH', etag='*')
                         except exc.RedfishError as re:
                             if re.msgid.endswith(u'PropertyUnknown'):
                                 await self._do_web_request(currl, {'Image': None},
-                                                     method='PATCH')
+                                                     method='PATCH', etag='*')
                             else:
                                 raise
         oem = await self.oem()
@@ -1534,6 +1860,15 @@ class Command(object):
     async def get_update_status(self):
         oem = await self.oem()
         return await oem.get_update_status()   
+
+    async def get_update_types(self):
+        """The kinds of firmware image this platform has to be told about
+
+        Only some implementations will not take an image without being told
+        which kind it is, and those are the ones with an answer here.
+        """
+        oem = await self.oem()
+        return await oem.get_update_types(self)
 
     async def update_firmware(self, file, data=None, progress=None, bank=None, otherfields=()):
         """Send file to BMC to perform firmware update
