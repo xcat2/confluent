@@ -570,18 +570,51 @@ class OEMHandler(object):
     @classmethod
     def is_event_log(cls, loginfo):
         """Say whether a log service holds events rather than something else"""
-        identity = '{0} {1}'.format(loginfo.get('Id', ''),
-                                    loginfo.get('Name', '')).lower()
-        for word in cls.noneventlogwords:
-            if word in identity:
-                return False
+        for part in (loginfo.get('Id', ''), loginfo.get('Name', '')):
+            # A build is free to space or punctuate the same name differently,
+            # "BIOS POST Code Log" for a post code log, so compare without any
+            # of that rather than miss it and merge 2719 post codes into the
+            # event log
+            flat = re.sub(r'[^a-z0-9]', '', str(part).lower())
+            for word in cls.noneventlogwords:
+                if word in flat:
+                    return False
         return True
+
+    async def _othereventlogcollections(self, fishclient, everywhere=True):
+        """The log service collections outside the manager.
+
+        A platform is free to keep its event log on the system or the chassis
+        rather than on the manager, and more than one of those may link the very
+        same collection, so the answer is deduplicated.
+        """
+        collections = []
+        candidates = list(self._allsysurls)
+        if everywhere:
+            try:
+                chassiscol = await self._do_web_request('/redfish/v1/Chassis')
+                candidates.extend(
+                    x['@odata.id'] for x in chassiscol.get('Members', []))
+            except Exception:
+                # A platform that will not describe its chassis still has the
+                # rest of its logs to offer
+                pass
+        for url in candidates:
+            try:
+                info = await self._do_web_request(url)
+            except Exception:
+                continue
+            lscollection = info.get('LogServices', {}).get('@odata.id', None)
+            if lscollection and lscollection not in collections:
+                collections.append(lscollection)
+        return collections
 
     async def get_event_log(self, clear=False, fishclient=None, extraurls=[]):
         bmcinfo = await self._do_web_request(await fishclient.get_bmcurl())
+        # A manager need not publish log services at all, and one that does not
+        # is the clearest case of a platform keeping its event log elsewhere, so
+        # carry on to the fallback below rather than answering with nothing
         lsurl = bmcinfo.get('LogServices', {}).get('@odata.id', None)
-        if not lsurl:
-            return
         currtime = bmcinfo.get('DateTime', None)
         correction = timedelta(0)
         utz = tz.tzoffset('', 0)
@@ -612,17 +645,22 @@ class OEMHandler(object):
                     found.append(candidate)
             return found
 
-        lurls = await eventlogurls(lsurl)
-        if not lurls:
+        lurls = await eventlogurls(lsurl) if lsurl else []
+        if not lurls or not clear:
             # Some implementations keep no event log under the manager and put
             # it under the system instead, so fall back to looking there rather
-            # than answering with nothing at all.
-            for sysurl in self._allsysurls:
-                currsysinfo = await self._do_web_request(sysurl)
-                syslsurl = currsysinfo.get('LogServices', {}).get(
-                    '@odata.id', None)
-                if syslsurl:
-                    lurls.extend(await eventlogurls(syslsurl))
+            # than answering with nothing at all.  A read goes further and
+            # gathers every event log the platform publishes, since one that is
+            # never read is one nobody can act on.  Clearing deliberately does
+            # not: a log that only a read reaches must not be destroyed by one.
+            for lscollection in await self._othereventlogcollections(
+                    fishclient, everywhere=not clear):
+                if lscollection == lsurl:
+                    # A platform may link the manager's own collection from the
+                    # system and the chassis as well, and reading it three times
+                    # would answer the same thing three times
+                    continue
+                lurls.extend(await eventlogurls(lscollection))
         lurls.extend([x['@odata.id'] for x in extraurls])
         seenurls = set()
         for lurl in lurls:

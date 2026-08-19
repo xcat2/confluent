@@ -933,6 +933,10 @@ class IpmiHandler:
         await self.output.put(msg.EventCollection(eventout, name=self.node))
 
     def pyghmi_event_to_confluent(self, event):
+        # An ipmi platform keeps its events in one place and the spec has a
+        # name for it, so say so rather than leaving the source blank and
+        # having a caller asking for a named log get nothing back
+        event.setdefault('log_id', 'SEL')
         event['severity'] = _str_health(event.get('severity', 'unknown'))
         if 'event_data' in event:
             event['event'] = '{0} - {1}'.format(
