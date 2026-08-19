@@ -438,31 +438,40 @@ async def _tlsstartup(cnn):
         raise Exception('Unable to find workable SSL support')
     tasks.spawn(sessionhdl(cnn, authname, cert=cert))
 
-def removesocket():
+default_socketpath = "/var/run/confluent/api.sock"
+
+
+def removesocket(socketpath=None):
+    if socketpath is None:
+        socketpath = default_socketpath
     try:
-        os.remove("/var/run/confluent/api.sock")
+        os.remove(socketpath)
     except OSError:
         pass
 
-async def _unixdomainhandler(bind_group=None, bind_perms=None):
+async def _unixdomainhandler(bind_group=None, bind_perms=None,
+                             socketpath=None):
     aloop = asyncio.get_running_loop()
     if not bind_perms:
         bind_perms = 0o666
+    if socketpath is None:
+        socketpath = default_socketpath
     unixsocket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     unixsocket.settimeout(0)
     try:
-        os.remove("/var/run/confluent/api.sock")
+        os.remove(socketpath)
     except OSError:  # if file does not exist, no big deal
         pass
-    if not os.path.isdir("/var/run/confluent"):
-        os.makedirs('/var/run/confluent', 0o755)
+    socketdir = os.path.dirname(socketpath)
+    if socketdir and not os.path.isdir(socketdir):
+        os.makedirs(socketdir, 0o755)
     oldumask = os.umask(0o777 - bind_perms)
-    unixsocket.bind("/var/run/confluent/api.sock")
-    os.chmod("/var/run/confluent/api.sock", bind_perms)
+    unixsocket.bind(socketpath)
+    os.chmod(socketpath, bind_perms)
     if bind_group:
-        shutil.chown("/var/run/confluent/api.sock", group=bind_group)
+        shutil.chown(socketpath, group=bind_group)
     os.umask(oldumask)
-    atexit.register(removesocket)
+    atexit.register(removesocket, socketpath)
     unixsocket.listen(5)
     while True:
         cnn, addr = await aloop.sock_accept(unixsocket)
@@ -491,13 +500,15 @@ async def _unixdomainhandler(bind_group=None, bind_perms=None):
 
 
 class SockApi(object):
-    def __init__(self, bindhost=None, bindport=None, bindgroup=None, bindperms=None):
+    def __init__(self, bindhost=None, bindport=None, bindgroup=None,
+                 bindperms=None, socketpath=None):
         self.tlsserver = None
         self.unixdomainserver = None
         self.bind_host = bindhost or '::'
         self.bind_port = bindport or 13001
         self.bind_group = bindgroup
         self.bind_perms = bindperms
+        self.socketpath = socketpath or default_socketpath
 
     async def start(self):
         global auditlog
@@ -509,7 +520,8 @@ class SockApi(object):
             self.start_remoteapi()
         else:
             tasks.spawn(self.watch_for_cert())
-        self.unixdomainserver = tasks.spawn_task(_unixdomainhandler(self.bind_group, self.bind_perms))
+        self.unixdomainserver = tasks.spawn_task(_unixdomainhandler(
+            self.bind_group, self.bind_perms, self.socketpath))
 
     async def watch_for_cert(self):
         watcher = libc.inotify_init1(os.O_NONBLOCK)
