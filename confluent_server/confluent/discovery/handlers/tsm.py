@@ -17,7 +17,6 @@ import confluent.discovery.handlers.generic as generic
 import confluent.exceptions as exc
 import confluent.netutil as netutil
 import confluent.util as util
-import socket
 from urllib.parse import urlencode
 
 

@@ -16,7 +16,6 @@ import asyncio
 import codecs
 import confluent.discovery.handlers.redfishbmc as redfishbmc
 import confluent.util as util
-import socket
 import struct
 import aiohmi.util.webclient as webclient
 
