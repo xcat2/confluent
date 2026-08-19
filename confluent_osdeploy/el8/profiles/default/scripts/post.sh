@@ -39,6 +39,7 @@ run_remote_python add_local_repositories
 run_remote_python autoconsole
 
 
+run_remote setuplogging
 # This will induce server side processing of the syncfile contents if
 # present
 run_remote_python syncfileclient
