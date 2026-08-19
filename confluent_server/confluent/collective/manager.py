@@ -627,7 +627,6 @@ async def handle_connection(connection, cert, request, local=False):
             await tlvdata.close(connection)
             return
         if leader_init.active:
-            print("initting leader....")
             await tlvdata.send(connection, {'error': 'Servicing a connection',
                                       'waitinline': True})
             await tlvdata.close(connection)
