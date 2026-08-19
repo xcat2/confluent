@@ -98,10 +98,10 @@ import yaml
 _masterkey = None
 _masterintegritykey = None
 _dirtylock = threading.RLock()
-_leaderlock = asyncio.Lock()
+_leaderlock = None
 _synclock = threading.RLock()
-_rpclock = asyncio.Lock()
-_initlock = asyncio.Lock()
+_rpclock = None
+_initlock = None
 _followerlocks = {}
 _config_areas = ('nodegroups', 'nodes', 'usergroups', 'users')
 tracelog = None
@@ -472,6 +472,9 @@ def init_masterkey(password=None, autogen=True):
 
 
 async def _push_rpc(stream, payload):
+    global _rpclock
+    if _rpclock is None:
+        _rpclock = asyncio.Lock()
     async with _rpclock:
         try:
             stream[1].write(struct.pack('!Q', len(payload)))
@@ -861,6 +864,9 @@ class StreamHandler(object):
 
 
 async def stop_following(replacement=None):
+    global _leaderlock
+    if _leaderlock is None:
+        _leaderlock = asyncio.Lock()
     async with _leaderlock:
         global cfgleader
         if cfgleader and not isinstance(cfgleader, bool):

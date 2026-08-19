@@ -65,14 +65,18 @@ def verify_stub(store, misc):
 class ContextBool(object):
     def __init__(self):
         self.active = False
-        self.mylock = asyncio.Lock()
+        self.mylock = None
 
     async def __aenter__(self):
         self.active = True
+        if self.mylock is None:
+            self.mylock = asyncio.Lock()
         return await self.mylock.__aenter__()
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         self.active = False
+        if self.mylock is None:
+            self.mylock = asyncio.Lock()
         return await self.mylock.__aexit__(exc_type, exc_val, exc_tb)
 
 connecting = ContextBool()
@@ -98,6 +102,8 @@ async def connect_to_leader(cert=None, name=None, leader=None, remote=None, isre
                  'subsystem': 'collective'})
         return False
     async with connecting:
+        if cfm._initlock is None:
+            cfm._initlock = asyncio.Lock()
         async with cfm._initlock:
             # remote is a socket...
             banner = await tlvdata.recv(remote)  # the banner

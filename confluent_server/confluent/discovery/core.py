@@ -681,6 +681,9 @@ def detected_models():
 async def _recheck_nodes(nodeattribs, configmanager):
     if not cfm.config_is_ready():
         return
+    global rechecklock
+    if rechecklock is None:
+        rechecklock = asyncio.Lock()
     if rechecklock.locked():
         # if already in progress, don't run again
         # it may make sense to schedule a repeat, but will try the easier and less redundant way first
@@ -1643,7 +1646,7 @@ async def newnodes(added, deleting, renamed, configmanager):
 
 rechecker = None
 rechecktime = None
-rechecklock = asyncio.Lock()
+rechecklock = None
 
 async def _periodic_recheck(configmanager):
     global rechecker

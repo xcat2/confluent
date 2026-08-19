@@ -487,7 +487,7 @@ async def find_nodeinfo_by_mac(mac, configmanager):
     return None, {'maccount': 0}
 
 
-mapupdating = asyncio.Lock()
+mapupdating = None
 
 
 async def update_macmap(configmanager, impatient=False):
@@ -498,6 +498,9 @@ async def update_macmap(configmanager, impatient=False):
     recheck the cache as results become possible, rather
     than having to wait for the process to complete to interrogate.
     """
+    global mapupdating
+    if mapupdating is None:
+        mapupdating = asyncio.Lock()
     if mapupdating.locked():
         while mapupdating.locked():
             await asyncio.sleep(1)
@@ -530,6 +533,9 @@ async def _full_updatemacmap(configmanager):
     global _macsbyswitch
     global switchbackoff
     start = util.monotonic_time()
+    global mapupdating
+    if mapupdating is None:
+        mapupdating = asyncio.Lock()
     async with mapupdating:
         vintage = util.monotonic_time()
         # Clear all existing entries
@@ -728,6 +734,9 @@ async def handle_read_api_request(pathcomponents, configmanager):
         if len(pathcomponents) == 8:
             return dump_macinfo(pathcomponents[-1])
     elif pathcomponents[2] == 'rescan':
+        global mapupdating
+        if mapupdating is None:
+            mapupdating = asyncio.Lock()
         return [msg.KeyValueData({'scanning': mapupdating.locked()})]
     raise exc.NotFoundException('Unrecognized path {0}'.format(
         '/'.join(pathcomponents)))

@@ -31,7 +31,7 @@ neightable = {}
 neightime = 0
 
 
-neighlock = asyncio.Lock()
+neighlock = None
 
 async def _update_neigh():
     global neightable
@@ -93,6 +93,9 @@ async def get_hwaddr(ipaddr):
         ipaddr = socket.inet_pton(socket.AF_INET6, ipaddr)
     elif '.' in ipaddr:
         ipaddr = socket.inet_pton(socket.AF_INET, ipaddr)
+    global neighlock
+    if neighlock is None:
+        neighlock = asyncio.Lock()
     async with neighlock:
         updated = False
         if os.times()[4] > (neightime + 30):
