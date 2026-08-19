@@ -209,7 +209,10 @@ def get_socket(handle):
 async def close(handle):
     if isinstance(handle, tuple):
         handle[1].close()
-        await handle[1].wait_closed()
+        try:
+            await handle[1].wait_closed()
+        except Exception:
+            pass
     else:
         handle.close()
 
