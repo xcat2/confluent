@@ -16,7 +16,6 @@
 """This represents the low layer message framing portion of IPMI"""
 
 import struct
-import threading
 
 import aiohmi.exceptions as exc
 from aiohmi.ipmi.private import constants
@@ -44,7 +43,6 @@ class Console(object):
     def __init__(self, bmc, userid, password,
                  iohandler, port=623,
                  force=False, kg=None):
-        self.outputlock = threading.RLock()
         self.keepaliveid = None
         self.connected = False
         self.broken = False
@@ -191,15 +189,14 @@ class Console(object):
         # correlates at all to an ipmi channel to check mux
 
     def _addpendingdata(self, data):
-        with self.outputlock:
-            if isinstance(data, dict):
+        if isinstance(data, dict):
+            self.pendingoutput.append(data)
+        else:  # it is a text situation
+            if (len(self.pendingoutput) == 0
+                    or isinstance(self.pendingoutput[-1], dict)):
                 self.pendingoutput.append(data)
-            else:  # it is a text situation
-                if (len(self.pendingoutput) == 0
-                        or isinstance(self.pendingoutput[-1], dict)):
-                    self.pendingoutput.append(data)
-                else:
-                    self.pendingoutput[-1] += data
+            else:
+                self.pendingoutput[-1] += data
 
     async def _got_cons_input(self, handle):
         """Callback for handle events detected by ipmi session"""
@@ -270,26 +267,25 @@ class Console(object):
         return session.Session.wait_for_rsp(timeout=timeout)
 
     async def _sendpendingoutput(self):
-        with self.outputlock:
-            dobreak = False
-            chunk = ''
-            if len(self.pendingoutput) == 0:
-                return
-            if isinstance(self.pendingoutput[0], dict):
-                if 'break' in self.pendingoutput[0]:
-                    dobreak = True
-                else:
-                    del self.pendingoutput[0]
-                    raise ValueError
-                del self.pendingoutput[0]
-            elif len(self.pendingoutput[0]) > self.maxoutcount:
-                chunk = self.pendingoutput[0][:self.maxoutcount]
-                self.pendingoutput[0] = self.pendingoutput[0][
-                    self.maxoutcount:]
+        dobreak = False
+        chunk = ''
+        if len(self.pendingoutput) == 0:
+            return
+        if isinstance(self.pendingoutput[0], dict):
+            if 'break' in self.pendingoutput[0]:
+                dobreak = True
             else:
-                chunk = self.pendingoutput[0]
                 del self.pendingoutput[0]
-            await self._sendoutput(chunk, sendbreak=dobreak)
+                raise ValueError
+            del self.pendingoutput[0]
+        elif len(self.pendingoutput[0]) > self.maxoutcount:
+            chunk = self.pendingoutput[0][:self.maxoutcount]
+            self.pendingoutput[0] = self.pendingoutput[0][
+                self.maxoutcount:]
+        else:
+            chunk = self.pendingoutput[0]
+            del self.pendingoutput[0]
+        await self._sendoutput(chunk, sendbreak=dobreak)
 
     async def _sendoutput(self, output, sendbreak=False):
         self.myseq += 1
@@ -420,14 +416,13 @@ class Console(object):
                 else:  # retry all or part of packet, but in a new form
                     # also add pending output for efficiency and ease
                     newtext = self.lastpayload[4 + ackcount:]
-                    with self.outputlock:
-                        if (self.pendingoutput
-                                and not isinstance(self.pendingoutput[0],
-                                                   dict)):
-                            self.pendingoutput[0] = \
-                                newtext + self.pendingoutput[0]
-                        else:
-                            self.pendingoutput = [newtext] + self.pendingoutput
+                    if (self.pendingoutput
+                            and not isinstance(self.pendingoutput[0],
+                                                dict)):
+                        self.pendingoutput[0] = \
+                            newtext + self.pendingoutput[0]
+                    else:
+                        self.pendingoutput = [newtext] + self.pendingoutput
             # self._sendpendingoutput() checks len(self._sendpendingoutput)
             await self._sendpendingoutput()
         elif ackseq != 0 and self.awaitingack:
@@ -468,7 +463,6 @@ class ServerConsole(Console):
     """
 
     def __init__(self, _session, iohandler, force=False):
-        self.outputlock = threading.RLock()
         self.keepaliveid = None
         self.connected = True
         self.broken = False
@@ -541,12 +535,11 @@ class ServerConsole(Console):
             self.awaitingack = False
             if nacked and not breakdetected:  # the BMC was in some way unhappy
                 newtext = self.lastpayload[4 + ackcount:]
-                with self.outputlock:
-                    if (self.pendingoutput
-                            and not isinstance(self.pendingoutput[0], dict)):
-                        self.pendingoutput[0] = newtext + self.pendingoutput[0]
-                    else:
-                        self.pendingoutput = [newtext] + self.pendingoutput
+                if (self.pendingoutput
+                        and not isinstance(self.pendingoutput[0], dict)):
+                    self.pendingoutput[0] = newtext + self.pendingoutput[0]
+                else:
+                    self.pendingoutput = [newtext] + self.pendingoutput
             # self._sendpendingoutput() checks len(self._sendpendingoutput)
             await self._sendpendingoutput()
         elif ackseq != 0 and self.awaitingack:

@@ -98,17 +98,6 @@ def get_pci_text_from_ids(subdevice, subvendor, device, vendor):
     return vendorstr, devstr
 
 
-class NullLock(object):
-
-    def donothing(self, *args, **kwargs):
-        return 1
-
-    __enter__ = donothing
-    __exit__ = donothing
-    acquire = donothing
-    release = donothing
-
-
 _ipmithread = None
 _ipmiwaiters = []
 
@@ -378,7 +367,6 @@ class IpmiConsole(conapi.Console):
                                                  password=self.password,
                                                  kg=self.kg, force=True,
                                                  iohandler=self.handle_data)
-            self.solconnection.outputlock = NullLock()
             await self.solconnection.connect()
             if (self.broken or not self.solconnection or
                     self.solconnection.broken or
