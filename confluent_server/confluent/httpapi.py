@@ -1246,7 +1246,7 @@ async def serve(bind_host, bind_port, bind_group, bind_perms):
                 bind_arg = bind_host
             else:
                 bindinfo = await asyncio.get_running_loop().getaddrinfo(
-                    bind_host, bind_port, 0, socket.SOCK_STREAM)
+                    bind_host, bind_port, type=socket.SOCK_STREAM)
                 if bindinfo[0][0] == socket.AF_INET:
                     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 elif bindinfo[0][0] == socket.AF_INET6:
