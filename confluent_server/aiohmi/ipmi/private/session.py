@@ -37,8 +37,8 @@ from aiohmi.ipmi.private.util import _monotonic_time
 from aiohmi.ipmi.private.util import get_ipmi_error
 
 
-KEEPALIVE_SESSIONS = asyncio.Lock()
-WAITING_SESSIONS = asyncio.Lock()
+KEEPALIVE_SESSIONS = None
+WAITING_SESSIONS = None
 
 
 try:
@@ -426,6 +426,9 @@ class Session(object):
 
     @classmethod
     async def _is_session_valid(cls, session):
+        global KEEPALIVE_SESSIONS
+        if KEEPALIVE_SESSIONS is None:
+            KEEPALIVE_SESSIONS = asyncio.Lock()
         await KEEPALIVE_SESSIONS.acquire()
         try:
             sess = cls.keepalive_sessions.get(session, None)
@@ -620,11 +623,17 @@ class Session(object):
         # deregister our keepalive facility
         self.lastpayload = None
         self.onlogpayload = None
+        global KEEPALIVE_SESSIONS
+        if KEEPALIVE_SESSIONS is None:
+            KEEPALIVE_SESSIONS = asyncio.Lock()
         await KEEPALIVE_SESSIONS.acquire()
         try:
             Session.keepalive_sessions.pop(self, None)
         finally:
             KEEPALIVE_SESSIONS.release()
+        global WAITING_SESSIONS
+        if WAITING_SESSIONS is None:
+            WAITING_SESSIONS = asyncio.Lock()
         await WAITING_SESSIONS.acquire()
         try:
             Session.waiting_sessions.pop(self, None)
@@ -839,6 +848,9 @@ class Session(object):
                 if _monotonic_time() > alltimeout:
                     await self._mark_broken('Session no longer connected')
                     raise exc.IpmiException('Session no longer connected')
+                global WAITING_SESSIONS
+                if WAITING_SESSIONS is None:
+                    WAITING_SESSIONS = asyncio.Lock()
                 await WAITING_SESSIONS.acquire()
                 try:
                     if (self in self.waiting_sessions
@@ -1038,6 +1050,9 @@ class Session(object):
         self.netpacket = message
         # advance idle timer since we don't need keepalive while sending
         # packets out naturally
+        global KEEPALIVE_SESSIONS
+        if KEEPALIVE_SESSIONS is None:
+            KEEPALIVE_SESSIONS = asyncio.Lock()
         await KEEPALIVE_SESSIONS.acquire()
         try:
             if (self in Session.keepalive_sessions and not needskeepalive
@@ -1155,6 +1170,9 @@ class Session(object):
                     return
         self.logging = False
         self.logoutexpiry = None
+        global KEEPALIVE_SESSIONS
+        if KEEPALIVE_SESSIONS is None:
+            KEEPALIVE_SESSIONS = asyncio.Lock()
         await KEEPALIVE_SESSIONS.acquire()
         try:
             Session.keepalive_sessions[self] = {}
@@ -1251,6 +1269,12 @@ class Session(object):
                         unspecified, will autodetect based on earliest timeout
         """
         global iosockets
+        global WAITING_SESSIONS
+        if WAITING_SESSIONS is None:
+            WAITING_SESSIONS = asyncio.Lock()
+        global KEEPALIVE_SESSIONS
+        if KEEPALIVE_SESSIONS is None:
+            KEEPALIVE_SESSIONS = asyncio.Lock()
         # Assume:
         # Instance A sends request to packet B
         # Then Instance C sends request to BMC D
@@ -1575,6 +1599,9 @@ class Session(object):
                     # stop the generic retry behavior here
                     self.lastpayload = None
                     self.last_payload_type = None
+                    global WAITING_SESSIONS
+                    if WAITING_SESSIONS is None:
+                        WAITING_SESSIONS = asyncio.Lock()
                     await WAITING_SESSIONS.acquire()
                     try:
                         Session.waiting_sessions.pop(self, None)
@@ -1820,6 +1847,9 @@ class Session(object):
         if not self.servermode:
             self.seqlun += 1  # prepare seqlun for next transmit
             self.seqlun &= 0x3f  # when overflowing, wrap around
+        global WAITING_SESSIONS
+        if WAITING_SESSIONS is None:
+            WAITING_SESSIONS = asyncio.Lock()
         await WAITING_SESSIONS.acquire()
         try:
             Session.waiting_sessions.pop(self, None)
@@ -1949,6 +1979,9 @@ class Session(object):
                 raise exc.IpmiException(
                     "Unable to transmit to specified address")
         if retry:
+            global WAITING_SESSIONS
+            if WAITING_SESSIONS is None:
+                WAITING_SESSIONS = asyncio.Lock()
             await WAITING_SESSIONS.acquire()
             try:
                 Session.waiting_sessions[self] = {}
@@ -1985,6 +2018,9 @@ class Session(object):
                 retry=False)
         # stop trying for a keepalive,
         self.lastpayload = None
+        global KEEPALIVE_SESSIONS
+        if KEEPALIVE_SESSIONS is None:
+            KEEPALIVE_SESSIONS = asyncio.Lock()
         await KEEPALIVE_SESSIONS.acquire()
         try:
             Session.keepalive_sessions.pop(self, None)
