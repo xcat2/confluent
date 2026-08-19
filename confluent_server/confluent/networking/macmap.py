@@ -219,9 +219,14 @@ def _fast_backend_fixup(macs, switch):
                 else:
                     _nodesbymac[mac] = (nodename, nummacs)
 
+startuplock = None
 async def _offload_map_switch(switch, password, user, privprotocol=None):
     if _offloader is None:
-        await _start_offloader()
+        global startuplock
+        if startuplock is None:
+            startuplock = asyncio.Lock()
+        async with startuplock:
+            await _start_offloader()
     evtid = random.randint(0, 4294967295)
     while evtid in _offloadevts:
         evtid = random.randint(0, 4294967295)
@@ -238,7 +243,6 @@ async def _offload_map_switch(switch, password, user, privprotocol=None):
         elif result[0] == 2:
             raise Exception(result[1])
     return result
-
 
 
 async def _start_offloader():
