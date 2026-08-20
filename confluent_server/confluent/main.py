@@ -375,6 +375,18 @@ async def asyncrun(args):
         pass
     webservice = httpapi.HttpApi(http_bind_host, http_bind_port, http_bind_group, http_bind_perms)
     webservice.start()
+    notifysock = os.environ.get('NOTIFY_SOCKET', None)
+    if notifysock:
+        watchdogsecs = int(os.environ.get('WATCHDOG_USEC', '0')) / 1000000
+        if not watchdogsecs:
+            watchdogsecs = 200
+        watchdogsecs = watchdogsecs / 2
+        if notifysock.startswith('@'):
+            notifysock = '\0' + notifysock[1:]
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+        sock.connect(notifysock)
+        sock.send(b'READY=1')
+        firstdeadline = time.time() + watchdogsecs
     while not _stopevent.is_set() and len(
             list(configmanager.list_collective())) >= 2:
         # If in a collective, stall automatic startup activity
@@ -390,7 +402,9 @@ async def asyncrun(args):
             try:
                 await asyncio.wait_for(_stopevent.wait(), 0.5)
             except asyncio.TimeoutError:
-                pass
+                if notifysock and time.time() >= firstdeadline:
+                    sock.send(b'WATCHDOG=1')
+                    firstdeadline = time.time() + watchdogsecs
     if _stopevent.is_set():
         # Asked to stop before startup got as far as serving anything, so
         # there is nothing to unwind beyond what stopping normally does
@@ -398,17 +412,7 @@ async def asyncrun(args):
     disco.start_detection()
     await asyncio.sleep(1)
     await consoleserver.start_console_sessions()
-    notifysock = os.environ.get('NOTIFY_SOCKET', None)
-    if notifysock:
-        if notifysock.startswith('@'):
-            notifysock = '\0' + notifysock[1:]
-        sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
-        sock.connect(notifysock)
-        sock.send(b'READY=1')
-    watchdogsecs = int(os.environ.get('WATCHDOG_USEC', '0')) / 1000000
-    if not watchdogsecs:
-        watchdogsecs = 200
-    watchdogsecs = watchdogsecs / 2
+
     while not _stopevent.is_set():
         try:
             await asyncio.wait_for(_stopevent.wait(), watchdogsecs)
