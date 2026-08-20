@@ -34,6 +34,7 @@ class DiskInfo(object):
         self.driver = ''
         self.mdcontainer = ''
         self.subsystype = ''
+        self.kernnames = []
         devnode = '/dev/{0}'.format(devname)
         qprop = subprocess.check_output(
             ['udevadm', 'info', '--query=property', devnode])
@@ -78,6 +79,8 @@ class DiskInfo(object):
                 raise Exception("Device is removable")
             elif k == 'ATTRS{address}':
                 self.busaddr = v.replace('"', '')
+            elif k == 'KERNELS':
+                self.kernnames.append(v.replace('"', ''))
         if not self.driver and 'imsm' not in self.mdcontainer and self.subsystype != 'nvm':
             raise Exception("No driver detected")
         if self.driver == 'sr':
@@ -201,14 +204,17 @@ def filter_deployment_storage(disks, storagespec, slotinfo=None):
         if spec == 'm2':
             if disk.model.lower() in PRIORITY_MODELS:
                 continue
-            if not getattr(disk, 'busaddr', None):
-                disks.remove(disk)
-                continue
             if slotinfo is None:
                 slotinfo = get_m2_slot_info()
+            if not getattr(disk, 'busaddr', None):
+                for kernname in getattr(disk, 'kernnames', []):
+                    if kernname in slotinfo:
+                        break
+                else:
+                    disks.remove(disk)
+                continue
             if disk.busaddr not in slotinfo:
                 disks.remove(disk)
-    
         elif spec.startswith('/dev/'):
             bspec = os.path.basename(spec)
             if disk.name.lower() == bspec:
