@@ -44,20 +44,52 @@ _handled_consoles = {}
 _tracelog = None
 _bufferdaemon = None
 
-try:
-    range = xrange
-except NameError:
-    pass
-
 
 def chunk_output(output, n):
     for i in range(0, len(output), n):
         yield output[i:i + n]
 
-async def get_buffer_output(nodename):
+async def get_buffer_connection():
     out = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     out.setsockopt(socket.SOL_SOCKET, socket.SO_PASSCRED, 1)
-    out.connect("\x00confluent-vtbuffer")
+    try:
+        out.connect("\x00confluent-vtbuffer")
+    except Exception:
+        try:
+            out.close()
+        except Exception:
+            pass
+        raise
+    return out
+
+async def _ensure_buffer_daemon():
+    if _bufferdaemon is not None:
+        return await get_buffer_connection()
+    global _bufferstartuplock
+    if _bufferstartuplock is None:
+        _bufferstartuplock = asyncio.Lock()
+    async with _bufferstartuplock:
+        if _bufferdaemon is not None:
+            return await get_buffer_connection()
+        tasks.spawn(run_buffer_daemon())
+        await asyncio.sleep(0)  # yield control to allow buffer daemon to start
+        deadline = time.time() + 0.5
+        storedexception = None
+        while time.time() < deadline:
+            try:
+                out = await get_buffer_connection()
+                return out
+            except Exception as e:
+                storedexception = e
+                await asyncio.sleep(0.05)  # yield control and retry
+                continue
+        raise storedexception if storedexception is not None else Exception("Failed to connect to buffer daemon")
+
+async def get_buffer_output(nodename):
+    try:
+        out = await _ensure_buffer_daemon()
+    except Exception:
+        return b''
     rdr, writer = await asyncio.open_unix_connection(sock=out)
     if not isinstance(nodename, bytes):
         nodename = nodename.encode('utf8')
@@ -76,11 +108,12 @@ async def get_buffer_output(nodename):
 
 
 async def send_output(nodename, output):
+    try:
+        out = await _ensure_buffer_daemon()
+    except Exception:
+        return
     if not isinstance(nodename, bytes):
         nodename = nodename.encode('utf8')
-    out = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    out.setsockopt(socket.SOL_SOCKET, socket.SO_PASSCRED, 1)
-    out.connect("\x00confluent-vtbuffer")
     rdr, writer = await asyncio.open_unix_connection(sock=out)
     hdr = struct.pack('I', len(nodename) | (1 << 29))
     writer.write(hdr)
@@ -606,17 +639,24 @@ running = True
 
 async def run_buffer_daemon():
     global _bufferdaemon
-    while running:
-        _bufferdaemon = await asyncio.subprocess.create_subprocess_exec(
-            '/opt/confluent/bin/vtbufferd', 'confluent-vtbuffer')
-        await _bufferdaemon.wait()
-        
-    
+    if _bufferdaemon is not None:
+        return
+    _bufferdaemon = True
+    try:
+        while running:
+            minrestarttime = time.time() + 30
+            _bufferdaemon = await asyncio.subprocess.create_subprocess_exec(
+                '/opt/confluent/bin/vtbufferd', 'confluent-vtbuffer')
+            await _bufferdaemon.wait()
+            if time.time() < minrestarttime:
+                await asyncio.sleep(minrestarttime - time.time())
+    finally:
+        _bufferdaemon = None
+
+_bufferstartuplock = None
 async def initialize():
     global _tracelog
-    global _bufferdaemon
     _tracelog = log.Logger('trace')
-    tasks.spawn(run_buffer_daemon())
     #_bufferdaemon = await asyncio.subprocess.create_subprocess_exec(
     #    '/opt/confluent/bin/vtbufferd', 'confluent-vtbuffer')
     #_bufferdaemon = subprocess.Popen(
