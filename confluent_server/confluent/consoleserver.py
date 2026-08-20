@@ -61,6 +61,8 @@ def chunk_output(output, n):
         yield output[i:i + n]
 
 def get_buffer_output(nodename):
+    if _bufferdaemon is None:
+        eventlet.spawn(run_buffer_daemon)
     out = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     out.setsockopt(socket.SOL_SOCKET, socket.SO_PASSCRED, 1)
     out.connect("\x00confluent-vtbuffer")
@@ -85,6 +87,8 @@ def get_buffer_output(nodename):
 def send_output(nodename, output):
     if not isinstance(nodename, bytes):
         nodename = nodename.encode('utf8')
+    if _bufferdaemon is None:
+        eventlet.spawn(run_buffer_daemon)
     out = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     out.setsockopt(socket.SOL_SOCKET, socket.SO_PASSCRED, 1)
     out.connect("\x00confluent-vtbuffer")
@@ -602,16 +606,20 @@ running = True
 def run_buffer_daemon():
     global _bufferdaemon
     while running:
+        minrestartdeadline = time.time() + 30  # Do not restart more than once every 30 seconds
         _bufferdaemon = subprocess.Popen(
             ['/opt/confluent/bin/vtbufferd', 'confluent-vtbuffer'], bufsize=0, stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL)
         _bufferdaemon.wait()
+        # Ensure we do not restart more than once every 30 seconds
+        sleep_time = minrestartdeadline - time.time()
+        if sleep_time > 0:
+            eventlet.sleep(sleep_time)
 
 def initialize():
     global _tracelog
     global _bufferdaemon
     _tracelog = log.Logger('trace')
-    eventlet.spawn(run_buffer_daemon)
 
 def start_console_sessions():
     configmodule.hook_new_configmanagers(_start_tenant_sessions)
