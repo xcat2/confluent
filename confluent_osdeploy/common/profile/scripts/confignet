@@ -36,6 +36,36 @@ def add_lla(iface, mac):
         return None
     return lla
 
+def create_systemd_link(nic, altnames):
+    if not os.path.exists('/etc/systemd/network'):
+        return
+    for disallowed in ['..', ' ', '/', '\n', '=']:
+        if disallowed in nic:
+            raise ValueError('Invalid nic name')
+
+    if not isinstance(altnames, list):
+        altnames = altnames.split(',')
+    filteredaltnames = []
+    for altname in altnames:
+        altname = altname.strip()
+        for disallowed in ['..', ' ', '/', '\n', '=']:
+            if disallowed in altname:
+                break
+        else:
+            if altname and altname not in filteredaltnames:
+                filteredaltnames.append(altname)
+    with open(f'/sys/class/net/{nic}/address') as macin:
+        macaddr = macin.read().strip()
+    with open(f'/etc/systemd/network/00-{nic}.link', 'w') as linkout:
+        linkout.write('[Match]\n')
+        linkout.write(f'MACAddress={macaddr}\n\n')
+        linkout.write('[Link]\n')
+        linkout.write('NamePolicy=kernel database onboard slot path\n')
+        linkout.write('AlternativeNamesPolicy=database onboard slot path mac\n')
+        for altname in filteredaltnames:
+            linkout.write(f'AlternativeName={altname}\n')
+    subprocess.check_call(['udevadm', 'trigger', '--action=add', '--subsystem-match=net'])
+
 #cli = apiclient.HTTPSClient(json=True)
 #c = cli.grab_url_with_status('/confluent-api/self/netcfg')
 def add_missing_llas():
@@ -161,6 +191,7 @@ class NetplanManager(object):
     
     def apply_configuration(self, cfg, lastchance=False):
         devnames = cfg['interfaces']
+        teammode = None
         if len(devnames) > 1:
             teammode = cfg['settings'].get('team_mode', None)
             if not teammode:
@@ -257,6 +288,9 @@ class NetplanManager(object):
                         keyptr[keypath[-1]] = val
             prune_from_cloudinit = []
             if needcfgwrite:
+                connname = cfg['settings'].get('connection_name', None)
+                if not teammode and connname and connname != devname:
+                    create_systemd_link(devname, [connname])
                 needcfgapply = True
                 oumask = os.umask(0o77)
                 if devname in self.cfgbydev:
@@ -548,6 +582,8 @@ class NetworkManager(object):
                     return
             cname = iname if not cname else cname
             u = self.uuidbyname.get(cname, None)
+            if cname != iname:
+                create_systemd_link(iname, [cname])
             cargs = []
             for arg in cmdargs:
                 cargs.append(arg)
