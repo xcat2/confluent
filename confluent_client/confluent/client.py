@@ -280,6 +280,7 @@ class Command(object):
     def stop_if_noderange_over(self, noderange, maxnodes):
         if maxnodes is None:
             return
+        maxnodes = int(maxnodes)
         nsize = self.get_noderange_size(noderange)
         if nsize > maxnodes:
             if nsize == 1:
