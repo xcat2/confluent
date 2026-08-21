@@ -281,6 +281,7 @@ class Command(object):
         if maxnodes is None:
             return
         nsize = self.get_noderange_size(noderange)
+        maxnodes = int(maxnodes)
         if nsize > maxnodes:
             if nsize == 1:
                 nodename = list(self.read(
