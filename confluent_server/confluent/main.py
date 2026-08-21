@@ -376,6 +376,7 @@ async def asyncrun(args):
     webservice = httpapi.HttpApi(http_bind_host, http_bind_port, http_bind_group, http_bind_perms)
     webservice.start()
     notifysock = os.environ.get('NOTIFY_SOCKET', None)
+    watchdogsecs = 200
     if notifysock:
         watchdogsecs = int(os.environ.get('WATCHDOG_USEC', '0')) / 1000000
         if not watchdogsecs:
