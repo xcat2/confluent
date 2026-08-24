@@ -62,6 +62,7 @@ if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
                 /usr/libexec/nm-initrd-generator ip=$NICGUESS:dhcp
                 echo ip=$NICGUESS:dhcp >> /etc/cmdline.d/01-confluent.conf
                 echo " "ip=$NICGUESS:dhcp >> /run/agama/cmdline.d/agama.conf
+		DETECTED=1
             else
                 v4addr=$(grep ^ipv4_address: $tcfg)
                 v4addr=${v4addr#ipv4_address: }

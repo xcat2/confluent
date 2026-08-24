@@ -8,6 +8,11 @@ if [ -e /run/confluent/01-autocons.conf ]; then
         serialcons=$(tty)
     fi
 fi
+if [ "$serialcons" = "not a tty" ]; then
+    serialcons="/dev/tty1"
+elif [ -z "$serialcons" ]; then
+    serialcons="/dev/tty1"
+fi
 profile=$(grep ^profile: /etc/confluent/confluent.deploycfg|awk '{print $2}')
 export profile
 python3 /opt/confluent/bin/apiclient /confluent-public/os/$profile/scripts/functions > /etc/confluent/functions
