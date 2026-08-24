@@ -700,6 +700,7 @@ async def _recheck_nodes_backend(nodeattribs, configmanager):
         macmap.vintage = 0  # expire current mac map data, in case
         # the attributes changed impacted the result
     for node in nodeattribs:
+        await asyncio.sleep(0)
         if node in known_nodes:
             for somemac in known_nodes[node]:
                 unknown_info[somemac] = known_nodes[node][somemac]
@@ -707,6 +708,7 @@ async def _recheck_nodes_backend(nodeattribs, configmanager):
     # Now we go through ones we did not find earlier
     for mac in list(unknown_info):
         try:
+            await asyncio.sleep(0)
             await _recheck_single_unknown(configmanager, mac)
         except Exception:
             traceback.print_exc()
