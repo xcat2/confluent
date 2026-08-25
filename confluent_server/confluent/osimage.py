@@ -192,7 +192,7 @@ def find_glob(loc, fileglob):
 
 async def update_boot_linux(profiledir, profile, label):
     profname = os.path.basename(profiledir)
-    kernelargs = profile.get('kernelargs', '')
+    kernelargs = profile.get('kernelargs') or ''
     needefi = False
     for grubexe in glob.glob(profiledir + '/boot/efi/boot/grubx64.efi'):
         with open(grubexe, 'rb') as grubin:
