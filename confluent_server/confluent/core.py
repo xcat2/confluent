@@ -818,7 +818,7 @@ async def create_group(inputdata, configmanager):
     except KeyError:
         raise exc.InvalidArgumentException()
     try:
-        await configmanager.add_group_attributes(attribmap)
+        await configmanager.add_group_attributes(attribmap, checkconflict=True)
     except ValueError as e:
         raise exc.InvalidArgumentException(str(e))
     yield msg.CreatedResource(groupname)
@@ -834,7 +834,7 @@ async def create_node(inputdata, configmanager):
     except KeyError:
         raise exc.InvalidArgumentException('name not specified')
     try:
-        await configmanager.add_node_attributes(attribmap)
+        await configmanager.add_node_attributes(attribmap, checkconflict=True)
     except ValueError as e:
         raise exc.InvalidArgumentException(str(e))
     yield msg.CreatedResource(nodename)
@@ -850,7 +850,7 @@ async def create_noderange(inputdata, configmanager):
     except KeyError:
         raise exc.InvalidArgumentException('name not specified')
     try:
-        await configmanager.add_node_attributes(attribmap)
+        await configmanager.add_node_attributes(attribmap, checkconflict=True)
     except ValueError as e:
         raise exc.InvalidArgumentException(str(e))
     for node in attribmap:

@@ -2023,7 +2023,11 @@ class ConfigManager(object):
                 continue  # next node, this node already in
             self._node_added_to_group(node, group, changeset)
 
-    async def add_group_attributes(self, attribmap):
+    async def add_group_attributes(self, attribmap, checkconflict=False):
+        if checkconflict:
+            for groupname in attribmap:
+                if groupname in self._cfgstore.get('nodes', {}):
+                    raise ValueError('Group "{}" conflicts with an existing node'.format(groupname))
         await self.set_group_attributes(attribmap, autocreate=True)
 
     async def set_group_attributes(self, attribmap, autocreate=False, merge="replace", keydata=None, skipped=None):
@@ -2422,7 +2426,11 @@ class ConfigManager(object):
         self._notif_attribwatchers(changeset)
         self._bg_sync_to_file()
 
-    async def add_node_attributes(self, attribmap):
+    async def add_node_attributes(self, attribmap, checkconflict=False):
+        if checkconflict:
+            for nodename in attribmap:
+                if nodename in self._cfgstore.get('nodegroups', {}):
+                    raise ValueError('Node "{}" conflicts with an existing group'.format(nodename))
         await self.set_node_attributes(attribmap, autocreate=True)
 
     async def rename_nodes(self, renamemap):
