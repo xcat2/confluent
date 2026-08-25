@@ -3,6 +3,7 @@ import argparse
 import os
 import re
 import signal
+import shutil
 import sys
 try:
     signal.signal(signal.SIGPIPE, signal.SIG_DFL)
@@ -205,7 +206,7 @@ def main():
             merger.add_entry(ipbynode[node], namesbynode[node])
     if os.path.exists('/etc/hosts'):
         merger.read_target('/etc/hosts')
-        os.rename('/etc/hosts', '/etc/hosts.confluentbkup')
+        shutil.copy2('/etc/hosts', '/etc/hosts.confluentbkup')
     merger.write_out('/etc/hosts')
 
 
