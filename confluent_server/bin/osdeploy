@@ -167,10 +167,15 @@ def init_confluent_myname():
         if pid:
             os.waitpid(pid, 0)
         else:
-            os.setgid(hasconfluentuser.pw_gid)
-            os.setuid(hasconfluentuser.pw_uid)
-            collective.get_myname()
-            os._exit(0)
+            exitcode = 0
+            try:
+                os.setgid(hasconfluentuser.pw_gid)
+                os.setuid(hasconfluentuser.pw_uid)
+                collective.get_myname()
+            except Exception:
+                exitcode = 1
+            finally:
+                os._exit(exitcode)
 
 
 async def local_node_trust_setup():

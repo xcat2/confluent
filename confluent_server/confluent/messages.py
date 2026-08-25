@@ -606,12 +606,14 @@ def checkaccess(user, filename, pwent, mode=os.R_OK):
     """
     child = os.fork()
     if child == 0:
-        os.setgroups(os.getgrouplist(user, pwent.pw_gid))
-        os.setgid(pwent.pw_gid)
-        os.setuid(pwent.pw_uid)
-        if os.access(filename, mode):
-            os._exit(0)
-        os._exit(1)
+        try:
+            os.setgroups(os.getgrouplist(user, pwent.pw_gid))
+            os.setgid(pwent.pw_gid)
+            os.setuid(pwent.pw_uid)
+            if os.access(filename, mode):
+                os._exit(0)
+        finally:
+            os._exit(1)
     else:
         pid, status = os.waitpid(child, 0)
         if os.WIFEXITED(status) and os.WEXITSTATUS(status) == 0:
