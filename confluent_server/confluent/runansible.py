@@ -130,6 +130,11 @@ class PlayRunner(object):
                 feedback.setblocking(False)
                 localenv = os.environ.copy()
                 localenv['FEEDBACK_SOCK'] = sockpath
+                # limit host based algorithms to avoid excessive authentication attempts
+                ansiblesshargs = os.environ.get('ANSIBLE_SSH_ARGS', '')
+                if 'hostbasedkeytypes' not in ansiblesshargs.lower() and 'hostbasedacceptedalgorithms' not in ansiblesshargs.lower():
+                    ansiblesshargs += ' -o HostbasedAcceptedAlgorithms=*ed25519*'
+                localenv['ANSIBLE_SSH_ARGS'] = ansiblesshargs
                 with feedback:
                     for playfilename in self.playfiles:
                         worker = await asyncio.create_subprocess_exec(
