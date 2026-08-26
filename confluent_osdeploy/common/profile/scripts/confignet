@@ -303,9 +303,11 @@ class NetplanManager(object):
                         prune_from_cloudinit.append(iface)
                         with open('/etc/netplan/10-{0}-confluentcfg.yaml'.format(iface), 'w') as planout:
                             planout.write(yaml.dump({'network': {'version': 2, 'ethernets': {iface: {'dhcp4': False}}}}))
+                        os.chmod('/etc/netplan/10-{0}-confluentcfg.yaml'.format(iface), 0o600)
                     cfgfile = '/etc/netplan/30-{0}-confluentcfg.yaml'.format(devname)
                 with open(cfgfile, 'w') as planout:
                     planout.write(yaml.dump(newcfg))
+                os.chmod(cfgfile, 0o600)
                 os.umask(oumask)
         if prune_from_cloudinit:
             prunecfgs = ['/etc/netplan/00-installer-config.yaml',
