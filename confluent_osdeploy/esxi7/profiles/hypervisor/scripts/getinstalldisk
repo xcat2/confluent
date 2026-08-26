@@ -72,6 +72,8 @@ PRIORITY_MODELS = ('m.2 nvme 2-bay raid kit',
                    'thinksystem_m.2_vd',
                    'thinksystem m.2',
                    'thinksystem_m.2',
+                   'thinksystem 7mm',
+                   'thinksystem_7mm',                  
                    'b540p-2hs',  # 7mm or M.2 in rear
                    'b540d-2hs',  # M.2 in E3.S or 2.5inch
                    'b550d-2hs',  # Front M.2
@@ -79,7 +81,26 @@ PRIORITY_MODELS = ('m.2 nvme 2-bay raid kit',
                    'raid b540p-2hs',
                    'raid b540d-2hs',
                    'raid b550d-2hs',
-                   'raid b550p-2hs')
+                   'raid b550p-2hs',
+                   'raid b540i-2i',
+                   'raid_b540i-2i',
+                   'raid b545i-2i',
+                   'raid b545i-2i',
+                   'raid_b545-2i',
+                   'raid 540-8i',
+                   'raid_540-8i',
+                   'raid 930-8i-2gb',                  
+                   'raid_930-8i-2gb',
+                   'raid 930-16i-4gb',
+                   'raid_930-16i-4gb',
+                   'raid 930-24i-4gb',                   
+                   'raid_930-24i-4gb',
+                   'raid 940-8i 4gb',
+                   'raid_940-8i_4gb',
+                   'raid 940-16i 4gb',
+                   'raid_940-16i_4gb',
+                   'raid 940-16i 8gb',
+                   'raid_940-16i_8gb')
 
 class DiskInfo(object):
     def __init__(self, devname, devinfo, storagespec=None):
