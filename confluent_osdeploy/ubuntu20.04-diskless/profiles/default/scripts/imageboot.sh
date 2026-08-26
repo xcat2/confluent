@@ -1,18 +1,28 @@
 confluent_urls=""
 confluent_proto=https
-for addr in $(grep ^MANAGER: /etc/confluent/confluent.info|awk '{print $2}'|sed -e s/%/%25/); do
-    if [[ $addr == *:* ]]; then
-        confluent_urls="$confluent_urls $confluent_proto://[$addr]/confluent-public/os/$confluent_profile/rootimg.sfs"
-    else
-        confluent_urls="$confluent_urls $confluent_proto://$addr/confluent-public/os/$confluent_profile/rootimg.sfs"
+if [ -n "$1" ] && [ -d "$1" ]; then
+    mbimntpoint=$1
+    if [ -e "$mbimntpoint/confluent/rootimg.sfs" ]; then
+        rootimg="$mbimntpoint/confluent/rootimg.sfs"
     fi
-done
+fi
+if [ -z "$rootimg" ]; then
+    for addr in $(grep ^MANAGER: /etc/confluent/confluent.info|awk '{print $2}'|sed -e s/%/%25/); do
+        if [[ $addr == *:* ]]; then
+            confluent_urls="$confluent_urls $confluent_proto://[$addr]/confluent-public/os/$confluent_profile/rootimg.sfs"
+        else
+            confluent_urls="$confluent_urls $confluent_proto://$addr/confluent-public/os/$confluent_profile/rootimg.sfs"
+        fi
+    done
+fi
 mkdir -p /mnt/remoteimg /mnt/remote /mnt/overlay
 TETHERED=1
 if grep -q confluent_imagemethod=untethered /proc/cmdline || grep -q confluent_imagemethod=uncompressed /proc/cmdline; then
     TETHERED=0
     mount -t tmpfs untethered /mnt/remoteimg
     curl https://$confluent_mgr/confluent-public/os/$confluent_profile/rootimg.sfs -o /mnt/remoteimg/rootimg.sfs
+elif [ -n "$rootimg" ]; then
+    ln -s "$rootimg" /mnt/remoteimg/rootimg.sfs
 else
     confluent_urls="$confluent_urls https://$confluent_mgr/confluent-public/os/$confluent_profile/rootimg.sfs"
     /opt/confluent/bin/urlmount $confluent_urls /mnt/remoteimg
@@ -135,12 +145,27 @@ chmod 600 /sysroot/etc/ssh/*_key
 mkdir -p /sysroot/usr/share/ca-certificates/confluent/
 cp /tls/*.pem /sysroot/usr/share/ca-certificates/confluent/
 chroot /sysroot/ update-ca-certificates
-curl -sf https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/onboot.service > /sysroot/etc/systemd/system/onboot.service
+if [ -n "$mbimntpoint" ]; then
+    if [ -e "$mbimntpoint/confluent/scripts/onboot.service" ]; then
+        cp $mbimntpoint/confluent/scripts/onboot.service /sysroot/etc/systemd/system/onboot.service
+    fi
+else
+    curl -sf https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/onboot.service > /sysroot/etc/systemd/system/onboot.service
+fi
 mkdir -p /sysroot/opt/confluent/bin
-curl -sf https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/onboot.sh > /sysroot/opt/confluent/bin/onboot.sh
+if [ -n "$mbimntpoint" ]; then
+    touch /sysroot/opt/confluent/bin/onboot.sh
+    if [ -e $mbimntpoint/confluent/scripts/onboot.sh ]; then
+        cp $mbimntpoint/confluent/scripts/onboot.sh /sysroot/opt/confluent/bin/onboot.sh
+    fi
+else
+    curl -sf https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/onboot.sh > /sysroot/opt/confluent/bin/onboot.sh
+fi
 chmod +x /sysroot/opt/confluent/bin/onboot.sh
 cp /opt/confluent/bin/apiclient /sysroot/opt/confluent/bin
-ln -s /etc/systemd/system/onboot.service /sysroot/etc/systemd/system/multi-user.target.wants/onboot.service
+if [ -e /sysroot/etc/systemd/system/onboot.service ]; then
+    ln -s /etc/systemd/system/onboot.service /sysroot/etc/systemd/system/multi-user.target.wants/onboot.service
+fi
 cp /etc/confluent/functions /sysroot/etc/confluent/functions
 mv /lib/modules/$(uname -r) /lib/modules/$(uname -r)-ramfs
 ln -s /sysroot/lib/modules/$(uname -r) /lib/modules/
@@ -182,9 +207,9 @@ EOF
         fi
         if [ -n "$ipv4gateway" -a "$ipv4gateway" != "none" -a "$ipv4gateway" != "null" ]; then
             cat >> /sysroot/etc/netplan/10-${iface}-confluentcfg.yaml <<EOF
-        routes:
-          - to: default
-            via: $ipv4gateway
+      routes:
+        - to: default
+          via: $ipv4gateway
 EOF
         fi
     fi
@@ -194,5 +219,15 @@ if grep installtodisk /proc/cmdline > /dev/null; then
     . /etc/confluent/functions
     run_remote installimage
     exec reboot -f
+fi
+if [ -n "$mbimntpoint" ]; then
+    for archive in $mbimntpoint/confluent/addons/*.t*; do
+        [ -f "$archive" ] || continue
+        tar -xpf "$archive" -C /sysroot
+    done
+    mkdir -p /sysroot/var/opt/confluent/mbi
+    mount -o bind $mbimntpoint /sysroot/var/opt/confluent/mbi
+    mkdir -p /sysroot/etc/confluent
+    echo /dev/disk/by-label/CNFLNT_MBI > /sysroot/etc/confluent/mbidevice
 fi
 exec /opt/confluent/bin/start_root

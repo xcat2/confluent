@@ -27,6 +27,18 @@ chmod 600 /var/log/confluent/confluent-onboot.log
 tail -f /var/log/confluent/confluent-onboot.log > /dev/console &
 logshowpid=$!
 
+if [ -e /etc/confluent/mbidevice ]; then
+    for script in /var/opt/confluent/mbi/confluent/onboot.d/*; do
+        [ -x "$script" ] && "$script"
+    done
+fi
+
+if [ -z "$confluent_mgr" ]; then
+    echo "Confluent manager not defined"
+    kill $logshowpid
+    exit 0
+fi
+
 run_remote_python syncfileclient
 run_remote_python confignet
 
