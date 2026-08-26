@@ -103,13 +103,38 @@ cd - > /dev/null
 mkdir -p /etc/ssl/certs
 cat /tls/*.pem > /etc/ssl/certs/ca-certificates.crt
 cat /tls/*.pem > /etc/confluent/ca.pem
-/opt/confluent/bin/copernicus -t > /etc/confluent/confluent.info
+if [ -e /dev/disk/by-label/CNFLNT_MBI ]; then  # media based image
+    mbimntpoint=$(mktemp -d)
+    mount /dev/disk/by-label/CNFLNT_MBI $mbimntpoint
+    echo EXTMGRINFO: media||1 > /etc/confluent/confluent.info
+else
+    /opt/confluent/bin/copernicus -t > /etc/confluent/confluent.info
+fi
 TRIES=0
 while ! grep ^EXTMGRINFO: /etc/confluent/confluent.info | awk -F'|' '{print $3}' | grep 1 > /dev/null && [ "$TRIES" -lt 30 ]; do
     TRIES=$((TRIES + 1))
+    if [ -e /dev/disk/by-label/CNFLNT_MBI ]; then
+        mbimntpoint=$(mktemp -d)
+        mount /dev/disk/by-label/CNFLNT_MBI $mbimntpoint
+        echo EXTMGRINFO: media||1 > /etc/confluent/confluent.info
+        break
+    fi
     /opt/confluent/bin/copernicus -t > /etc/confluent/confluent.info
     sleep 1
 done
+if [ -n "$mbimntpoint" ]; then
+    sed -i '/^EXTMGRINFO:/d' /etc/confluent/confluent.info
+    if [ -e $mbimntpoint/confluent/confluent.info ]; then
+        cp $mbimntpoint/confluent/confluent.info /etc/confluent/
+    fi
+
+    if [ -e $mbimntpoint/confluent/confluent.deploycfg ]; then
+        cp $mbimntpoint/confluent/confluent.deploycfg /etc/confluent/
+    fi
+    if [ -e $mbimntpoint/confluent/confluent.apikey ]; then
+        cp $mbimntpoint/confluent/confluent.apikey /etc/confluent/
+    fi
+fi
 confluent_mgr=$(grep '^EXTMGRINFO:.*1$' /etc/confluent/confluent.info | head -n 1 | awk -F': ' '{print $2}' | awk -F'|' '{print $1}')
 if [ -z "$confluent_mgr" ]; then
     confluent_mgr=$(grep ^MANAGER: /etc/confluent/confluent.info|head -n 1 | awk '{print $2}')
@@ -120,7 +145,15 @@ else
     confluent_http_mgr=$confluent_mgr
 fi
 confluent_nodename=$(grep ^NODENAME: /etc/confluent/confluent.info |awk '{print $NF}')
+if [ -z "$confluent_nodename" ]; then
+    confluent_nodename=standalone
+fi
 hostname $confluent_nodename
+if [ -z "$confluent_mgr" ] && [ -n "$mbimntpoint" ]; then
+    # Standalone diskless image
+    cp $mbimntpoint/confluent/scripts/functions /etc/confluent/
+    exec /bin/bash $mbimntpoint/confluent/scripts/imageboot.sh $mbimntpoint
+fi
 get_tpm_apikey
 if [ -z "$confluent_apikey" ]; then
     get_remote_apikey
