@@ -23,7 +23,7 @@ PRIORITY_MODELS = ('m.2 nvme 2-bay raid kit',
                    'raid b550p-2hs')
 
 class DiskInfo(object):
-    def __init__(self, devname):
+    def __init__(self, devname, slotinfo=None):
         if devname.startswith('nvme') and 'c' in devname:
             raise Exception("Skipping multipath devname")
         self.name = devname
@@ -35,6 +35,7 @@ class DiskInfo(object):
         self.mdcontainer = ''
         self.subsystype = ''
         self.kernnames = []
+        self.is_m2 = False
         devnode = '/dev/{0}'.format(devname)
         qprop = subprocess.check_output(
             ['udevadm', 'info', '--query=property', devnode])
@@ -81,6 +82,13 @@ class DiskInfo(object):
                 self.busaddr = v.replace('"', '')
             elif k == 'KERNELS':
                 self.kernnames.append(v.replace('"', ''))
+        if not getattr(self, 'busaddr', None):
+            for kernname in getattr(self, 'kernnames', []):
+                if kernname in slotinfo:
+                    self.is_m2 = True
+                    break
+        if getattr(self, 'busaddr', None) and disk.busaddr in slotinfo:
+            self.is_m2 = True
         if not self.driver and 'imsm' not in self.mdcontainer and self.subsystype != 'nvm':
             raise Exception("No driver detected")
         if self.driver == 'sr':
@@ -93,6 +101,8 @@ class DiskInfo(object):
 
     @property
     def priority(self):
+        if self.is_m2:
+            return 0
         if self.model.lower() in PRIORITY_MODELS:
             return 0
         if 'imsm' in self.mdcontainer:
@@ -229,15 +239,15 @@ def filter_deployment_storage(disks, storagespec, slotinfo=None):
 
 def main():
     disks = []
+    slotinfo = get_m2_slot_info()
     for disk in sorted(os.listdir('/sys/class/block')):
         try:
-            disk = DiskInfo(disk)
+            disk = DiskInfo(disk, slotinfo=slotinfo)
             disks.append(disk)
         except SilentException:
             pass
         except Exception as e:
             print("Skipping {0}: {1}".format(disk, str(e)))
-    slotinfo = get_m2_slot_info()
     disks = filter_deployment_storage(disks, get_deployment_storage(), slotinfo=slotinfo)
     nd = [x.name for x in sorted(disks, key=lambda x: [x.priority, x.size])]
     if nd:
