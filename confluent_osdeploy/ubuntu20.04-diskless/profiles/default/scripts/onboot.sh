@@ -28,7 +28,7 @@ tail -f /var/log/confluent/confluent-onboot.log > /dev/console &
 logshowpid=$!
 
 if [ -e /etc/confluent/mbidevice ]; then
-    for script in /var/opt/confluent/mbi/confluent/onboot.d/*; do
+    for script in /var/opt/confluent/mbi/confluent/scripts/onboot.d/*; do
         [ -x "$script" ] && "$script"
     done
 fi
