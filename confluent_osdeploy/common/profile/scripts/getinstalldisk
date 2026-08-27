@@ -87,7 +87,7 @@ class DiskInfo(object):
                 if kernname in slotinfo:
                     self.is_m2 = True
                     break
-        if getattr(self, 'busaddr', None) and disk.busaddr in slotinfo:
+        if getattr(self, 'busaddr', None) and self.busaddr in slotinfo:
             self.is_m2 = True
         if not self.driver and 'imsm' not in self.mdcontainer and self.subsystype != 'nvm':
             raise Exception("No driver detected")
