@@ -42,7 +42,9 @@ class DiskInfo(object):
         self.mdcontainer = ''
         self.subsystype = ''
         self.kernnames = []
+        self.vrocmembers = []
         self.is_m2 = False
+        self.in_vroc = False
         devnode = '/dev/{0}'.format(devname)
         qprop = subprocess.check_output(
             ['udevadm', 'info', '--query=property', devnode])
@@ -98,6 +100,22 @@ class DiskInfo(object):
             self.is_m2 = True
         if not self.driver and 'imsm' not in self.mdcontainer and self.subsystype != 'nvm':
             raise Exception("No driver detected")
+        if 'imsm' in self.mdcontainer:
+            try:
+                mdinfo = subprocess.check_output(
+                    ['mdadm', '--detail', '-Y', devnode],
+                    stderr=subprocess.DEVNULL)
+                if not isinstance(mdinfo, str):
+                    mdinfo = mdinfo.decode('utf8', errors='ignore')
+                for line in mdinfo.splitlines():
+                    key, separator, value = line.partition('=')
+                    if separator and key.endswith('_DEV'):
+                        member = value.strip()
+                        member = member.replace('/dev/', '')
+                        if member and member not in self.vrocmembers:
+                            self.vrocmembers.append(member)
+            except Exception:
+                pass
         if self.driver == 'sr':
             raise Exception('cd/dvd')
         if os.path.exists('/sys/block/{0}/size'.format(self.name)):
@@ -108,6 +126,8 @@ class DiskInfo(object):
 
     @property
     def priority(self):
+        if self.in_vroc:
+            return 99  # prefer the assembled array over the member disks
         if self.is_m2:
             return 0
         if self.model.lower() in PRIORITY_MODELS:
@@ -219,6 +239,8 @@ def filter_deployment_storage(disks, storagespec, slotinfo=None):
     spec = storagespec.strip().lower()
     for disk in list(disks):
         if spec == 'm2':
+            if disk.is_m2:
+                continue
             if disk.model.lower() in PRIORITY_MODELS:
                 continue
             if slotinfo is None:
@@ -243,6 +265,22 @@ def filter_deployment_storage(disks, storagespec, slotinfo=None):
         raise Exception("No disks match deployment.storage specification: {0}".format(storagespec))
     return disks
 
+def attach_member_disks(disks):
+    for disk in disks:
+        num_vroc_members = len(getattr(disk, 'vrocmembers', []))
+        for vrocmember in getattr(disk, 'vrocmembers', []):
+            for memberdisk in disks:
+                if memberdisk.name == vrocmember:
+                    memberdisk.in_vroc = True
+                    if memberdisk.is_m2:
+                        disk.is_m2 = True
+                    else:
+                        if num_vroc_members == 2 and 'nvme' in vrocmember:
+                            # This is not assured, but is likely
+                            # Unfortunately, some VMD configurations blow past any way to detect form factor
+                            # as DMI table may not include
+                            disk.is_m2 = True
+                    
 
 def main():
     disks = []
@@ -255,6 +293,7 @@ def main():
             pass
         except Exception as e:
             print("Skipping {0}: {1}".format(disk, str(e)))
+    attach_member_disks(disks)
     disks = filter_deployment_storage(disks, get_deployment_storage(), slotinfo=slotinfo)
     nd = [x.name for x in sorted(disks, key=lambda x: [x.priority, x.size])]
     if nd:
