@@ -170,27 +170,35 @@ class SyncList(object):
 async def sync_list_to_node(sl, node, suffixes, peerip=None):
     targdir = tempfile.mkdtemp('.syncto{}'.format(node))
     output = ''
+    correctionlist = []
     try:
         for ent in sl.replacemap:
-            stage_ent(sl.replacemap, ent, targdir)
+            stage_ent(sl.replacemap, ent, targdir, correctionlist=correctionlist)
         if 'append' in suffixes:
             while suffixes['append'] and suffixes['append'][0] == '/':
                 suffixes['append'] = suffixes['append'][1:]
             for ent in sl.appendmap:
                 stage_ent(sl.appendmap, ent,
-                          os.path.join(targdir, suffixes['append']))
+                          os.path.join(targdir, suffixes['append']), correctionlist=correctionlist)
         if 'merge' in suffixes:
             while suffixes['merge'] and suffixes['merge'][0] == '/':
                 suffixes['merge'] = suffixes['merge'][1:]
             for ent in sl.mergemap:
                 stage_ent(sl.mergemap, ent,
-                          os.path.join(targdir, suffixes['merge']), True)
+                          os.path.join(targdir, suffixes['merge']), True, correctionlist=correctionlist)
         if 'appendonce' in suffixes:
             while suffixes['appendonce'] and suffixes['appendonce'][0] == '/':
                 suffixes['appendonce'] = suffixes['appendonce'][1:]
             for ent in sl.appendoncemap:
                 stage_ent(sl.appendoncemap, ent,
-                          os.path.join(targdir, suffixes['appendonce']), True)
+                          os.path.join(targdir, suffixes['appendonce']), True, correctionlist=correctionlist)
+        for correction in correctionlist:
+            source, destination, srcstat = correction
+            shutil.copystat(source, destination)
+            try:
+                os.chown(destination, srcstat.st_uid, srcstat.st_gid)
+            except OSError:  # lacking CAP_CHOWN, leave it owned by daemon
+                pass
         filelist = []
         for root, dirs, files in os.walk(targdir):
             if not dirs and not files and root != targdir:
@@ -238,6 +246,8 @@ async def sync_list_to_node(sl, node, suffixes, peerip=None):
         else:
             raise
     finally:
+        for root, dirnames, filenames in os.walk(targdir):
+            os.chown(root, os.getuid(), -1)
         shutil.rmtree(targdir)
     if not isinstance(output, str):
         output = output.decode('utf8')
@@ -247,7 +257,7 @@ async def sync_list_to_node(sl, node, suffixes, peerip=None):
     }
     return retval # need dictionary with output and options
 
-def stage_ent(currmap, ent, targdir, appendexist=False):
+def stage_ent(currmap, ent, targdir, appendexist=False, correctionlist=None):
     dst = currmap[ent]
     everyfent = []
     allfents = ent.split()
@@ -267,24 +277,21 @@ def stage_ent(currmap, ent, targdir, appendexist=False):
             'Multiple files match {}, {} needs a trailing slash to indicate a directory'.format(ent, dst))
     fulltarg = os.path.join(targdir, dst)
     for targ in everyfent:
-        mkpathorlink(targ, fulltarg, appendexist)
+        mkpathorlink(targ, fulltarg, appendexist, correctionlist)
 
-def mkpathorlink(source, destination, appendexist=False):
+def mkpathorlink(source, destination, appendexist=False, correctionlist=None):
     if os.path.isdir(source):
         mkdirp(destination)
         # Files are staged as symlinks, so rsync reads their attributes
         # through to the real file, but a directory is staged as a directory
         # and has to be given the source attributes to pass them along.
         srcstat = os.stat(source)
-        shutil.copystat(source, destination)
-        try:
-            os.chown(destination, srcstat.st_uid, srcstat.st_gid)
-        except OSError:  # lacking CAP_CHOWN, leave it owned by the daemon
-            pass
+        if correctionlist is not None:
+            correctionlist.append((source, destination, srcstat))
         for ent in os.listdir(source):
             currsrc = os.path.join(source, ent)
             currdst = os.path.join(destination, ent)
-            mkpathorlink(currsrc, currdst)
+            mkpathorlink(currsrc, currdst, appendexist, correctionlist)
     else:
         if destination[-1] == '/':
             mkdirp(destination)
