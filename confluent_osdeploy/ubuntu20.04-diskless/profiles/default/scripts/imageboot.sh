@@ -5,6 +5,9 @@ if [ -n "$1" ] && [ -d "$1" ]; then
     if [ -e "$mbimntpoint/confluent/rootimg.sfs" ]; then
         rootimg="$mbimntpoint/confluent/rootimg.sfs"
     fi
+    if [ -e "$mbimntpoint/confluent/private/rootimg.key" ]; then
+        cp "$mbimntpoint/confluent/private/rootimg.key" /tmp/rootimg.key
+    fi
 fi
 if [ -z "$rootimg" ]; then
     for addr in $(grep ^MANAGER: /etc/confluent/confluent.info|awk '{print $2}'|sed -e s/%/%25/); do
@@ -33,10 +36,12 @@ export mountsrc=$loopdev
 losetup -r $loopdev /mnt/remoteimg/rootimg.sfs
 confluent_nodename=$(grep ^NODENAME: /etc/confluent/confluent.info |awk '{print $2}')
 if grep '^Format: confluent_crypted' /tmp/rootimg.info > /dev/null; then
-    while ! curl -sf -H "CONFLUENT_NODENAME: $confluent_nodename" -H "CONFLUENT_APIKEY: $(cat /etc/confluent/confluent.apikey)" https://$confluent_mgr/confluent-api/self/profileprivate/pending/rootimg.key > /tmp/rootimg.key; do
-        echo "Unable to retrieve private key from $confluent_mgr (verify that confluent can access /var/lib/confluent/private/os/$confluent_profile/pending/rootimg.key)"
-        sleep 1
-    done
+    if [ ! -s /tmp/rootimg.key ]; then
+        while ! curl -sf -H "CONFLUENT_NODENAME: $confluent_nodename" -H "CONFLUENT_APIKEY: $(cat /etc/confluent/confluent.apikey)" https://$confluent_mgr/confluent-api/self/profileprivate/pending/rootimg.key > /tmp/rootimg.key; do
+            echo "Unable to retrieve private key from $confluent_mgr (verify that confluent can access /var/lib/confluent/private/os/$confluent_profile/pending/rootimg.key)"
+            sleep 1
+        done
+    fi
     cipher=$(head -n 1 /tmp/rootimg.key)
     key=$(tail -n 1 /tmp/rootimg.key)
     len=$(ls -l /mnt/remoteimg/rootimg.sfs | awk '{print $3}')
