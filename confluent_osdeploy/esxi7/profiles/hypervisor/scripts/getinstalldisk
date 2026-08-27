@@ -89,6 +89,7 @@ class DiskInfo(object):
         self.model = devinfo.get('model', 'Unknown')
         self.driver = devinfo.get('adapter_driver', 'Unknown')
         self.size = devinfo.get('size', 0)  # in MiB
+        self.m2_slot = devinfo.get('m2_slot', None)
         if not devinfo.get('is_local', False):
             raise SilentException("Not local")
         if devinfo.get('is_removable', False):
@@ -108,6 +109,8 @@ class DiskInfo(object):
 
     @property
     def priority(self):
+        if self.m2_slot:
+            return 0
         if self.model.lower() in PRIORITY_MODELS:
             return 0
         if self.driver == 'vmw_ahci':
