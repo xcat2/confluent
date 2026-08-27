@@ -86,15 +86,7 @@ PRIORITY_MODELS = ('m.2 nvme 2-bay raid kit',
                    'raid_b540i-2i',
                    'raid b545i-2i',
                    'raid b545i-2i',
-                   'raid_b545-2i',
-                   'raid 930-16i-4gb',
-                   'raid_930-16i-4gb',
-                   'raid 930-24i-4gb',                   
-                   'raid_930-24i-4gb',
-                   'raid 940-16i 4gb',
-                   'raid_940-16i_4gb',
-                   'raid 940-16i 8gb',
-                   'raid_940-16i_8gb')
+                   'raid_b545-2i')
 
 class DiskInfo(object):
     def __init__(self, devname, devinfo, storagespec=None):
