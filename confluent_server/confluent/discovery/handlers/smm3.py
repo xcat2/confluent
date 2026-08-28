@@ -22,7 +22,7 @@ class NodeHandler(redfishbmc.NodeHandler):
     maxmacs = 18  # support an enclosure, but try to avoid catching daisy chain
     is_enclosure = True
 
-    def scan(self):
+    async def scan(self):
         attrs = self.info.get('attributes', {})
         mtm = attrs.get('enclosure-machinetype-model', None)
         if mtm:
