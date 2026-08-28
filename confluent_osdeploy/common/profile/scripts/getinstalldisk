@@ -14,6 +14,7 @@ PRIORITY_MODELS = ('m.2 nvme 2-bay raid kit',
                    'thinksystem m.2',
                    'thinksystem_m.2',
                    'thinksystem 7mm',
+                   'thinksystem_7mm',
                    'thinksystem_7mm_vd',                  
                    'b540p-2hs',  # 7mm or M.2 in rear
                    'b540d-2hs',  # M.2 in E3.S or 2.5inch
@@ -28,6 +29,8 @@ PRIORITY_MODELS = ('m.2 nvme 2-bay raid kit',
                    'raid b545i-2i',
                    'raid b545i-2i',
                    'raid_b545-2i')
+
+BOOT_SLOT_KEYWORDS = ('m.2 socket', '7mm')
 
 class DiskInfo(object):
     def __init__(self, devname, slotinfo=None):
@@ -199,7 +202,9 @@ def get_m2_slot_info():
     slots = get_dmi_type9_info()
     m2slots = {}
     for slot in slots.values():
-        if 'm.2 socket' not in slot.get('type', '').lower():
+        label = '{0} {1}'.format(
+            slot.get('type', ''), slot.get('designation', '')).lower()
+        if not any(x in label for x in BOOT_SLOT_KEYWORDS):
             continue
         busaddr = slot.get('bus_address', None)
         if not busaddr:

@@ -73,6 +73,7 @@ PRIORITY_MODELS = ('m.2 nvme 2-bay raid kit',
                    'thinksystem m.2',
                    'thinksystem_m.2',
                    'thinksystem 7mm',
+                   'thinksystem_7mm',
                    'thinksystem_7mm_vd',                  
                    'b540p-2hs',  # 7mm or M.2 in rear
                    'b540d-2hs',  # M.2 in E3.S or 2.5inch
