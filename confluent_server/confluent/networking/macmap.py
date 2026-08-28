@@ -219,14 +219,8 @@ def _fast_backend_fixup(macs, switch):
                 else:
                     _nodesbymac[mac] = (nodename, nummacs)
 
-startuplock = None
 async def _offload_map_switch(switch, password, user, privprotocol=None):
-    if _offloader is None:
-        global startuplock
-        if startuplock is None:
-            startuplock = asyncio.Lock()
-        async with startuplock:
-            await _start_offloader()
+    await _ensure_offloader_started()
     evtid = random.randint(0, 4294967295)
     while evtid in _offloadevts:
         evtid = random.randint(0, 4294967295)
@@ -245,15 +239,23 @@ async def _offload_map_switch(switch, password, user, privprotocol=None):
     return result
 
 
-async def _start_offloader():
+startuplock = None
+
+
+async def _ensure_offloader_started():
     global _offloader
-    #_offloader = subprocess.Popen(
-    #    [sys.executable, __file__, '-o'], bufsize=0, stdin=subprocess.PIPE,
-    #    stdout=subprocess.PIPE)
-    _offloader = await asyncio.subprocess.create_subprocess_exec(sys.executable, __file__, '-o', stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE)
-    #fl = fcntl.fcntl(_offloader.stdout.fileno(), fcntl.F_GETFL)
-    #fcntl.fcntl(_offloader.stdout.fileno(),
-    #            fcntl.F_SETFL, fl | os.O_NONBLOCK)
+    global startuplock
+    if _offloader:
+        return
+    if startuplock is None:
+        startuplock = asyncio.Lock()
+    async with startuplock:  # ensure only one offloader is started at a time
+        if _offloader:
+            return
+        _offloader = await asyncio.subprocess.create_subprocess_exec(sys.executable, __file__, '-o', stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE)
+        #fl = fcntl.fcntl(_offloader.stdout.fileno(), fcntl.F_GETFL)
+        #fcntl.fcntl(_offloader.stdout.fileno(),
+        #            fcntl.F_SETFL, fl | os.O_NONBLOCK)
     asyncio.get_running_loop().create_task(_recv_offload())
 
 
