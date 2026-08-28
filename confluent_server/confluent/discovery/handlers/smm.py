@@ -72,7 +72,7 @@ class NodeHandler(bmchandler.NodeHandler):
     devname = 'SMM'
     maxmacs = 14  # support an enclosure, but try to avoid catching daisy chain
 
-    def scan(self):
+    async def scan(self):
         # the UUID is in a weird order, fix it up to match
         # ipmi return and property value
         uuid = self.info.get('attributes', {}).get('uuid', None)

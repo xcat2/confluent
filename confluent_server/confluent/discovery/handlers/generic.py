@@ -96,7 +96,7 @@ class NodeHandler(object):
         # A no-op by default
         return
 
-    def scan(self):
+    async def scan(self):
         # Do completely passive things to enhance data.
         # Probe is permitted to for example attempt a login
         # scan *only* does what it can without a login attempt

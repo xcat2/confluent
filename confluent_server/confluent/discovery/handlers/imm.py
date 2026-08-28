@@ -28,7 +28,7 @@ class NodeHandler(bmchandler.NodeHandler):
         # This is not adequate for being satisfied
         return bool(info.get('attributes', {}))
 
-    def scan(self):
+    async def scan(self):
         slpattrs = self.info.get('attributes', {})
         self.isdense = False
         try:
@@ -75,7 +75,7 @@ class NodeHandler(bmchandler.NodeHandler):
 
     async def probe(self):
         if self.info.get('enclosure.bay', 0) == 0:
-            self.scan()
+            await self.scan()
         if self.info.get('enclosure.bay', 0) != 0:
             # scan has already populated info
             return
