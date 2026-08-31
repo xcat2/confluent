@@ -107,7 +107,7 @@ def sensorpass(showout=True, appendtime=False):
             if 'error' in reading:
                 sys.stderr.write('Error: {0}\n'.format(reading['error']))
                 if 'errorcode' in reading:
-                    exitcode |= exitcode
+                    exitcode |= reading['errorcode']
                 else:
                     exitcode |= 1
             if 'databynode' not in reading:
@@ -120,6 +120,10 @@ def sensorpass(showout=True, appendtime=False):
                     sys.stderr.write(
                         '{0}: Error: {1}\n'.format(node,
                                                    reading[node]['error']))
+                    if 'errorcode' in reading[node]:
+                        exitcode |= reading[node]['errorcode']
+                    else:
+                        exitcode |= 1
                 if 'sensors' not in reading[node]:
                     continue
                 for sensedata in reading[node]['sensors']:
@@ -261,3 +265,6 @@ try:
 except KeyboardInterrupt:
     print('')
     sys.exit(0)
+# Falling off the end exited 0 whatever sensorpass recorded, so only the
+# --interval path ever reported a failed read.
+sys.exit(exitcode)

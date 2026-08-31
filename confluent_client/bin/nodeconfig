@@ -327,7 +327,7 @@ async def main():
             else:
                 path = '/noderange/{0}/configuration/system/advanced'.format(
                     noderange)
-            rcode = await client.print_attrib_path(path, session, printsys,
+            rcode |= await client.print_attrib_path(path, session, printsys,
                                             options)
     sys.exit(rcode)
 
