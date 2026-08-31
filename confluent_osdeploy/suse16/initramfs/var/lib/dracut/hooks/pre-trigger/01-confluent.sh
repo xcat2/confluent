@@ -37,6 +37,14 @@ while [ ! -e /dev/disk/by-label ] && [ $TRIES -gt 0 ]; do
     sleep 2
     TRIES=$((TRIES - 1))
 done
+if [ -e /dev/disk/by-label ]; then
+    # We detected disks, but CNFLNT_IDNT may be slower than other devices to appear
+    TRIES=3
+    while [ ! -e /dev/disk/by-label/CNFLNT_IDNT ] && [ $TRIES -gt 0 ]; do
+        sleep 1
+        TRIES=$((TRIES - 1))
+    done
+fi
 if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
     tmnt=/tmp/idntmnt
     mkdir -p $tmnt
@@ -224,6 +232,7 @@ echo $ifname > /run/confluent/ifname
 dnsdomain=$(grep ^dnsdomain: /etc/confluent/confluent.deploycfg)
 dnsdomain=${dnsdomain#dnsdomain: }
 hostname=$nodename
+hostname $nodename
 if [ ! -z "$dnsdomain" ] && [ "$dnsdomain" != "null" ]; then
     hostname=$hostname.$dnsdomain
 fi
