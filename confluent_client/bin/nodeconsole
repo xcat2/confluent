@@ -379,7 +379,7 @@ class InputHandler:
             self.seqtimeout = asyncio.create_task(self.timeout_sequence(10))  # extend timeout to navigate options
             return
         elif self.buffer == '\x05ck':
-            set_extra_text('Keystrokes: d: Ctrl-Alt-Delete, 1: Ctrl-Alt-F1, 2: Ctrl-Alt-F2, 3: Ctrl-Alt-F3, 4: Ctrl-Alt-F4, w: Win)
+            set_extra_text('Keystrokes: d: Ctrl-Alt-Delete, 1: Ctrl-Alt-F1, 2: Ctrl-Alt-F2, 3: Ctrl-Alt-F3, 4: Ctrl-Alt-F4, w: Win')
             self.seqtimeout = asyncio.create_task(self.timeout_sequence(10))  # extend timeout to navigate options
         elif self.buffer == '\x05ck1':
             await relay_keypresses(SpecialKeys.F1, modifiers=[SpecialKeys.CTRL, SpecialKeys.ALT])  # Ctrl-Alt-F1
