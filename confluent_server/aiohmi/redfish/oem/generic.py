@@ -789,11 +789,14 @@ class OEMHandler(object):
                     meminfo = sysinfo['MemorySummary']
                     meminfo['Name'] = 'Memory'
                     summary['badreadings'].append(SensorReading(meminfo))
-            for adapter in sysinfo['PCIeDevices']:
+            # Both are optional in Redfish. A PDU or a cooling unit has no
+            # PCIe at all, and indexing them raised KeyError out of a health
+            # read.
+            for adapter in sysinfo.get('PCIeDevices', []):
                 adpinfo = await fishclient._do_web_request(adapter['@odata.id'])
                 if adpinfo['Status']['Health'] not in ('OK', None):
                     summary['badreadings'].append(SensorReading(adpinfo))
-            for fun in sysinfo['PCIeFunctions']:
+            for fun in sysinfo.get('PCIeFunctions', []):
                 funinfo = await fishclient._do_web_request(fun['@odata.id'])
                 if funinfo['Status']['Health'] not in ('OK', None):
                     summary['badreadings'].append(SensorReading(funinfo))
