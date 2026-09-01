@@ -232,7 +232,6 @@ echo $ifname > /run/confluent/ifname
 dnsdomain=$(grep ^dnsdomain: /etc/confluent/confluent.deploycfg)
 dnsdomain=${dnsdomain#dnsdomain: }
 hostname=$nodename
-hostname $nodename
 if [ ! -z "$dnsdomain" ] && [ "$dnsdomain" != "null" ]; then
     hostname=$hostname.$dnsdomain
 fi

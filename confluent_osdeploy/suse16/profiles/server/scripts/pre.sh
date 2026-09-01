@@ -32,6 +32,7 @@ if [[ "$deployserver" == *":"* ]]; then
     deployserver="[$deployserver]"
 fi
 source /etc/confluent/functions
+hostname $(grep ^NODENAME: /etc/confluent/confluent.info|awk '{print $2}')
 run_remote_parts pre.d
 sed -i s!%%DEPLOYER%%!$deployserver!g /tmp/autoinstall.json
 sed -i s!%%PROFILE%%!$(grep ^profile: /etc/confluent/confluent.deploycfg|awk '{print $2}')!g /tmp/autoinstall.json
