@@ -52,3 +52,4 @@ manual_add_modules raid10 raid456 dm-raid dm-thin-pool dm-crypt dm-snapshot
 manual_add_modules linear dm-era fuse overlay squashfs loop zram
 manual_add_modules vmxnet3 r8169
 manual_add_modules xen-netfront xen-blkfront xen-pcifront
+manual_add_modules nls_iso8859-1  # vfat support

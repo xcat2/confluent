@@ -106,7 +106,7 @@ cat /tls/*.pem > /etc/confluent/ca.pem
 if [ -e /dev/disk/by-label/CNFLNT_MBI ]; then  # media based image
     mbimntpoint=$(mktemp -d)
     mount /dev/disk/by-label/CNFLNT_MBI $mbimntpoint
-    echo EXTMGRINFO: media||1 > /etc/confluent/confluent.info
+    echo 'EXTMGRINFO: media||1' > /etc/confluent/confluent.info
 else
     /opt/confluent/bin/copernicus -t > /etc/confluent/confluent.info
 fi
@@ -116,7 +116,7 @@ while ! grep ^EXTMGRINFO: /etc/confluent/confluent.info | awk -F'|' '{print $3}'
     if [ -e /dev/disk/by-label/CNFLNT_MBI ]; then
         mbimntpoint=$(mktemp -d)
         mount /dev/disk/by-label/CNFLNT_MBI $mbimntpoint
-        echo EXTMGRINFO: media||1 > /etc/confluent/confluent.info
+        echo 'EXTMGRINFO: media||1' > /etc/confluent/confluent.info
         break
     fi
     /opt/confluent/bin/copernicus -t > /etc/confluent/confluent.info
