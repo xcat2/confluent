@@ -820,6 +820,11 @@ class Command(object):
     async def _get_bmc_nic_url(self, name=None):
         bmcinfo = await self._do_web_request(await self.get_bmcurl())
         nicurl = bmcinfo.get('EthernetInterfaces', {}).get('@odata.id', None)
+        if not nicurl:
+            # Also optional. The None went straight into a request and
+            # raised TypeError out of the url library.
+            raise exc.UnsupportedFunctionality(
+                'BMC publishes no network interface collection of its own')
         niclist = await self._do_web_request(nicurl)
         candidates = []
         oem = await self.oem()
