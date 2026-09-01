@@ -821,8 +821,7 @@ class Command(object):
         bmcinfo = await self._do_web_request(await self.get_bmcurl())
         nicurl = bmcinfo.get('EthernetInterfaces', {}).get('@odata.id', None)
         niclist = await self._do_web_request(nicurl)
-        foundnics = 0
-        lastnicurl = None
+        candidates = []
         oem = await self.oem()
         for nic in niclist.get('Members', []):
             curl = nic.get('@odata.id', None)
@@ -852,13 +851,26 @@ class Command(object):
                     socket.AF_INET6, addrs.get('Address', '::'))
                 if self._bmcv6ip == v6addr:
                     return curl
-            foundnics += 1
-            lastnicurl = curl
-        if name is None and foundnics != 1:
-            raise exc.PyghmiException(
-                'BMC does not have exactly one interface')
-        if name is None:
-            return lastnicurl
+            candidates.append(curl)
+        if name is not None:
+            return None
+        if len(candidates) == 1:
+            return candidates[0]
+        # UnsupportedFunctionality, not the bare base class, which confluent
+        # maps through its generic handler and shows as "Unexpected Error".
+        if not candidates:
+            raise exc.UnsupportedFunctionality(
+                'BMC published no enabled network interface of its own')
+        # Several NICs is ordinary. Reaching here means the address this
+        # session came in on matched none of them, which a tunnel or a NAT
+        # does, and picking one to reconfigure would be a guess. Every caller
+        # takes a name.
+        raise exc.UnsupportedFunctionality(
+            'BMC has {0} enabled interfaces and none of them carries the '
+            'address this session connected to, so which one is meant cannot '
+            'be determined. Name one of: {1}'.format(
+                len(candidates),
+                ', '.join(url.rsplit('/', 1)[-1] for url in candidates)))
 
     async def _bmcresetinfo(self):
         if not self._varresetbmcurl:
