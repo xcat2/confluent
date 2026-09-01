@@ -158,6 +158,7 @@ class SpecialKeys(enum.Enum):
     HOME = 0xff50
     END = 0xff57
     ESC = 0xff1b
+    WIN = 0xffeb
 
 extratextbynode = {}
 focustext = ''
@@ -374,10 +375,31 @@ class InputHandler:
             await relay_keypresses(self.buffer[1:])
             self.reset_input_context()
         if self.buffer == '\x05c':
-            set_extra_text('Commands: q:exit, p:power, f:input focus, b:sysrq, ^c:abort') 
+            set_extra_text('Commands: q:exit, p:power, f:input focus, b:sysrq, k:keystroke, ^c:abort') 
             self.seqtimeout = asyncio.create_task(self.timeout_sequence(10))  # extend timeout to navigate options
             return
-        if '\x05cb' == self.buffer: # send break
+        elif self.buffer == '\x05ck':
+            set_extra_text('Keystrokes: d: Ctrl-Alt-Delete, 1: Ctrl-Alt-F1, 2: Ctrl-Alt-F2, 3: Ctrl-Alt-F3, 4: Ctrl-Alt-F4, w: Win)
+            self.seqtimeout = asyncio.create_task(self.timeout_sequence(10))  # extend timeout to navigate options
+        elif self.buffer == '\x05ck1':
+            await relay_keypresses(SpecialKeys.F1, modifiers=[SpecialKeys.CTRL, SpecialKeys.ALT])  # Ctrl-Alt-F1
+            self.reset_input_context()
+        elif self.buffer == '\x05ck2':
+            await relay_keypresses(SpecialKeys.F2, modifiers=[SpecialKeys.CTRL, SpecialKeys.ALT])  # Ctrl-Alt-F2
+            self.reset_input_context()
+        elif self.buffer == '\x05ck3':
+            await relay_keypresses(SpecialKeys.F3, modifiers=[SpecialKeys.CTRL, SpecialKeys.ALT])  # Ctrl-Alt-F3
+            self.reset_input_context()
+        elif self.buffer == '\x05ck4':
+            await relay_keypresses(SpecialKeys.F4, modifiers=[SpecialKeys.CTRL, SpecialKeys.ALT])  # Ctrl-Alt-F4
+            self.reset_input_context()
+        elif self.buffer == '\x05ckd':
+            await relay_keypresses(SpecialKeys.DELETE, modifiers=[SpecialKeys.CTRL, SpecialKeys.ALT])  # Ctrl-Alt-Delete
+            self.reset_input_context()
+        elif self.buffer == '\x05ckw':
+            await relay_keypresses(SpecialKeys.WIN)  # Ctrl-Alt-Win
+            self.reset_input_context()
+        elif '\x05cb' == self.buffer: # send break
             # but we need to know more, so wait for the next key
             set_extra_text('Enter sysrq command key (or <ESC> to abort)')
             self.seqtimeout = asyncio.create_task(self.timeout_sequence())
