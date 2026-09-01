@@ -1794,7 +1794,14 @@ class OEMHandler(object):
                 errmsg = ','.join(errmsg)
                 raise exc.RedfishError(errmsg)
             except (ValueError, KeyError):
-                raise exc.PyghmiException(str(url) + ":" + res[0])
+                # Reached by an html 404 page, or anything else that is not
+                # the JSON error document. res[0] is bytes there, so building
+                # the message crashed and the caller saw that TypeError
+                # instead of the status and the body.
+                body = res[0]
+                if isinstance(body, bytes):
+                    body = body.decode('utf-8', errors='replace')
+                raise exc.PyghmiException('{0}:{1}'.format(url, body))
         if payload is None and method is None:
             self._urlcache[url] = {
                 'contents': res[0],

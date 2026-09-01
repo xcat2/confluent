@@ -147,8 +147,12 @@ def _eval_conditional(expression, cfg, setting):
 class LenovoFirmwareConfig(object):
     def __init__(self, xc, useipmi=True):
         if not etree:
-            raise Exception("python-lxml and python-eficompressor required "
-                            "for this function")
+            # Not a bare Exception. Confluent has no handler for one, so a
+            # missing optional dependency showed as "Unexpected Error" and hid
+            # the message below, which already names what to install.
+            raise pygexc.UnsupportedFunctionality(
+                "python-lxml and python-eficompressor required "
+                "for this function")
         if useipmi:
             self.connection = xc.ipmicmd
         else:
