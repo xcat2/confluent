@@ -44,7 +44,11 @@ if grep '^Format: confluent_crypted' /tmp/rootimg.info > /dev/null; then
     fi
     cipher=$(head -n 1 /tmp/rootimg.key)
     key=$(tail -n 1 /tmp/rootimg.key)
-    len=$(ls -l /mnt/remoteimg/rootimg.sfs | awk '{print $3}')
+    rootimgfile=/mnt/remoteimg/rootimg.sfs
+    while [ -L "$rootimgfile" ]; do
+        rootimgfile=$(readlink -f "$rootimgfile")
+    done
+    len=$(ls -l $rootimgfile | awk '{print $3}')
     len=$(((len-4096)/512))
     dmsetup create cryptimg --table "0 $len crypt $cipher $key 0 $loopdev 8"
     /opt/confluent/bin/confluent_imginfo /dev/mapper/cryptimg > /tmp/rootimg.info
