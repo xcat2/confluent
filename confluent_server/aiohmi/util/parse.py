@@ -42,9 +42,10 @@ def parse_time(timeval):
             secs = secs * 60 * positive
             ms = None
             if '.' in timeval:
-                timeval, ms = timeval.split('.', 1)
-                ms = int(ms)
-                ms = timedelta(0, 0, 0, ms)
+                # A decimal fraction of a second. Read as whole
+                # milliseconds, '.5' came out as five of them.
+                timeval, fraction = timeval.split('.', 1)
+                ms = timedelta(seconds=float('0.' + fraction))
             retval = datetime.strptime(timeval, '%Y-%m-%dT%H:%M:%S')
             if ms:
                 retval += ms
