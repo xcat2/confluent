@@ -1150,6 +1150,18 @@ class OEMHandler(generic.OEMHandler):
             self.weblogging = False
         return self._wc
 
+    async def wc_if_available(self):
+        """The web client, or None where carrying on without it is meant.
+
+        Four inventory reads answer partially when the web interface is out of
+        reach, and used to say so by checking wc() for None. wc() refuses now,
+        so they ask here instead.
+        """
+        try:
+            return await self.wc()
+        except pygexc.UnsupportedFunctionality:
+            return None
+
     async def get_webclient(self, login=True):
         wc = self.webclient.dupe()
         wc.vintage = util._monotonic_time()
@@ -1179,6 +1191,12 @@ class OEMHandler(generic.OEMHandler):
                     wc.set_header('X-XSRF-TOKEN', cookie.value)
                     break
             return wc
+        # Falling off the end returned None, which wc() handed to thirty
+        # call sites that use it unchecked. The status separates firmware
+        # with no web api, answering 404, from credentials it will not take.
+        raise pygexc.UnsupportedFunctionality(
+            'the XCC web interface, which this operation needs beside '
+            'Redfish, did not accept a login (HTTP {0})'.format(status))
 
     async def grab_redfish_response_with_status(self, url, body=None, method=None):
         wc = self.webclient
@@ -1818,7 +1836,7 @@ class OEMHandler(generic.OEMHandler):
             if self.updating:
                 raise pygexc.TemporaryError(
                     'Cannot read extended inventory during firmware update')
-            wc = await self.wc()
+            wc = await self.wc_if_available()
             if wc:
                 adapterdata = await wc.grab_json_response(self.ADP_URL)
                 if adapterdata:
@@ -1897,7 +1915,7 @@ class OEMHandler(generic.OEMHandler):
         # mode 0 is firmware, 1 is hardware
         storagedata = self.get_cached_data('lenovo_cached_storage')
         if not storagedata:
-            wc = await self.wc()
+            wc = await self.wc_if_available()
             if wc:
                 storagedata = await wc.grab_json_response(
                     '/api/function/raid_alldevices?params=storage_GetAllDisks')
@@ -1926,7 +1944,7 @@ class OEMHandler(generic.OEMHandler):
     async def _get_cpu_inventory(self):
         procdata = self.get_cached_data('lenovo_cached_proc')
         if not procdata:
-            wc = await self.wc()
+            wc = await self.wc_if_available()
             if wc:
                 procdata = await wc.grab_json_response(
                     '/api/dataset/imm_processors')
@@ -1944,7 +1962,7 @@ class OEMHandler(generic.OEMHandler):
     async def _get_mem_inventory(self):
         memdata = self.get_cached_data('lenovo_cached_memory')
         if not memdata:
-            wc = await self.wc()
+            wc = await self.wc_if_available()
             if wc:
                 memdata = await wc.grab_json_response(
                     '/api/dataset/imm_memory')
