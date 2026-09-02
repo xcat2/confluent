@@ -501,6 +501,18 @@ class Command(object):
                     'BMC does not implement extended firmware information')
         return self._varfwinventory
 
+    def _system_url(self):
+        """The system this client acts on, or a refusal that says so.
+
+        Power and cooling equipment publishes no Systems collection, which is
+        legal. sysurl is then None, and handing that to a request raised
+        TypeError from inside the url library.
+        """
+        if not self.sysurl:
+            raise exc.UnsupportedFunctionality(
+                'this service publishes no computer system to act on')
+        return self.sysurl
+
     async def sysinfo(self):
         if not self.sysurl:
             return {}
@@ -517,7 +529,7 @@ class Command(object):
         return await self._do_web_request(bmcurl)
 
     async def get_power(self):
-        currinfo = await self._do_web_request(self.sysurl, cache=False)
+        currinfo = await self._do_web_request(self._system_url(), cache=False)
         return {'powerstate': str(currinfo['PowerState'].lower())}
 
     async def reseat_bay(self, bay):
@@ -640,7 +652,7 @@ class Command(object):
         :raises: PyghmiException on error
         :returns: dict
         """
-        result = await self._do_web_request(self.sysurl)
+        result = await self._do_web_request(self._system_url())
         overridestate = result.get('Boot', {}).get(
             'BootSourceOverrideEnabled', None)
         if overridestate == 'Disabled':
