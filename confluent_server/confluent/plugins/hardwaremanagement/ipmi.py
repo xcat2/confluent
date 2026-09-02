@@ -1482,8 +1482,13 @@ class IpmiHandler:
                 node=self.node, state=self.inputdata.inputbynode[self.node]))
             return
         elif 'read' == self.op:
-            # ipmi has identify as read-only for now
-            await self.output.put(msg.IdentifyState(node=self.node, state=''))
+            # IPMI can set the identify light but has no command to read it
+            # back, so aiohmi offers no get_identify. This used to answer an
+            # empty state, which nodeidentify prints as the node name and
+            # nothing else, exit 0.
+            await self.output.put(msg.ConfluentNodeError(
+                self.node,
+                'IPMI provides no way to read the identify state'))
             return
 
     async def power(self):
