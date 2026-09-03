@@ -605,8 +605,12 @@ class Command(object):
             if hasattr(self._oem, 'init_sdr'):
                 self._sdr = await self._oem.init_sdr()
             else:
-                self._sdr = sdr.SDR(self, self._sdrcachedir)
-                await self._sdr.initialize()
+                # Assigned only once it is built. Assigning first meant a
+                # failed initialize left the half built object cached, and
+                # every later call returned that instead of retrying.
+                newsdr = sdr.SDR(self, self._sdrcachedir)
+                await newsdr.initialize()
+                self._sdr = newsdr
         return self._sdr
 
     async def get_event_constants(self):
