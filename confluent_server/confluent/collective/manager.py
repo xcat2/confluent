@@ -565,7 +565,7 @@ async def handle_connection(connection, cert, request, local=False):
                                 {'error': 'Refusing, my name is better',
                                 'txcount': cfm._txcount,})
                             return
-        if follower is not None and not follower.dead:
+        if follower is not None and not follower.done():
             await tlvdata.send(
                 connection,
                 {'error': 'Already following, assimilate leader first',
@@ -579,7 +579,7 @@ async def handle_connection(connection, cert, request, local=False):
             return
         cnn = tlvdata.get_socket(connection)
         if (currentleader == cnn.getpeername()[0] and
-                follower and not follower.dead):
+            follower and not follower.done()):
             # if we are happily following this leader already, don't stir
             # the pot
             await tlvdata.send(connection, {'status': 0})
