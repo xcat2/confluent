@@ -7,7 +7,7 @@ if [ "$discnum" != 1 ]; then exit 0; fi
 if [ -e $2/boot/kernel ]; then exit 0; fi
 profile=$(basename $2)
 
-sed -i 's/sle 15/SUSE Linux Enterprise 15/; s/opensuse_leap/openSUSE Leap/' $2/profile.yaml
+sed -i 's/sle 16/SUSE Linux Enterprise 16/; s/opensuse_leap/openSUSE Leap/' $2/profile.yaml
 ln -s $1/boot/x86_64/loader/linux $2/boot/kernel && \
 ln -s $1/boot/x86_64/loader/initrd $2/boot/initramfs/distribution && \
 mkdir -p $2/boot/efi/boot && \
