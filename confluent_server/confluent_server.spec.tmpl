@@ -56,10 +56,7 @@ python3 setup.py install --single-version-externally-managed -O1 --root=$RPM_BUI
 for file in $(grep confluent/__init__.py INSTALLED_FILES.bare); do
     rm $RPM_BUILD_ROOT/$file
 done
-grep -v confluent/__init__.py INSTALLED_FILES.bare | grep -v etc/init.d/confluent > INSTALLED_FILES
-rm $RPM_BUILD_ROOT/etc/init.d/confluent
-rmdir $RPM_BUILD_ROOT/etc/init.d
-rmdir $RPM_BUILD_ROOT/etc
+grep -v confluent/__init__.py INSTALLED_FILES.bare > INSTALLED_FILES
 # Only do non-root confluent if systemd of the platform supports it
 systemd-analyze verify $RPM_BUILD_ROOT/usr/lib/systemd/system/confluent.service 2>&1 | grep "'AmbientCapabilities'" > /dev/null && sed -e 's/User=.*//' -e 's/Group=.*//' -e 's/AmbientCapabilities=.*//' -i $RPM_BUILD_ROOT/usr/lib/systemd/system/confluent.service
 cat INSTALLED_FILES
