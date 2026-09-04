@@ -588,9 +588,10 @@ class SuseHandler(OsHandler):
     def __init__(self, name, version, arch, args):
         if not isinstance(version, str):
             version = version.decode('utf8')
-        if not version.startswith('15.'):
+        major = version.split('.', 1)[0]
+        if major not in ('15', '16'):
             raise Exception('Unsupported Suse version {}'.format(version))
-        self.oscategory = 'suse15'
+        self.oscategory = 'suse{0}'.format(major)
         super().__init__(name, version, arch, args)
         self.zyppargs = []
         self.sources = []
@@ -610,6 +611,15 @@ class SuseHandler(OsHandler):
         if enterprise:
             self.sources.append('file://' + os.path.join(sourcepath, 'Product-HPC'))
 
+    def zypper_cmd(self):
+        # 16's stock repo urls are written in terms of ${releasever}, which
+        # zypper resolves from the target root's os-release. That file does not
+        # exist yet when the first packages are installed, so say it outright.
+        cmd = ['zypper', '-R', self.targpath]
+        if self.version:
+            cmd.extend(['--releasever', self.version])
+        return cmd
+
     def prep_root(self, args):
         gpgkeys = []
         mkdirp(self.targpath)
@@ -617,8 +627,19 @@ class SuseHandler(OsHandler):
             gpgkeys = glob.glob('/usr/lib/rpm/gnupg/keys/*.asc')
             targzypp = os.path.join(self.targpath, 'etc/zypp')
             mkdirp(targzypp)
-            shutil.copytree(
-                '/etc/zypp/repos.d/', os.path.join(targzypp, 'repos.d'))
+            # 16 declares its repositories through a zypper service backed by
+            # a package-provided directory the target root does not have. Drop
+            # the service line so each definition stands on its own, otherwise
+            # zypper discards every one of them as an orphan.
+            targrepos = os.path.join(targzypp, 'repos.d')
+            mkdirp(targrepos)
+            for repofile in glob.glob('/etc/zypp/repos.d/*'):
+                with open(repofile) as repoin:
+                    cfg = [line for line in repoin.read().splitlines()
+                           if not line.startswith('service=')]
+                with open(os.path.join(
+                        targrepos, os.path.basename(repofile)), 'w') as repoout:
+                    repoout.write('\n'.join(cfg) + '\n')
         idx = 1
         for source in self.sources:
             if not source:
@@ -626,7 +647,7 @@ class SuseHandler(OsHandler):
             if source.startswith('file://'):
                 gpgpath = source.replace('file://', '')
                 gpgkeys.extend(glob.glob(os.path.join(gpgpath, '*/gpg-pubkey*.asc')))
-            subprocess.check_call(['zypper', '-R', self.targpath, 'ar', source, 'source-{}'.format(idx)])
+            subprocess.check_call(self.zypper_cmd() + ['ar', source, 'source-{}'.format(idx)])
             idx += 1
         if gpgkeys:
                 addkeycmd = ['rpm', '--root', self.targpath, '--import'] + gpgkeys
@@ -638,7 +659,7 @@ class SuseHandler(OsHandler):
                 if not source.startswith('/') and os.path.exists(os.path.abspath(source)):
                     source = os.path.abspath(source)
                 source = 'file://' + source
-                subprocess.check_call(['zypper', '-R', self.targpath, 'ar', source, 'source-{}'.format(idx)])
+                subprocess.check_call(self.zypper_cmd() + ['ar', source, 'source-{}'.format(idx)])
                 idx += 1
         mydir = get_mydir(self.oscategory)
         mkdirp(os.path.join(self.targpath, 'usr/lib/dracut/modules.d'))
@@ -652,10 +673,15 @@ class SuseHandler(OsHandler):
         cmd.extend(glob.glob(os.path.join(targdir, '*')))
         subprocess.check_call(cmd)
         if self._interactive:
-            subprocess.check_call(['zypper', '-R', self.targpath, 'install'] + self.zyppargs)
+            subprocess.check_call(self.zypper_cmd() + ['install'] + self.zyppargs)
         else:
-            subprocess.check_call(['zypper', '-n', '-R', self.targpath, 'install'] + self.zyppargs)
-        os.symlink('/usr/lib/systemd/system/sshd.service', os.path.join(self.targpath, 'etc/systemd/system/multi-user.target.wants/sshd.service'))
+            subprocess.check_call(self.zypper_cmd() + ['-n', 'install'] + self.zyppargs)
+        # 16's presets enable sshd already, so the link is often there
+        sshdwant = os.path.join(
+            self.targpath, 'etc/systemd/system/multi-user.target.wants/sshd.service')
+        mkdirp(os.path.dirname(sshdwant))
+        if not os.path.lexists(sshdwant):
+            os.symlink('/usr/lib/systemd/system/sshd.service', sshdwant)
         with open(os.path.join(self.targpath, 'etc/permissions.local'), 'a') as permout:
             permout.write(
                 '/usr/lib/ssh/ssh-keysign root:ssh_keys 2711\n'
@@ -675,7 +701,12 @@ class SuseHandler(OsHandler):
         if os.path.exists(os.path.join(self.targpath, 'sbin/mkinitrd')):
             args.cmd = ['mkinitrd']
         else:
-            args.cmd = ['dracut', '-f']
+            # dracut alone would build for the running kernel, which is the
+            # build host's, not the one just installed into the image. 16 has
+            # no mkinitrd to work that out, so name the kernel and the output.
+            kver = sorted(os.listdir(os.path.join(self.targpath, 'lib/modules')),
+                          key=versionize_string)[-1]
+            args.cmd = ['dracut', '-f', '/boot/initrd-{0}'.format(kver), kver]
         run_constrainedx(fancy_chroot, (args, self.targpath))
 
 
@@ -1297,7 +1328,7 @@ def fingerprint_source_suse(files, sourcepath, args):
                 if ': ' not in line:
                     continue
                 key, val = line.split(': ')
-                if key == 'category' and val == 'suse15':
+                if key == 'category' and val in ('suse15', 'suse16'):
                     issuse = True
                 if key == 'name':
                     osname, ver, arch = val.split('-')
@@ -1739,6 +1770,15 @@ def gather_bootloader(outdir, rootpath='/'):
         shimlocation = os.path.join(rootpath, 'usr/lib/shim/shimx64.efi.signed')
     if not os.path.exists(shimlocation):
         shimlocation = os.path.join(rootpath, 'usr/lib/shim/shimaa64.efi.signed.latest')
+    if not os.path.exists(shimlocation):
+        # SUSE 16 moved the efi payloads out of /usr/lib64/efi
+        shimlocation = os.path.join(rootpath, 'usr/share/efi/x86_64/shim.efi')
+        shimdestfilename = 'BOOTX64.EFI'
+    if not os.path.exists(shimlocation):
+        aa64shim = os.path.join(rootpath, 'usr/share/efi/aarch64/shim.efi')
+        if os.path.exists(aa64shim):
+            shimlocation = aa64shim
+            shimdestfilename = 'BOOTAA64.EFI'
     mkdirp(os.path.join(outdir, 'boot/efi/boot'))
     shutil.copyfile(shimlocation, os.path.join(outdir, 'boot/efi/boot/{0}'.format(shimdestfilename)))
     for maybemokmanager in glob.glob(os.path.join(rootpath, 'boot/efi/EFI/*/mmx64.efi')):
@@ -1747,6 +1787,8 @@ def gather_bootloader(outdir, rootpath='/'):
     else:
         if os.path.exists(os.path.join(rootpath, 'usr/lib/shim/mmx64.efi')):
             shutil.copyfile(os.path.join(rootpath, 'usr/lib/shim/mmx64.efi'), os.path.join(outdir, 'boot/efi/boot/mmx64.efi'))
+        elif os.path.exists(os.path.join(rootpath, 'usr/share/efi/x86_64/MokManager.efi')):
+            shutil.copyfile(os.path.join(rootpath, 'usr/share/efi/x86_64/MokManager.efi'), os.path.join(outdir, 'boot/efi/boot/mmx64.efi'))
     for maybemokmanager in glob.glob(os.path.join(rootpath, 'boot/efi/EFI/*/mmaa64.efi')):
         shutil.copyfile(maybemokmanager, os.path.join(outdir, 'boot/efi/boot/mmaa64.efi'))
         break
@@ -1769,6 +1811,8 @@ def gather_bootloader(outdir, rootpath='/'):
         grubbin = os.path.join(rootpath, 'usr/lib/grub/x86_64-efi-signed/grubx64.efi.signed')
     if not os.path.exists(grubbin):
         grubbin = os.path.join(rootpath, 'usr/lib/grub/arm64-efi/monolithic/grubaa64.efi')
+    if not os.path.exists(grubbin):
+        grubbin = os.path.join(rootpath, 'usr/share/efi/x86_64/grub.efi')
     if not os.path.exists(grubbin):
         grubs = os.path.join(rootpath, 'boot/efi/EFI/*/grubx64.efi')
         grubs = glob.glob(grubs)
