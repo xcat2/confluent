@@ -59,5 +59,8 @@ if [ "$cryptboot" != "" ]  && [ "$cryptboot" != "none" ] && [ "$cryptboot" != "n
     chmod 000 /etc/confluent_lukspass
 fi
 ) &
-tail --pid $! -n 0 -F /var/log/confluent/confluent-pre.log > /dev/console
+subpid=$!
+if ! tail --pid $subpid -n 0 -F /var/log/confluent/confluent-pre.log > /dev/console; then
+    wait $subpid
+fi
 

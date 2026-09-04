@@ -40,4 +40,7 @@ run_remote_parts firstboot.d
 run_remote_config firstboot.d
 curl --capath /etc/confluent/tls -f -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $confluent_apikey" -X POST -d "status: complete" https://$confluent_mgr/confluent-api/self/updatestatus
 ) &
-tail --pid $! -n 0 -F /var/log/confluent/confluent-post.log > /dev/console
+subpid=$!
+if ! tail --pid $subpid -n 0 -F /var/log/confluent/confluent-firstboot.log > /dev/console; then
+    wait $subpid
+fi

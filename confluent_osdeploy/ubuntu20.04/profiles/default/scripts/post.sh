@@ -92,4 +92,7 @@ python3 /opt/confluent/bin/apiclient /confluent-api/self/updatestatus  -d 'statu
 
 umount /target/sys /target/dev /target/proc
 ) &
-tail --pid $! -n 0 -F /target/var/log/confluent/confluent-post.log > /dev/console
+subpid=$!
+if ! tail --pid $subpid -n 0 -F /target/var/log/confluent/confluent-post.log > /dev/console; then
+    wait $subpid
+fi

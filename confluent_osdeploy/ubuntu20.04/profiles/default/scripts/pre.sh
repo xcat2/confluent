@@ -46,5 +46,8 @@ if [ ! -e /tmp/installdisk ]; then
 fi
 sed -i s!%%INSTALLDISK%%!/dev/$(cat /tmp/installdisk)! /autoinstall.yaml
 ) &
-tail --pid $! -n 0 -F /var/log/confluent/confluent-pre.log > /dev/console
+subpid=$!
+if ! tail --pid $subpid -n 0 -F /var/log/confluent/confluent-pre.log > /dev/console; then
+    wait $subpid
+fi
 

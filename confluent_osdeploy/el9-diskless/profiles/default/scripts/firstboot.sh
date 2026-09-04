@@ -48,4 +48,9 @@ systemctl disable firstboot
 rm /etc/systemd/system/firstboot.service
 rm /etc/confluent/firstboot.ran
 ) &
-tail --pid  $! -F /var/log/confluent/confluent-firstboot.log > /dev/console
+subpid=$!
+if ! tail --pid  $subpid -F /var/log/confluent/confluent-firstboot.log > /dev/console;
+then
+	wait $subpid
+fi
+
