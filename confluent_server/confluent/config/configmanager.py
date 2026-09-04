@@ -479,7 +479,7 @@ def init_masterkey(password=None, autogen=True):
     #        password=password))
 
 
-async def _push_rpc(stream, payload):
+async def _push_rpc(stream, payload, streamhandler=None):
     global _rpclock
     if _rpclock is None:
         _rpclock = asyncio.Lock()
@@ -489,6 +489,8 @@ async def _push_rpc(stream, payload):
             if len(payload):
                 stream[1].write(payload)
             await stream[1].drain()
+            if streamhandler:
+                streamhandler.keepalive = confluent.util.monotonic_time() + 20
             return True
         except Exception:
             logException()
@@ -770,7 +772,7 @@ async def relay_slaved_requests(name, listener):
                     raise Exception("Unexpected loss of node in followers: " + name)
                 sz = struct.unpack('!Q', msg)[0]
                 if sz == 0:
-                    await _push_rpc(listener, b'')
+                    await _push_rpc(listener, b'', lh)
                 else:
                     rpc = b''
                     while len(rpc) < sz:
@@ -795,7 +797,7 @@ async def relay_slaved_requests(name, listener):
                     if 'xid' in rpc:
                         res = await _push_rpc(listener,
                                               msgpack.packb({'xid': rpc['xid'],
-                                              'exc': exc, 'ret': retv}, use_bin_type=False))
+                                              'exc': exc, 'ret': retv}, use_bin_type=False), lh)
                         if not res:
                             break
                 try:
@@ -843,14 +845,14 @@ class StreamHandler(object):
         self.keepalive = confluent.util.monotonic_time() + 20
         self.expiry = self.keepalive + 40
 
-
     async def get_next_msg(self):
         while True:
             try:
                 msg = await asyncio.wait_for(self.sock[0].read(8), timeout=self.keepalive - confluent.util.monotonic_time())
                 if msg:
                     self.expiry = confluent.util.monotonic_time() + 60
-                    self.keepalive = confluent.util.monotonic_time() + 20
+                    # Receiving a message doesn't reset the peer's expiry, so don't delay the keepalive
+                    # self.keepalive = confluent.util.monotonic_time() + 20
                     return msg
                 else:
                     return None
@@ -858,10 +860,9 @@ class StreamHandler(object):
                 if confluent.util.monotonic_time() > self.expiry:
                     return None
                 if confluent.util.monotonic_time() >= self.keepalive:
-                    res = await _push_rpc(self.sock, b'')  # nulls are a keepalive
+                    res = await _push_rpc(self.sock, b'', self)  # nulls are a keepalive
                     if not res:
                         return None
-                    self.keepalive = confluent.util.monotonic_time() + 20
             except Exception as e:
                 print(repr(e))
                 return None
@@ -1020,7 +1021,7 @@ async def follow_channel(channel):
                         _pendingchangesets[rpc['xid']].set_result(rpc.get('ret', None))
                 if 'quorum' in rpc:
                     _hasquorum = rpc['quorum']
-                res = await _push_rpc(channel, b'')  # use null as ACK
+                res = await _push_rpc(channel, b'', lh)  # use null as ACK
                 if not res:
                     break
             msg = await lh.get_next_msg()
