@@ -67,8 +67,16 @@ if [ $NEEDCHOWN = 1 ]; then
 fi
 systemctl daemon-reload
 if systemctl is-active confluent > /dev/null || [ $NEEDSTART = 1 ]; then systemctl restart confluent > /dev/null 2>&1; fi
+# -e is false for a dangling link, so an existing bad one is replaced. Linux-PAM
+# reads vendor defaults from /usr/lib/pam.d and distributions are migrating there
+# package by package; openssh has already done so on SUSE 16.
 if [ ! -e /etc/pam.d/confluent ]; then
-    ln -s /etc/pam.d/sshd /etc/pam.d/confluent
+    for pamsrc in /etc/pam.d/sshd /usr/lib/pam.d/sshd; do
+        if [ -f $pamsrc ]; then
+            ln -sf $pamsrc /etc/pam.d/confluent
+            break
+        fi
+    done
 fi
 true
 EOF
