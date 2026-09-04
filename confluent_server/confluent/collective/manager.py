@@ -66,17 +66,33 @@ class ContextBool(object):
     def __init__(self):
         self.active = False
         self.mylock = None
+        self.owner = None
+        self.depth = 0
 
     async def __aenter__(self):
-        self.active = True
         if self.mylock is None:
             self.mylock = asyncio.Lock()
-        return await self.mylock.__aenter__()
+        currtask = asyncio.current_task()
+        if self.owner is not None and self.owner is currtask:
+            # reentrant acquisition by the same task, just track depth
+            self.depth += 1
+            return None
+        rv = await self.mylock.__aenter__()
+        self.owner = currtask
+        self.depth = 1
+        self.active = True
+        return rv
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        self.active = False
         if self.mylock is None:
             self.mylock = asyncio.Lock()
+        currtask = asyncio.current_task()
+        if self.owner is currtask and self.depth > 1:
+            self.depth -= 1
+            return False
+        self.owner = None
+        self.depth = 0
+        self.active = False
         return await self.mylock.__aexit__(exc_type, exc_val, exc_tb)
 
 connecting = ContextBool()
@@ -103,7 +119,7 @@ async def connect_to_leader(cert=None, name=None, leader=None, remote=None, isre
         return False
     async with connecting:
         if cfm._initlock is None:
-            cfm._initlock = asyncio.Lock()
+            cfm._initlock = ContextBool()
         async with cfm._initlock:
             # remote is a socket...
             banner = await tlvdata.recv(remote)  # the banner
