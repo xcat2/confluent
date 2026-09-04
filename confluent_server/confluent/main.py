@@ -346,7 +346,6 @@ async def asyncrun(args):
         _redirectoutput()
     if havefcntl:
         _updatepidfile()
-    asyncio.get_running_loop().set_debug(True)
     global _stopevent
     _stopevent = asyncio.Event()
     for stopsig in (signal.SIGINT, signal.SIGTERM):
