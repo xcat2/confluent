@@ -28,6 +28,14 @@ Requires: python3-asyncssh, python3-cryptography, confluent_client == %{version}
 %else
 %if "%{dist}" == ".el10"
 Requires: python3-asyncssh, python3-cryptography, confluent_client == %{version}, python3-pyparsing, python3-webauthn python3-psutil, python3-pyasn1 >= 0.2.3, python3-pysnmp >= 4.3.4, python3-lxml,python3-setuptools, python3-dateutil, python3-cffi, python3-pyOpenSSL python3-msgpack python3-libarchive-c python3-yaml openssl iproute python3-yarl python3-aiohttp
+%else
+%if 0%{?suse_version}
+# python3-dbm is split out there, PyYAML keeps its upstream capitalisation
+Requires: python3-dbm, python3-asyncssh, python3-cryptography, confluent_client == %{version}, python3-pyparsing, python3-psutil, python3-pyasn1 >= 0.2.3, python3-pysnmp >= 4.3.4, python3-lxml, python3-setuptools, python3-dateutil, python3-cffi, python3-pyOpenSSL, python3-msgpack, python3-libarchive-c, python3-PyYAML, python3-yarl, python3-aiohttp, openssl, iproute
+# httpapi imports webauthn behind a try/except and drops passkey support
+# without it, and openSUSE packages no candidate, so recommend it instead.
+Recommends: python3-webauthn
+%endif
 %endif
 %endif
 
@@ -57,6 +65,12 @@ for file in $(grep confluent/__init__.py INSTALLED_FILES.bare); do
     rm $RPM_BUILD_ROOT/$file
 done
 grep -v confluent/__init__.py INSTALLED_FILES.bare > INSTALLED_FILES
+%if 0%{?suse_version}
+# openSUSE patches setuptools to write a literal "#!python" placeholder into
+# installed scripts and expects the packager to rewrite it. The stock
+# %%python3_fix_shebang only looks at %%{_bindir}, so do it for our prefix.
+sed -i '1s|^#!python|#!/usr/bin/python3|' $RPM_BUILD_ROOT/opt/confluent/bin/*
+%endif
 # Only do non-root confluent if systemd of the platform supports it
 systemd-analyze verify $RPM_BUILD_ROOT/usr/lib/systemd/system/confluent.service 2>&1 | grep "'AmbientCapabilities'" > /dev/null && sed -e 's/User=.*//' -e 's/Group=.*//' -e 's/AmbientCapabilities=.*//' -i $RPM_BUILD_ROOT/usr/lib/systemd/system/confluent.service
 cat INSTALLED_FILES

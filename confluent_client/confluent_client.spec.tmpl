@@ -19,7 +19,13 @@ BuildArch: noarch
 Vendor: Lenovo
 Url: http://github.com/lenovo/confluent
 Obsoletes: confluent_common
+# SUSE keeps Pillow's upstream capitalisation and rpm capability names are
+# case sensitive, so the lowercase EL spelling resolves to nothing there.
+%if 0%{?suse_version}
+Requires: python3-numpy python3-Pillow python3-matplotlib
+%else
 Requires: python3-numpy python3-pillow python3-matplotlib
+%endif
 
 %description
 This package enables python development and command line access to
@@ -42,6 +48,12 @@ python2 setup.py install --single-version-externally-managed -O1 --root=$RPM_BUI
 python3 setup.py install --single-version-externally-managed -O1 --root=$RPM_BUILD_ROOT --record=INSTALLED_FILES --install-scripts=/opt/confluent/bin --install-purelib=/opt/confluent/lib/python
 %endif
 
+%if 0%{?suse_version}
+# openSUSE patches setuptools to write a literal "#!python" placeholder into
+# installed scripts and expects the packager to rewrite it. The stock
+# %%python3_fix_shebang only looks at %%{_bindir}, so do it for our prefix.
+sed -i '1s|^#!python|#!/usr/bin/python3|' $RPM_BUILD_ROOT/opt/confluent/bin/*
+%endif
 
 %clean
 rm -rf $RPM_BUILD_ROOT
