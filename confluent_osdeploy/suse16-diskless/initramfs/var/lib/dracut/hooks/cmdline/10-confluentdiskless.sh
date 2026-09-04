@@ -205,15 +205,23 @@ if [ "$dnsdomain" = "null" ]; then
 fi
 mkdir -p /run/confluent
 nmcfg=/run/confluent/$ifname.nmconnection
+linktype=$(ip link show dev "$ifname" | grep link/ | awk '{print $1}')
+if [ "$linktype" = link/infiniband ]; then
+    linktype=infiniband
+else
+    linktype=ethernet
+fi
+printf '[connection]\nid=%s\ntype=%s\ninterface-name=%s\nautoconnect=true\n' "$ifname" "$linktype" "$ifname" > $nmcfg
+if [ "$linktype" = infiniband ]; then
+    printf '\n[infiniband]\ntransport-mode=datagram\n' >> $nmcfg
+fi
 autoconfigmethod=$(grep ipv4_method /etc/confluent/confluent.deploycfg |awk '{print $2}')
 if [ "$autoconfigmethod" = "dhcp" ]; then
     echo -n "Attempting to use dhcp to bring up $ifname..."
     dhclient $ifname
     echo "Complete:"
     ip addr show dev $ifname
-    printf '[connection]\nid=%s\ntype=ethernet\ninterface-name=%s\nautoconnect=true\n\n[ipv4]\nmethod=auto\n' "$ifname" "$ifname" > $nmcfg
-    printf '\n[ipv6]\nmethod=link-local\n' >> $nmcfg
-    chmod 600 $nmcfg
+    printf '\n[ipv4]\nmethod=auto\n' >> $nmcfg
 else
     v4addr=$(grep ^ipv4_address: /etc/confluent/confluent.deploycfg)
     v4addr=${v4addr#ipv4_address: }
@@ -229,7 +237,7 @@ else
     if [ ! -z "$v4gw" ]; then
         ip route add default via $v4gw
     fi
-    printf '[connection]\nid=%s\ntype=ethernet\ninterface-name=%s\nautoconnect=true\n\n[ipv4]\nmethod=manual\naddress1=%s/%s' "$ifname" "$ifname" "$v4addr" "$v4nm" > $nmcfg
+    printf '\n[ipv4]\nmethod=manual\naddress1=%s/%s' "$v4addr" "$v4nm" >> $nmcfg
     if [ ! -z "$v4gw" ]; then
         printf ',%s' "$v4gw" >> $nmcfg
     fi
@@ -240,9 +248,9 @@ else
     if [ ! -z "$dnsdomain" ]; then
         printf 'dns-search=%s\n' "$dnsdomain" >> $nmcfg
     fi
-    printf '\n[ipv6]\nmethod=link-local\n' >> $nmcfg
-    chmod 600 $nmcfg
 fi
+printf '\n[ipv6]\nmethod=link-local\n' >> $nmcfg
+chmod 600 $nmcfg
 
 echo -n "Initializing ssh..."
 ssh-keygen -A
