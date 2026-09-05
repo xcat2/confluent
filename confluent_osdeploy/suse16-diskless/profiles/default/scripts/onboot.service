@@ -1,0 +1,11 @@
+[Unit]
+Description=Confluent onboot hook
+Requires=network-online.target
+After=network-online.target
+
+[Service]
+ExecStart=/opt/confluent/bin/onboot.sh
+
+[Install]
+WantedBy=multi-user.target
+

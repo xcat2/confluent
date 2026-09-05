@@ -1,0 +1,25 @@
+hostname
+curl
+irqbalance
+less
+sudo
+tuned
+xfsprogs
+e2fsprogs
+chrony net-tools rsync tar util-linux python3 tar dracut ethtool parted openssl bash rpm iputils lvm2 efibootmgr attr
+dhcp-client
+zypper
+libfuse2
+openssh
+shim
+kernel-default
+tpm2.0-tools
+# tpm2.0-tools only requires tctildr, and the diskless dracut module
+# installs the device tcti explicitly
+libtss2-tcti-device0
+NetworkManager  # 16 dropped wicked; confignet writes nmconnections
+vim
+%onlyarch x86_64
+grub2-x86_64-efi
+%onlyarch aarch64
+grub2-arm64-efi
