@@ -634,12 +634,22 @@ class SuseHandler(OsHandler):
             targrepos = os.path.join(targzypp, 'repos.d')
             mkdirp(targrepos)
             for repofile in glob.glob('/etc/zypp/repos.d/*'):
-                with open(repofile) as repoin:
-                    cfg = [line for line in repoin.read().splitlines()
-                           if not line.startswith('service=')]
-                with open(os.path.join(
-                        targrepos, os.path.basename(repofile)), 'w') as repoout:
+                targrepo = os.path.join(targrepos, os.path.basename(repofile))
+                # Anything that is not a plain text repo definition is passed
+                # through as-is rather than rewritten
+                if os.path.isdir(repofile):
+                    shutil.copytree(repofile, targrepo)
+                    continue
+                try:
+                    with open(repofile) as repoin:
+                        cfg = [line for line in repoin.read().splitlines()
+                               if not line.startswith('service=')]
+                except (IsADirectoryError, UnicodeDecodeError):
+                    shutil.copy2(repofile, targrepo)
+                    continue
+                with open(targrepo, 'w') as repoout:
                     repoout.write('\n'.join(cfg) + '\n')
+                shutil.copystat(repofile, targrepo)
         idx = 1
         for source in self.sources:
             if not source:
@@ -1813,6 +1823,12 @@ def gather_bootloader(outdir, rootpath='/'):
         grubbin = os.path.join(rootpath, 'usr/lib/grub/arm64-efi/monolithic/grubaa64.efi')
     if not os.path.exists(grubbin):
         grubbin = os.path.join(rootpath, 'usr/share/efi/x86_64/grub.efi')
+    if not os.path.exists(grubbin):
+        # same relocation as the shim above, on the other architecture
+        aa64grub = os.path.join(rootpath, 'usr/share/efi/aarch64/grub.efi')
+        if os.path.exists(aa64grub):
+            grubbin = aa64grub
+            grubdestfilename = 'grubaa64.efi'
     if not os.path.exists(grubbin):
         grubs = os.path.join(rootpath, 'boot/efi/EFI/*/grubx64.efi')
         grubs = glob.glob(grubs)
