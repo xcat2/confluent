@@ -14,10 +14,10 @@ fi
 udevadm trigger
 udevadm trigger --type=devices --action=add
 udevadm settle
-#modprobe ib_ipoib
-#modprobe ib_umad
-#modprobe hfi1
-#modprobe mlx5_ib
+modprobe ib_ipoib
+modprobe ib_umad
+modprobe hfi1
+modprobe mlx5_ib
 
 vlaninfo=$(getarg vlan)
 if [ ! -z "$vlaninfo" ]; then
