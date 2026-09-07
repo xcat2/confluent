@@ -38,3 +38,6 @@ run_remote_parts firstboot.d
 run_remote_config firstboot.d
 
 python3 /opt/confluent/bin/apiclient /confluent-api/self/updatestatus -d 'status: complete'
+
+systemctl disable confluent-firstboot
+rm /etc/systemd/system/confluent-firstboot.service
