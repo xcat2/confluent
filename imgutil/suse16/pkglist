@@ -7,7 +7,9 @@ tuned
 xfsprogs
 e2fsprogs
 chrony timezone net-tools rsync tar util-linux python3 tar dracut ethtool parted openssl bash rpm iputils lvm2 efibootmgr attr
-dhcp-client
+dhcpcd
+# dhcp-client used to pull this in; the diskless hook needs ip regardless
+iproute2
 zypper
 libfuse2
 openssh

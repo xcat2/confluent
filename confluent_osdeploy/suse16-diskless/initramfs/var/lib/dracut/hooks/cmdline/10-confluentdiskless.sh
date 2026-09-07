@@ -218,7 +218,7 @@ fi
 autoconfigmethod=$(grep ipv4_method /etc/confluent/confluent.deploycfg |awk '{print $2}')
 if [ "$autoconfigmethod" = "dhcp" ]; then
     echo -n "Attempting to use dhcp to bring up $ifname..."
-    dhclient $ifname
+    dhcpcd $ifname
     echo "Complete:"
     ip addr show dev $ifname
     printf '\n[ipv4]\nmethod=auto\n' >> $nmcfg
