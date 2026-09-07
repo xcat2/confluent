@@ -657,6 +657,8 @@ class SuseHandler(OsHandler):
             if source.startswith('file://'):
                 gpgpath = source.replace('file://', '')
                 gpgkeys.extend(glob.glob(os.path.join(gpgpath, '*/gpg-pubkey*.asc')))
+                # SLE media publishes the signing key only as the repo key
+                gpgkeys.extend(glob.glob(os.path.join(gpgpath, '*/repodata/repomd.xml.key')))
             subprocess.check_call(self.zypper_cmd() + ['ar', source, 'source-{}'.format(idx)])
             idx += 1
         if gpgkeys:
