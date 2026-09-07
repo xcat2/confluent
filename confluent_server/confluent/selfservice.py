@@ -367,12 +367,14 @@ async def handle_request(req, make_response, mimetype):
                 for line in langinfo:
                     line = line.strip()
                     if line.startswith(b'System Locale:'):
+                        if b'=' not in line:
+                            continue
                         ccurrlocale = line.split(b'=')[-1]
                         if not ccurrlocale:
                             continue
                         if not isinstance(ccurrlocale, str):
                             ccurrlocale = ccurrlocale.decode('utf8')
-                        if ccurrlocale == 'n/a':
+                        if ccurrlocale in ('n/a', '(unset)'):
                             continue
                         currlocale = ccurrlocale
                     elif line.startswith(b'VC Keymap:'):
@@ -382,7 +384,7 @@ async def handle_request(req, make_response, mimetype):
                             continue
                         if not isinstance(ckeymap, str):
                             ckeymap = ckeymap.decode('utf8')
-                        if ckeymap == 'n/a':
+                        if ckeymap in ('n/a', '(unset)'):
                             continue
                         keymap = ckeymap
             try:
