@@ -12,6 +12,10 @@ dracut_install ssh sshd reboot parted mkfs mkfs.ext4 mkfs.xfs xfs_db mkswap
 dracut_install /usr/libexec/ssh/sshd-session /usr/libexec/ssh/sshd-auth
 dracut_install efibootmgr uuidgen
 dracut_install du df ssh-keygen scp clear dhcpcd
+# udev's kmod builtin dlopens this. The dracut on SLE 16 media declares it
+# only in 00systemd, which the diskless module set never loads, so without
+# this line udev autoloads nothing at all
+dracut_install /usr/lib64/libkmod.so.2
 dracut_install /lib64/libnss_dns.so.2  # glibc dropped the versioned name
 dracut_install /lib64/libnss_compat*
 dracut_install /usr/lib64/libnl-3.so.200
