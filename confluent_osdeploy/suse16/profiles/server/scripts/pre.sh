@@ -36,7 +36,12 @@ hostname $(grep ^NODENAME: /etc/confluent/confluent.info|awk '{print $2}')
 run_remote_parts pre.d
 sed -i s!%%DEPLOYER%%!$deployserver!g /tmp/autoinstall.json
 sed -i s!%%PROFILE%%!$(grep ^profile: /etc/confluent/confluent.deploycfg|awk '{print $2}')!g /tmp/autoinstall.json
-sed -i s!%%ROOTPASSWORD%%!$(grep ^rootpassword: /etc/confluent/confluent.deploycfg|awk '{print $2}')!g /tmp/autoinstall.json
+rootpw=$(grep ^rootpassword: /etc/confluent/confluent.deploycfg|awk '{print $2}')
+if [ "$rootpw" = "null" ]; then
+    # lock the account, as 15 does. ! is a marker, not a hash anything matches
+    rootpw='!'
+fi
+sed -i 's@%%ROOTPASSWORD%%@'"$rootpw"'@g' /tmp/autoinstall.json
 sed -i s!%%NODENAME%%!$(hostname)!g /tmp/autoinstall.json
 python3 /opt/confluent/bin/apiclient /confluent-public/os/$profile/profile.yaml > /tmp/instprofile.yaml
 blargs=$(grep ^installedargs: /tmp/instprofile.yaml | sed -e 's/#.*//' -e 's/^installedargs: //')
