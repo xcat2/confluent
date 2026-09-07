@@ -283,17 +283,11 @@ if [ -z "$ISOSRC" ]; then
     echo root=live:$proto://$mgr/confluent-public/os/$profilename/distribution/1/LiveOS/squashfs.img >> /etc/cmdline.d/01-confluent.conf
     echo -n " "inst.install_url=$proto://$mgr/confluent-public/os/$profilename/distribution/1/install >> /run/agama/cmdline.d/agama.conf
     echo -n " "inst.script=$proto://$mgr/confluent-public/os/$profilename/autoinstall.sh" " >> /run/agama/cmdline.d/agama.conf
-    #echo inst.=$proto://$mgr/confluent-public/os/$profilename/distribution >> /etc/cmdline.d/01-confluent.conf
-    #root=anaconda-net:$proto://$mgr/confluent-public/os/$profilename/distribution
-    #export root
     netroot=livenet:$proto://$mgr/confluent-public/os/$profilename/distribution/1/LiveOS/squashfs.img
 
 else
     echo inst.repo=cdrom:$ISOSRC >> /etc/cmdline.d/01-confluent.conf
 fi
-#echo inst.ks=$proto://$mgr/confluent-public/os/$profilename/kickstart >> /etc/cmdline.d/01-confluent.conf
-#kickstart=$proto://$mgr/confluent-public/os/$profilename/kickstart
-#export kickstart
 autoconfigmethod=$(grep ipv4_method /etc/confluent/confluent.deploycfg)
 autoconfigmethod=${autoconfigmethod#ipv4_method: }
 if [ "$autoconfigmethod" = "dhcp" ]; then
