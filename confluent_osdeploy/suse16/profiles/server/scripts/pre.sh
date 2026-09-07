@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # This script runs before the installer executes, and sets up ssh during install as well
-# as rewriting the autoyast file with any substitutions prior to it being evaluated for real
+# as rewriting the autoinstall file with any substitutions prior to it being evaluated for real
 
 exec >> /tmp/confluent-pre.log
 exec 2>> /tmp/confluent-pre.log
