@@ -692,13 +692,17 @@ class SuseHandler(OsHandler):
         mkdirp(os.path.dirname(sshdwant))
         if not os.path.lexists(sshdwant):
             os.symlink('/usr/lib/systemd/system/sshd.service', sshdwant)
+        # 16 moved ssh-keysign to libexec
+        keysign = 'usr/libexec/ssh/ssh-keysign'
+        if not os.path.exists(os.path.join(self.targpath, keysign)):
+            keysign = 'usr/lib/ssh/ssh-keysign'
         with open(os.path.join(self.targpath, 'etc/permissions.local'), 'a') as permout:
             permout.write(
-                '/usr/lib/ssh/ssh-keysign root:ssh_keys 2711\n'
+                '/{0} root:ssh_keys 2711\n'
                 '/etc/ssh/ssh_host_dsa_key root:ssh_keys 640\n'
                 '/etc/ssh/ssh_host_ecdsa_key root:ssh_keys 640\n'
                 '/etc/ssh/ssh_host_ed25519_key root:ssh_keys 640\n'
-                '/etc/ssh/ssh_host_rsa_key root:ssh_keys 640\n'
+                '/etc/ssh/ssh_host_rsa_key root:ssh_keys 640\n'.format(keysign)
             )
         args.cmd = ['groupadd', 'ssh_keys']
         run_constrainedx(fancy_chroot, (args,
