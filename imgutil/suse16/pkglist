@@ -6,7 +6,7 @@ sudo
 tuned
 xfsprogs
 e2fsprogs
-chrony net-tools rsync tar util-linux python3 tar dracut ethtool parted openssl bash rpm iputils lvm2 efibootmgr attr
+chrony timezone net-tools rsync tar util-linux python3 tar dracut ethtool parted openssl bash rpm iputils lvm2 efibootmgr attr
 dhcp-client
 zypper
 libfuse2
