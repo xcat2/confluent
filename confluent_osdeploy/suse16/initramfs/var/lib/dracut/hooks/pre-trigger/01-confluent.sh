@@ -268,21 +268,10 @@ if [ "$textconsole" = "true" ] && ! grep console= /proc/cmdline > /dev/null; the
         fi
 fi
 
-. /etc/os-release
-if [ "$ID" = "dracut" ]; then
-    ID=$(echo $PRETTY_NAME|awk '{print $1}')
-    VERSION_ID=$(echo $VERSION|awk '{print $1}')
-fi
-ISOSRC=$(blkid -t TYPE=iso9660|grep -Ei ' LABEL="'$ID-$VERSION_ID|sed -e s/:.*//)
-if [ -z "$ISOSRC" ]; then
-    echo root=live:$proto://$mgr/confluent-public/os/$profilename/distribution/1/LiveOS/squashfs.img >> /etc/cmdline.d/01-confluent.conf
-    echo -n " "inst.install_url=$proto://$mgr/confluent-public/os/$profilename/distribution/1/install >> /run/agama/cmdline.d/agama.conf
-    echo -n " "inst.script=$proto://$mgr/confluent-public/os/$profilename/autoinstall.sh" " >> /run/agama/cmdline.d/agama.conf
-    netroot=livenet:$proto://$mgr/confluent-public/os/$profilename/distribution/1/LiveOS/squashfs.img
-
-else
-    echo inst.repo=cdrom:$ISOSRC >> /etc/cmdline.d/01-confluent.conf
-fi
+echo root=live:$proto://$mgr/confluent-public/os/$profilename/distribution/1/LiveOS/squashfs.img >> /etc/cmdline.d/01-confluent.conf
+echo -n " "inst.install_url=$proto://$mgr/confluent-public/os/$profilename/distribution/1/install >> /run/agama/cmdline.d/agama.conf
+echo -n " "inst.script=$proto://$mgr/confluent-public/os/$profilename/autoinstall.sh" " >> /run/agama/cmdline.d/agama.conf
+netroot=livenet:$proto://$mgr/confluent-public/os/$profilename/distribution/1/LiveOS/squashfs.img
 autoconfigmethod=$(grep ipv4_method /etc/confluent/confluent.deploycfg)
 autoconfigmethod=${autoconfigmethod#ipv4_method: }
 if [ "$autoconfigmethod" = "dhcp" ]; then
