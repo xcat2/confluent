@@ -272,11 +272,6 @@ fi
 if [ "$ID" = "dracut" ]; then
     ID=$(echo $PRETTY_NAME|awk '{print $1}')
     VERSION_ID=$(echo $VERSION|awk '{print $1}')
-    if [ "$ID" = "Oracle" ]; then
-        ID=OL
-    elif [ "$ID" = "Red" ]; then
-        ID=RHEL
-    fi
 fi
 ISOSRC=$(blkid -t TYPE=iso9660|grep -Ei ' LABEL="'$ID-$VERSION_ID|sed -e s/:.*//)
 if [ -z "$ISOSRC" ]; then
