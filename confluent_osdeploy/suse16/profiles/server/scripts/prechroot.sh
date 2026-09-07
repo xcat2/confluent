@@ -26,12 +26,7 @@ if [ -e "$instnmcfg" ]; then
 	cp $instnmcfg /mnt/etc/NetworkManager/system-connections/
 fi
 
-#run_remote setupssh.sh
-cp /etc/ssh/ssh*key* /mnt/etc/ssh/
-mkdir -p /mnt/etc/ssh/sshd_config.d/
-cp /etc/ssh/sshd_config.d/20_hostkeys.conf /mnt/etc/ssh/sshd_config.d/
-mkdir -p /mnt/root/.ssh/
-cp /root/.ssh/authorized_keys /mnt/root/.ssh/
+run_remote setupssh.sh
 
 echo Port 22 >> /etc/ssh/sshd_config.d/00-chroot.conf
 echo Port 2222 >> /etc/ssh/sshd_config.d/00-chroot.conf
