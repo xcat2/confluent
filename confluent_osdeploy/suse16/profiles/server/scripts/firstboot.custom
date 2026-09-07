@@ -1,0 +1,9 @@
+#!/bin/sh
+
+# This script runs at the end of the final boot
+
+. /etc/confluent/functions
+
+# Custom scripts may go here
+# run_remote example.sh
+# run_remote_python example.py
