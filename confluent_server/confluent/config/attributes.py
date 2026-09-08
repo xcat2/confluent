@@ -636,7 +636,11 @@ node = {
     'snmp.privacyprotocol': {
         'description': 'The privacy protocol to use for SNMPv3.  If unset, '
                        '"des" is assumed.',
-        'validvalues': ('aes', 'des'),
+        'validvalues': ('aes', 'des', 'aes256'),
+    },
+    'snmp.authprotocol': {
+        'description': 'The authentication protocol to use for SNMPv3.  If unset, "sha" is assumed.',
+        'validvalues': ('sha', 'md5', 'sha256'),
     },
 #    'secret.snmplocalizedkey': {
 #        'description': ("SNMPv3 key localized to this node's SNMP Engine id"

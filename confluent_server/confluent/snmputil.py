@@ -38,7 +38,7 @@ async def _get_transport(name):
 
 class Session(object):
 
-    def __init__(self, server, secret, username=None, context=None, privacy_protocol=None):
+    def __init__(self, server, secret, username=None, context=None, privacy_protocol=None, auth_protocol=None):
         """Create a new session to interrogate a switch
 
         If username is not given, it is assumed that
@@ -59,14 +59,25 @@ class Session(object):
         else:
             if privacy_protocol == 'aes':
                 privproto = snmp.usmAesCfb128Protocol
+            elif privacy_protocol == 'aes256':
+                privproto = snmp.usmAesCfb256Protocol
             elif privacy_protocol in ('des', None):
                 privproto = snmp.usmDESPrivProtocol
             else:
                 raise exc.ConfluentException('Unsupported SNMPv3 privacy protocol '
                                              '{0}'.format(privacy_protocol))
+            if auth_protocol == 'sha256':
+                authproto = snmp.usmHMAC192SHA256AuthProtocol
+            elif auth_protocol == 'md5':
+                authproto = snmp.usmHMACMD5AuthProtocol
+            elif auth_protocol in ('sha', None):
+                authproto = snmp.usmHMACSHAAuthProtocol
+            else:
+                raise exc.ConfluentException('Unsupported SNMPv3 auth protocol '
+                                             '{0}'.format(auth_protocol))
             self.authdata = snmp.UsmUserData(
                 username, authKey=secret, privKey=secret,
-                authProtocol=snmp.usmHMACSHAAuthProtocol,
+                authProtocol=authproto,
                 privProtocol=privproto)
         self.eng = snmp.SnmpEngine()
 
