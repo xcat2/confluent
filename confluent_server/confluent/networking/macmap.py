@@ -44,7 +44,7 @@ if __name__ == '__main__':
 
 import asyncio
 from confluent.networking.lldp import detect_backend, _handle_neighbor_query, get_fingerprint
-from confluent.networking.netutil import get_switchcreds, list_switches, get_portnamemap
+from confluent.networking.switchutil import get_switchcreds, list_switches, get_portnamemap
 
 import socket
 

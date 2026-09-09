@@ -40,7 +40,7 @@ import confluent.exceptions as exc
 import confluent.log as log
 import confluent.messages as msg
 import confluent.snmputil as snmp
-import confluent.networking.netutil as netutil
+import confluent.networking.switchutil as switchutil
 import confluent.util as util
 import confluent.tasks as tasks
 import re
@@ -358,7 +358,7 @@ async def _extract_neighbor_data_b(args):
 
 
 async def update_switch_data(switch, configmanager, force=False, retexc=False):
-    switchcreds = netutil.get_switchcreds(configmanager, (switch,))[0]
+    switchcreds = switchutil.get_switchcreds(configmanager, (switch,))[0]
     ndr = await _extract_neighbor_data(switchcreds + (force, retexc))
     if retexc and isinstance(ndr, Exception):
         raise ndr
@@ -379,8 +379,8 @@ async def _update_neighbors_backend(configmanager, force, retexc):
         return
     _neighdata = {'!!vintage': now}
     _neighbypeerid = {'!!vintage': now}
-    switches = netutil.list_switches(configmanager)
-    switchcreds = netutil.get_switchcreds(configmanager, switches)
+    switches = switchutil.list_switches(configmanager)
+    switchcreds = switchutil.get_switchcreds(configmanager, switches)
     switchcreds = [ x + (force, retexc) for x in switchcreds]
     async for ans in tasks.task_imap(_extract_neighbor_data, switchcreds, max_concurrent=64):
         yield ans
