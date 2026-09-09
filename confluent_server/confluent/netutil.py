@@ -165,6 +165,17 @@ async def mac2ip(mac):
     return lla
 
 
+async def ping_everywhere():
+    pingtasks = []
+    pingresponders = {}
+    for interface in list_viable_nics():
+        async def ping_task(iface):
+            addrs = await ping6('ff02::1', interface=iface, multi=True)
+            pingresponders[iface] = addrs
+        pingtasks.append(ping_task(interface))
+    await asyncio.gather(*pingtasks)
+    return pingresponders
+
 async def ping6(target, interface=None, multi=False):
     # Do an IPv6 ping.  Notably interesting target is ff02::1, to induce all local
     # peers to transmit a reply
