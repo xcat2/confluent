@@ -29,6 +29,8 @@ done
 export confluent_mgr
 run_remote_python confignet
 
+run_remote firstboot.custom
+
 # Firstboot scripts may be placed into firstboot.d, e.g. firstboot.d/01-firstaction.sh, firstboot.d/02-secondaction.sh
 run_remote_parts firstboot.d
 
@@ -36,3 +38,6 @@ run_remote_parts firstboot.d
 run_remote_config firstboot.d
 
 python3 /opt/confluent/bin/apiclient /confluent-api/self/updatestatus -d 'status: complete'
+
+systemctl disable confluent-firstboot
+rm /etc/systemd/system/confluent-firstboot.service

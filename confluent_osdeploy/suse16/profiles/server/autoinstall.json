@@ -16,6 +16,9 @@
   "product": {
     "id": "%%PRODUCT%%"
   },
+  "bootloader": {
+    "extraKernelParams": "%%INSTALLEDARGS%%"
+  },
   "storage": {
     "drives": [
       {

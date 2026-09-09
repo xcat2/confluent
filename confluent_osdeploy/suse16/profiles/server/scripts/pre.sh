@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # This script runs before the installer executes, and sets up ssh during install as well
-# as rewriting the autoyast file with any substitutions prior to it being evaluated for real
+# as rewriting the autoinstall file with any substitutions prior to it being evaluated for real
 
 exec >> /tmp/confluent-pre.log
 exec 2>> /tmp/confluent-pre.log
@@ -36,8 +36,16 @@ hostname $(grep ^NODENAME: /etc/confluent/confluent.info|awk '{print $2}')
 run_remote_parts pre.d
 sed -i s!%%DEPLOYER%%!$deployserver!g /tmp/autoinstall.json
 sed -i s!%%PROFILE%%!$(grep ^profile: /etc/confluent/confluent.deploycfg|awk '{print $2}')!g /tmp/autoinstall.json
-sed -i s!%%ROOTPASSWORD%%!$(grep ^rootpassword: /etc/confluent/confluent.deploycfg|awk '{print $2}')!g /tmp/autoinstall.json
+rootpw=$(grep ^rootpassword: /etc/confluent/confluent.deploycfg|awk '{print $2}')
+if [ "$rootpw" = "null" ]; then
+    # lock the account, as 15 does. ! is a marker, not a hash anything matches
+    rootpw='!'
+fi
+sed -i 's@%%ROOTPASSWORD%%@'"$rootpw"'@g' /tmp/autoinstall.json
 sed -i s!%%NODENAME%%!$(hostname)!g /tmp/autoinstall.json
+python3 /opt/confluent/bin/apiclient /confluent-public/os/$profile/profile.yaml > /tmp/instprofile.yaml
+blargs=$(grep ^installedargs: /tmp/instprofile.yaml | sed -e 's/#.*//' -e 's/^installedargs: //')
+sed -i 's!%%INSTALLEDARGS%%!'"$blargs"'!g' /tmp/autoinstall.json
 python3 /opt/confluent/bin/apiclient /confluent-public/os/$profile/scripts/getinstalldisk > /tmp/getinstalldisk
 locale=$(grep ^locale: /etc/confluent/confluent.deploycfg)
 locale=${locale#locale: }
@@ -45,6 +53,10 @@ keymap=$(grep ^keymap: /etc/confluent/confluent.deploycfg)
 keymap=${keymap#keymap: }
 tz=$(grep ^timezone: /etc/confluent/confluent.deploycfg)
 tz=${tz#timezone: }
+# agama checks against the tzdata list, which carries UTC but no Etc/ zones
+if [ "$tz" = "Etc/UTC" ]; then
+    tz=UTC
+fi
 sed -i 's!%%TIMEZONE%%!'$tz'!g' /tmp/autoinstall.json
 sed -i 's!%%LOCALE%%!'$locale'!g' /tmp/autoinstall.json
 sed -i 's!%%KEYMAP%%!'$keymap'!g' /tmp/autoinstall.json
