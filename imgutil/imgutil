@@ -709,7 +709,7 @@ class SuseHandler(OsHandler):
         args.cmd = ['groupadd', 'ssh_keys']
         run_constrainedx(fancy_chroot, (args,
                                         self.targpath))
-        args.cmd = ['chkstat', '--system', '--set'],
+        args.cmd = ['chkstat', '--system', '--set']
         run_constrainedx(fancy_chroot, (args,
                                         self.targpath))
 
