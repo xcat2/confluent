@@ -3,7 +3,7 @@
 mkdir -p /mnt/root/.ssh/
 chmod 700 /mnt/root/.ssh/
 cp /root/.ssh/authorized_keys /mnt/root/.ssh/
-chmd 600 /mnt/root/.ssh/authorized_keys
+chmod 600 /mnt/root/.ssh/authorized_keys
 cp /etc/ssh/*key* /mnt/etc/ssh/
 for i in /etc/ssh/*-cert.pub; do
     echo HostCertificate $i >> /mnt/etc/ssh/sshd_config
