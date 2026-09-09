@@ -28,10 +28,10 @@ import struct
 import os
 import socket
 import confluent.tasks as tasks
+import time
+import confluent.neighutil as neighutil
 
 
-def msg_align(len):
-    return (len + 3) & ~3
 
 def mask_to_cidr(mask):
     cidr = 32
@@ -54,10 +54,122 @@ def cidr_to_mask(cidr):
     return socket.inet_ntop(
         socket.AF_INET, struct.pack('!I', (2**32 - 1) ^ (2**(32 - cidr) - 1)))
 
+niclist = []
+niclistexpiry = 0
+
+
+def list_viable_nics():
+    global niclist
+    global niclistexpiry
+    if niclist and niclistexpiry > time.time():
+        return niclist
+    niclist = []
+    niclistexpiry = time.time() + 10  # cache for 10 seconds
+    # Nics that are not loopback, are up, with carrier are considered viable
+    for iname in os.listdir('/sys/class/net'):
+        if os.path.isdir(f'/sys/class/net/{iname}'):
+            with open(f'/sys/class/net/{iname}/flags') as f:
+                flags = int(f.read().strip(), 16)
+                # IFF_LOOPBACK is 0x8, skip loopback interfaces
+                if (flags & 0x8):  # loopback
+                    continue
+                if not flags & 0x1:  # IFF_UP is 0x1, skip interfaces that are down
+                    continue
+                with open(f'/sys/class/net/{iname}/carrier') as f:
+                    carrier = f.read().strip()
+                    if carrier != '1':
+                        continue
+                niclist.append(iname)
+    return niclist
+
+
+async def peer_reachable(address):
+    checkports = 22, 443
+    testtasks = []
+    for port in checkports:
+        async def check_port(port):
+            conn = None
+            try:
+                conn = await asyncio.wait_for(
+                    asyncio.open_connection(address, port), timeout=0.5)
+                return True
+            except Exception:
+                return False
+            finally:
+                if conn:
+                    conn[1].close()
+                    await conn[1].wait_closed()
+        testtasks.append(check_port(port))
+    results = await asyncio.gather(*testtasks, return_exceptions=True)
+    return any(not isinstance(r, Exception) and r for r in results)
+
+
+async def add_zone(lla):
+    # take an lla input without a zone and try to detect the right zone for it
+    if '%' in lla:
+        return lla
+    tocheck = list(list_viable_nics())
+    checktasks = []
+    for link in tocheck:
+        zone_addr = lla + '%' + link
+        checktasks.append(peer_reachable(zone_addr))
+    results = await asyncio.gather(*checktasks, return_exceptions=True)
+    for link, reachable in zip(tocheck, results):
+        if reachable and not isinstance(reachable, Exception):
+            return lla + '%' + link
+    return lla
+
+
+def mac2lla(mac):
+    """Convert MAC address to IPv6 link-local address."""
+    # Remove colons from MAC address
+    mac_clean = mac.replace(':', '').lower()
+    # Insert fe80:: prefix and convert to lowercase
+    # Split MAC into first 3 octets and last 3 octets
+    first_half = mac_clean[:6]
+    second_half = mac_clean[6:]
+    # Flip the universal/local bit in the first octet
+    first_octet = int(first_half[:2], 16)
+    first_octet ^= 0x02
+    first_half = f'{first_octet:02x}' + first_half[2:]
+    # Format as IPv6 link-local address
+    lla = f'fe80::{first_half[0:4]}:{first_half[4:]}ff:fe{second_half[0:2]}:{second_half[2:6]}'
+    return lla
+
+
+async def mac2ip(mac):
+    lla = None
+    ipaddr = None
+    try:
+        addrs = await neighutil.get_ipaddr(mac)
+        for addr in addrs:
+            ip = addr.get('ip', None)
+            ifidx = addr.get('ifidx', None)
+            if ip:
+                ipaddr = socket.inet_ntop(socket.AF_INET6 if len(ip) == 16 else socket.AF_INET, ip)
+                if ipaddr.startswith('fe80::'):
+                    lla = ipaddr
+                    if ifidx:
+                        lla += '%' + socket.if_indextoname(ifidx)
+                        return lla  # prefer LLA if possible
+    except Exception:
+        pass
+    if ipaddr:
+        # we don't have LLA, but we do have some IP address that should work, return that
+        return ipaddr
+    # not in our neighbor table, try to convert from mac, which is not a guarantee
+    if not lla:
+        lla = mac2lla(mac)
+    if '%' not in lla:
+        lla = await add_zone(lla)
+    return lla
+
+
 async def ping6(target, interface=None, multi=False):
     # Do an IPv6 ping.  Notably interesting target is ff02::1, to induce all local
     # peers to transmit a reply
     respondingpeers = set([])
+    respondingaddrs = set([])
     loop = asyncio.get_running_loop()
     addrinf = (await loop.getaddrinfo(
         target, None, family=socket.AF_INET6,
@@ -88,53 +200,59 @@ async def ping6(target, interface=None, multi=False):
                         loop.sock_recvfrom(s, 1024), timeout=currtimeout)
                 except AttributeError:
                     # Ugly workaround for python less than 3.11, blocking wrapped in thread
-                    def blocking_recvfrom():
+                    def blocking_recvfrom(currtimeo):
                         s.setblocking(True)
-                        s.settimeout(currtimeout)
+                        s.settimeout(currtimeo)
                         try:
                             return s.recvfrom(1024)
                         finally:
                             s.setblocking(False)
                     try:
                         data, peer = await loop.run_in_executor(
-                            None, blocking_recvfrom)
+                            None, blocking_recvfrom, currtimeout)
                     except socket.timeout:
                         raise asyncio.TimeoutError()
             except asyncio.TimeoutError:
-                return respondingpeers
+                break
             ifname = None
+            respondingpeers.add(peer)
             if len(peer) > 3 and peer[3]:
                 try:
                     ifname = socket.if_indextoname(peer[3])
                 except OSError:
                     ifname = f'{peer[3]}'
-            respondingpeers.add(f'{peer[0]}%{ifname}')
+            if ifname:
+                respondingaddrs.add(f'{peer[0]}%{ifname}')
+            else:
+                respondingaddrs.add(f'{peer[0]}')
             if not multi:
-                return respondingpeers
-        return respondingpeers
+                return respondingaddrs
+        # likely in multi scenario, meaning our neighbor table could use some fill-out
+
+        for peer in respondingpeers:
+            try:
+                tmpsock = socket.socket(s.family, socket.SOCK_DGRAM)
+                tmpsock.setblocking(False)
+                try:
+                    if len(peer) == 4:
+                        peer = (peer[0], 9, peer[2], peer[3])
+                    else:
+                        peer = (peer[0], 9)
+                    await loop.sock_connect(tmpsock, peer)
+                    await loop.sock_sendall(tmpsock, b'')
+                except (OSError, socket.gaierror):
+                    pass
+            finally:
+                tmpsock.close()
+        return respondingaddrs
     except OSError:
-        return respondingpeers
+        return respondingaddrs
     finally:
         s.close()
 
 
 def ipn_on_same_subnet(fam, first, second, prefix):
-    if fam == socket.AF_INET6:
-        if prefix > 64:
-            firstmask = 0xffffffffffffffff
-            secondmask = (2**64-1) ^ (2**(128 - prefix) - 1)
-        else:
-            firstmask = (2**64-1) ^ (2**(64 - prefix) - 1)
-            secondmask = 0
-        first = struct.unpack('!QQ', first)
-        second = struct.unpack('!QQ', second)
-        return ((first[0] & firstmask == second[0] & firstmask)
-            and (first[1] & secondmask == second[1] & secondmask))
-    else:
-        mask = (2**32 - 1) ^ (2**(32 - prefix) - 1)
-        first = struct.unpack('!I', first)[0]
-        second = struct.unpack('!I', second)[0]
-        return (first & mask == second & mask)
+    return neighutil.ipn_on_same_subnet(fam, first, second, prefix)
 
 async def ip_on_same_subnet(first, second, prefix):
     if first.startswith('::ffff:') and '.' in first:
@@ -164,15 +282,7 @@ async def ip_on_same_subnet(first, second, prefix):
 
 
 async def ipn_is_local(ipn):
-    if len(ipn) > 5 and ipn.startswith(b'\xfe\x80'):
-        return True
-    for addr in await get_my_addresses():
-        if len(addr[1]) != len(ipn):
-            continue
-        if ipn_on_same_subnet(addr[0], ipn, addr[1], addr[2]):
-            return True
-    return False
-
+    return await neighutil.ipn_is_local(ipn)
 
 async def address_is_local(address):
     if psutil:
@@ -835,46 +945,7 @@ nlhdrsz = struct.calcsize('IHHII')
 ifaddrsz = struct.calcsize('BBBBI')
 
 async def get_my_addresses(idx=0, family=0, matchlla=None):
-    # RTM_GETADDR = 22
-    # nlmsghdr struct: u32 len, u16 type, u16 flags, u32 seq, u32 pid
-    nlhdr = struct.pack('IHHII', nlhdrsz + ifaddrsz, 22, 0x301, 0, 0)
-    # ifaddrmsg struct: u8 family, u8 prefixlen, u8 flags, u8 scope, u32 index
-    ifaddrmsg = struct.pack('BBBBI', family, 0, 0, 0, idx)
-    s = socket.socket(socket.AF_NETLINK, socket.SOCK_RAW, socket.NETLINK_ROUTE)
-    s.bind((0, 0))
-    s.setblocking(False)
-    await asyncio.get_running_loop().sock_sendall(s, nlhdr + ifaddrmsg)
-    addrs = []
-    while True:
-        pdata = await asyncio.get_running_loop().sock_recv(s, 65536)
-        v = memoryview(pdata)
-        if struct.unpack('H', v[4:6])[0] == 3:  # netlink done message
-            break
-        while len(v):
-            length, typ = struct.unpack('IH', v[:6])
-            if typ == 20:
-                fam, plen, _, scope, ridx = struct.unpack('BBBBI', v[nlhdrsz:nlhdrsz+ifaddrsz])
-                if matchlla:
-                    if scope == 253:
-                        rta = v[nlhdrsz+ifaddrsz:length]
-                        while len(rta):
-                            rtalen, rtatyp = struct.unpack('HH', rta[:4])
-                            if rtalen < 4:
-                                break
-                            if rta[4:rtalen].tobytes() == matchlla:
-                                return await get_my_addresses(idx=ridx)
-                            rta = rta[msg_align(rtalen):]
-                elif (ridx == idx or not idx) and scope == 0:
-                    rta = v[nlhdrsz+ifaddrsz:length]
-                    while len(rta):
-                        rtalen, rtatyp = struct.unpack('HH', rta[:4])
-                        if rtalen < 4:
-                            break
-                        if rtatyp == 1:
-                            addrs.append((fam, rta[4:rtalen].tobytes(), plen, ridx))
-                        rta = rta[msg_align(rtalen):]
-            v = v[msg_align(length):]
-    return addrs
+    return neighutil.get_my_addresses(idx=idx, family=family, matchlla=matchlla)
 
 
 async def get_prefix_len_for_ip(ip):

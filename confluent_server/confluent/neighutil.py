@@ -17,7 +17,6 @@
 # A consolidated manage of neighbor table information management.
 
 import asyncio
-import confluent.netutil as netutil
 import os
 import socket
 import struct
@@ -28,6 +27,7 @@ def msg_align(len):
 
 
 neightable = {}
+ipbymac = {}
 neightime = 0
 
 
@@ -35,6 +35,7 @@ neighlock = None
 
 async def _update_neigh():
     global neightable
+    global ipbymac
     global neightime
     neightime = os.times()[4]
     s = socket.socket(socket.AF_NETLINK, socket.SOCK_RAW, socket.NETLINK_ROUTE)
@@ -49,6 +50,7 @@ async def _update_neigh():
     await cloop.sock_sendall(s, nlhdr + ndmsg)
     #s.sendall(nlhdr + ndmsg)
     neightable = {}
+    ipbymac = {}
     inprogress = True
     try:
         while inprogress:
@@ -78,10 +80,104 @@ async def _update_neigh():
                                 break
                         if curraddr and currip:
                             neightable[currip] = curraddr
+                            ipbymac.setdefault(curraddr, []).append({'ip': currip, 'ifidx': idx})
                 v = v[msg_align(length):]
     finally:
         s.close()
 
+
+async def ipn_is_local(ipn):
+    if len(ipn) > 5 and ipn.startswith(b'\xfe\x80'):
+        return True
+    for addr in await get_my_addresses():
+        if len(addr[1]) != len(ipn):
+            continue
+        if ipn_on_same_subnet(addr[0], ipn, addr[1], addr[2]):
+            return True
+    return False
+
+def ipn_on_same_subnet(fam, first, second, prefix):
+    if fam == socket.AF_INET6:
+        if prefix > 64:
+            firstmask = 0xffffffffffffffff
+            secondmask = (2**64-1) ^ (2**(128 - prefix) - 1)
+        else:
+            firstmask = (2**64-1) ^ (2**(64 - prefix) - 1)
+            secondmask = 0
+        first = struct.unpack('!QQ', first)
+        second = struct.unpack('!QQ', second)
+        return ((first[0] & firstmask == second[0] & firstmask)
+            and (first[1] & secondmask == second[1] & secondmask))
+    else:
+        mask = (2**32 - 1) ^ (2**(32 - prefix) - 1)
+        first = struct.unpack('!I', first)[0]
+        second = struct.unpack('!I', second)[0]
+        return (first & mask == second & mask)
+
+nlhdrsz = struct.calcsize('IHHII')
+ifaddrsz = struct.calcsize('BBBBI')
+
+async def get_my_addresses(idx=0, family=0, matchlla=None):
+    # RTM_GETADDR = 22
+    # nlmsghdr struct: u32 len, u16 type, u16 flags, u32 seq, u32 pid
+    nlhdr = struct.pack('IHHII', nlhdrsz + ifaddrsz, 22, 0x301, 0, 0)
+    # ifaddrmsg struct: u8 family, u8 prefixlen, u8 flags, u8 scope, u32 index
+    ifaddrmsg = struct.pack('BBBBI', family, 0, 0, 0, idx)
+    s = socket.socket(socket.AF_NETLINK, socket.SOCK_RAW, socket.NETLINK_ROUTE)
+    try:
+        s.bind((0, 0))
+        s.setblocking(False)
+        await asyncio.get_running_loop().sock_sendall(s, nlhdr + ifaddrmsg)
+        addrs = []
+        while True:
+            pdata = await asyncio.get_running_loop().sock_recv(s, 65536)
+            v = memoryview(pdata)
+            if struct.unpack('H', v[4:6])[0] == 3:  # netlink done message
+                break
+            while len(v):
+                length, typ = struct.unpack('IH', v[:6])
+                if typ == 20:
+                    fam, plen, _, scope, ridx = struct.unpack('BBBBI', v[nlhdrsz:nlhdrsz+ifaddrsz])
+                    if matchlla:
+                        if scope == 253:
+                            rta = v[nlhdrsz+ifaddrsz:length]
+                            while len(rta):
+                                rtalen, rtatyp = struct.unpack('HH', rta[:4])
+                                if rtalen < 4:
+                                    break
+                                if rta[4:rtalen].tobytes() == matchlla:
+                                    return await get_my_addresses(idx=ridx)
+                                rta = rta[msg_align(rtalen):]
+                    elif (ridx == idx or not idx) and scope == 0:
+                        rta = v[nlhdrsz+ifaddrsz:length]
+                        while len(rta):
+                            rtalen, rtatyp = struct.unpack('HH', rta[:4])
+                            if rtalen < 4:
+                                break
+                            if rtatyp == 1:
+                                addrs.append((fam, rta[4:rtalen].tobytes(), plen, ridx))
+                            rta = rta[msg_align(rtalen):]
+                v = v[msg_align(length):]
+    finally:
+        s.close()
+    return addrs
+
+async def get_ipaddr(hwaddr):
+    global neighlock
+    ipaddr = None
+    if neighlock is None:
+        neighlock = asyncio.Lock()
+    hwaddrbytes = bytes.fromhex(hwaddr.replace(':', ''))
+    async with neighlock:
+        updated = False
+        if os.times()[4] > (neightime + 30):
+            await _update_neigh()
+            updated = True
+        ipaddr = ipbymac.get(hwaddrbytes, [])
+        if not ipaddr and not updated:
+            await _update_neigh()
+            ipaddr = ipbymac.get(hwaddrbytes, [])
+    return ipaddr
 
 async def get_hwaddr(ipaddr):
     if '%' in ipaddr:
@@ -102,7 +198,7 @@ async def get_hwaddr(ipaddr):
             await _update_neigh()
             updated = True
         hwaddr = neightable.get(ipaddr, None)
-        if not hwaddr and not await netutil.ipn_is_local(ipaddr):
+        if not hwaddr and not await ipn_is_local(ipaddr):
             hwaddr = False
         if hwaddr is None and not updated:
             await _update_neigh()
