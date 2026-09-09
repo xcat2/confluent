@@ -54,6 +54,70 @@ def cidr_to_mask(cidr):
     return socket.inet_ntop(
         socket.AF_INET, struct.pack('!I', (2**32 - 1) ^ (2**(32 - cidr) - 1)))
 
+async def ping6(target, interface=None, multi=False):
+    # Do an IPv6 ping.  Notably interesting target is ff02::1, to induce all local
+    # peers to transmit a reply
+    respondingpeers = set([])
+    loop = asyncio.get_running_loop()
+    addrinf = (await loop.getaddrinfo(
+        target, None, family=socket.AF_INET6,
+        type=socket.SOCK_DGRAM))[0]
+    sockaddr = addrinf[-1]
+    if interface:
+        scopeid = socket.if_nametoindex(interface)
+        sockaddr = (sockaddr[0], sockaddr[1], sockaddr[2], scopeid)
+    s = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM,
+                      socket.IPPROTO_ICMPV6)
+    try:
+        s.setblocking(False)
+        ident = os.getpid() & 0xffff
+        payload = b'confluent'
+        header = struct.pack('!BBHHH', 128, 0, 0, ident, 1)
+        packet = header + payload
+        try:
+            await loop.sock_sendto(s, packet, sockaddr)
+        except AttributeError:
+            await loop.run_in_executor(
+                None, lambda: s.sendto(packet, sockaddr))
+        deadline = loop.time() + 1
+        while loop.time() < deadline:
+            try:
+                currtimeout = deadline - loop.time()
+                try:
+                    data, peer = await asyncio.wait_for(
+                        loop.sock_recvfrom(s, 1024), timeout=currtimeout)
+                except AttributeError:
+                    # Ugly workaround for python less than 3.11, blocking wrapped in thread
+                    def blocking_recvfrom():
+                        s.setblocking(True)
+                        s.settimeout(currtimeout)
+                        try:
+                            return s.recvfrom(1024)
+                        finally:
+                            s.setblocking(False)
+                    try:
+                        data, peer = await loop.run_in_executor(
+                            None, blocking_recvfrom)
+                    except socket.timeout:
+                        raise asyncio.TimeoutError()
+            except asyncio.TimeoutError:
+                return respondingpeers
+            ifname = None
+            if len(peer) > 3 and peer[3]:
+                try:
+                    ifname = socket.if_indextoname(peer[3])
+                except OSError:
+                    ifname = f'{peer[3]}'
+            respondingpeers.add(f'{peer[0]}%{ifname}')
+            if not multi:
+                return respondingpeers
+        return respondingpeers
+    except OSError:
+        return respondingpeers
+    finally:
+        s.close()
+
+
 def ipn_on_same_subnet(fam, first, second, prefix):
     if fam == socket.AF_INET6:
         if prefix > 64:
