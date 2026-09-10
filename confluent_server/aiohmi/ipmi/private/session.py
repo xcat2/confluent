@@ -1590,6 +1590,9 @@ class Session(object):
             if ptype == 0:
                 await self._parse_ipmi_payload(payload)
             elif ptype == 1:  # There should be no other option
+                if not payload:
+                    # malformed SOL Payload, ignore it
+                    return
                 if (payload[1] & 0b1111) and self.last_payload_type == 1:
                     # for ptype 1, the 4 least significant bits of 2nd byte
                     # is  the ACK number.
