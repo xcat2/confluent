@@ -39,6 +39,8 @@ import select
 import signal
 import socket
 import re
+import queue
+import threading
 import tty
 import termios
 import fcntl
@@ -88,6 +90,11 @@ argparser.add_option('-i', '--interval', type='float',
                           'works for one node')
 argparser.add_option('-v', '--video', action='store_true', default=False,
                      help='Attempt to continuously stream video from nodes that support streaming console via confluent')
+argparser.add_option('-o', '--outputfile', type='string', default=None,
+                     help='Record VNC mode output to the specified video file. When '
+                          'multiple nodes are recorded, use a confluent attribute '
+                          'expression (e.g. "{node}.mp4") to make the filename unique '
+                          'for each node.  If multiple nodes specified but not an expression, node name will be inserted.')
 argparser.add_option('-w','--windowed', action='store_true', default=False,
                      help='Open terminal windows for each node.  The '
                           'environment variable NODECONSOLE_WINDOWED_COMMAND '
@@ -827,27 +834,34 @@ cheight = 0
 imagedatabynode = {}
 firstnodename = None
 
+# Terminal drawing is offloaded to a single worker thread so slow image
+# encoding/output doesn't stall the asyncio loop. The lock keeps the worker
+# from interleaving output with redraw() on the main thread.
+draw_lock = threading.Lock()
+draw_queue = queue.Queue()
+
 def redraw():
-    for node in imagedatabynode:
-        imgdata = imagedatabynode[node]
-        if node in nodepositions:
-            prep_node_tile(node)
-            cursor_save()
-        else:
-            if options.interval is not None:
-                if node != firstnodename:
-                    sys.stderr.write('Multiple nodes not supported for interval')
-                    sys.exit(1)
-                sticky_cursor()
-            sys.stdout.write('{}: '.format(node))
-        # one row is used by our own name, so cheight - 1 for that allowance
-        draw_image(imgdata, cwidth, cheight - 1 if cheight else cheight)
-        if node in nodepositions:
-            cursor_restore()
-            reset_cursor(node)
-        else:
-            sys.stdout.write('\n')
-        sys.stdout.flush()
+    with draw_lock:
+        for node in imagedatabynode:
+            imgdata = imagedatabynode[node]
+            if node in nodepositions:
+                prep_node_tile(node)
+                cursor_save()
+            else:
+                if options.interval is not None:
+                    if node != firstnodename:
+                        sys.stderr.write('Multiple nodes not supported for interval')
+                        sys.exit(1)
+                    sticky_cursor()
+                sys.stdout.write('{}: '.format(node))
+            # one row is used by our own name, so cheight - 1 for that allowance
+            draw_image(imgdata, cwidth, cheight - 1 if cheight else cheight)
+            if node in nodepositions:
+                cursor_restore()
+                reset_cursor(node)
+            else:
+                sys.stdout.write('\n')
+            sys.stdout.flush()
 resized = False
 inputwatcher = None
 
@@ -961,9 +975,29 @@ async def grab_vncs(urlbynode):
     try:
         if streaming:
             directed = direct_console()
+        outputbynode = {}
+        if options.outputfile:
+            expr = options.outputfile
+            if '{' in expr:
+                # Let the server evaluate the expression to a unique name per node
+                sess = client.Command()
+                noderange = ','.join(urlbynode)
+                async for res in sess.create(
+                        '/noderange/{}/attributes/expression'.format(noderange),
+                        {'expression': expr}):
+                    for node in res.get('databynode', {}):
+                        outputbynode[node] = res['databynode'][node]['value']
+            else:
+                for node in urlbynode:
+                    if len(urlbynode) > 1:
+                        base, ext = os.path.splitext(options.outputfile)
+                        outputbynode[node] = '{}-{}{}'.format(base, node, ext)
+                    else:
+                        outputbynode[node] = expr
         for node in urlbynode:
             url = urlbynode[node]
-            tasks.append(asyncio.create_task(do_vnc(node, url)))
+            tasks.append(asyncio.create_task(
+                do_vnc(node, url, outputbynode.get(node))))
         await asyncio.gather(*tasks)
     except Exception as e:
         sys.stderr.write(f"Error in grab_vncs: {e}\n")
@@ -1046,13 +1080,13 @@ def toggle_focus_all():
         del focused_nodes[node]
 
 
-async def do_vnc(node, url):
+async def do_vnc(node, url, outputfile=None):
     global streaming
     keeprunning = True
     retries = 5
     while keeprunning:
         try:
-            async with await vnc.VNCClient.create(url) as client:
+            async with await vnc.VNCClient.create(url, outputfile=outputfile) as client:
                 vncclientsbynode[node] = client
                 while True:
                     # Retrieve pixels as a 3D numpy array
@@ -1090,6 +1124,16 @@ async def do_vnc(node, url):
 
 
 def draw_node(node, imgdata, errorstr, firstnodename, cwidth, cheight):
+    # Queue the frame for the drawing thread; frames arriving mid-draw wait here
+    draw_queue.put((node, imgdata, errorstr, firstnodename, cwidth, cheight))
+
+def _draw_worker():
+    while True:
+        node, imgdata, errorstr, firstnodename, cwidth, cheight = draw_queue.get()
+        with draw_lock:
+            _draw_node(node, imgdata, errorstr, firstnodename, cwidth, cheight)
+
+def _draw_node(node, imgdata, errorstr, firstnodename, cwidth, cheight):
     imagedatabynode[node] = imgdata
     if node in nodepositions:
         prep_node_tile(node)
@@ -1112,6 +1156,9 @@ def draw_node(node, imgdata, errorstr, firstnodename, cwidth, cheight):
     else:
         sys.stdout.write('\n')
     sys.stdout.flush()
+
+draw_thread = threading.Thread(target=_draw_worker, daemon=True)
+draw_thread.start()
 
 if options.screenshot or options.video:
     if not sys.stdout.isatty():

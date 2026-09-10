@@ -2,6 +2,9 @@ import asyncio
 from PIL import Image
 import io
 import numpy as np
+import queue
+import threading
+import time
 import zlib
 
 # This results in an RGBA organization of pixels
@@ -48,8 +51,27 @@ class VNCClient:
         return False
     
     @classmethod
-    async def create(cls, url):
+    async def create(cls, url, outputfile=None, fps=30):
         self = cls()
+        self.outputfile = outputfile
+        self.fps = fps
+        self.video_writer = None
+        self._video_size = None
+        self._last_frame = None
+        self._last_frame_time = None
+        self._video_queue = None
+        self._video_thread = None
+        self._cv2 = None
+        if outputfile:
+            try:
+                import cv2
+            except ImportError:
+                raise ImportError("OpenCV is required for video output but is not installed.")
+            self._cv2 = cv2
+            self._video_queue = queue.Queue()
+            self._video_thread = threading.Thread(
+                target=self._video_worker, daemon=True)
+            self._video_thread.start()
         if url.startswith('unix://'):
             url = url.replace('unix://', '')
         if url.startswith('/'):
@@ -212,7 +234,51 @@ class VNCClient:
         for _ in range(num_rects):
             await self._handle_rectangle()
         self._updating = False
+        self._write_video_frame()
         self._request_screen_update(incremental=True)
+
+    def _write_video_frame(self):
+        if not self._cv2 or self.framebuffer is None:
+            return
+        # Snapshot the framebuffer now and hand it to the writer thread. Frames
+        # captured while a write is in progress simply queue up behind it.
+        frame = np.ascontiguousarray(
+            np.array(self.framebuffer.convert('RGB'))[:, :, ::-1])
+        self._video_queue.put((frame, time.monotonic()))
+
+    def _video_worker(self):
+        cv2 = self._cv2
+        while True:
+            item = self._video_queue.get()
+            if item is None:
+                # Flush the final frame for the time it stayed on screen
+                if self.video_writer is not None and self._last_frame is not None:
+                    nframes = max(1, round(
+                        (time.monotonic() - self._last_frame_time) * self.fps))
+                    for _ in range(nframes):
+                        self.video_writer.write(self._last_frame)
+                if self.video_writer is not None:
+                    self.video_writer.release()
+                    self.video_writer = None
+                return
+            frame, now = item
+            if self.video_writer is None:
+                self._video_size = (frame.shape[1], frame.shape[0])
+                fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+                self.video_writer = cv2.VideoWriter(
+                    self.outputfile, fourcc, self.fps, self._video_size)
+            if (frame.shape[1], frame.shape[0]) != self._video_size:
+                frame = cv2.resize(frame, self._video_size)
+            if self._last_frame is None:
+                self._last_frame = frame
+                self._last_frame_time = now
+                continue
+            # Hold the previous frame for the real time it was displayed
+            nframes = max(1, round((now - self._last_frame_time) * self.fps))
+            for _ in range(nframes):
+                self.video_writer.write(self._last_frame)
+            self._last_frame = frame
+            self._last_frame_time = now
 
     async def _handle_rectangle(self):
         if self.framebuffer is None:
@@ -272,5 +338,10 @@ class VNCClient:
                 break
         return length
     async def close(self):
+        if self._video_thread is not None:
+            # Signal the writer thread to flush and finalize the file
+            self._video_queue.put(None)
+            await asyncio.to_thread(self._video_thread.join)
+            self._video_thread = None
         self.writer.close()
         await self.writer.wait_closed()
