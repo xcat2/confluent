@@ -343,7 +343,7 @@ class InputHandler:
                       '\x05cfa', # toggle focus all
                       '\x05c\x1b[A', '\x05c\x1b[B', '\x05c\x1b[C', '\x05c\x1b[D', # move focus with arrow keys
                       '\x05cf\x1b[A', '\x05cf\x1b[B', '\x05cf\x1b[C', '\x05cf\x1b[D', # move focus with arrow keys
-
+                      '\x05ck\x1b[3~', # Delete key
                       )
 
     def starts_valid_command(self):
@@ -379,7 +379,7 @@ class InputHandler:
             self.seqtimeout = asyncio.create_task(self.timeout_sequence(10))  # extend timeout to navigate options
             return
         elif self.buffer == '\x05ck':
-            set_extra_text('Keystrokes: d: Ctrl-Alt-Delete, 1: Ctrl-Alt-F1, 2: Ctrl-Alt-F2, 3: Ctrl-Alt-F3, 4: Ctrl-Alt-F4, w: Win')
+            set_extra_text('Keystrokes: <DEL>: Ctrl-Alt-Delete, w: Win, 1: Ctrl-Alt-F1, 2: Ctrl-Alt-F2, 3: Ctrl-Alt-F3, 4: Ctrl-Alt-F4,')
             self.seqtimeout = asyncio.create_task(self.timeout_sequence(10))  # extend timeout to navigate options
         elif self.buffer == '\x05ck1':
             await relay_keypresses(SpecialKeys.F1, modifiers=[SpecialKeys.CTRL, SpecialKeys.ALT])  # Ctrl-Alt-F1
@@ -393,7 +393,7 @@ class InputHandler:
         elif self.buffer == '\x05ck4':
             await relay_keypresses(SpecialKeys.F4, modifiers=[SpecialKeys.CTRL, SpecialKeys.ALT])  # Ctrl-Alt-F4
             self.reset_input_context()
-        elif self.buffer == '\x05ckd':
+        elif self.buffer == '\x05ck\x1b[3~':
             await relay_keypresses(SpecialKeys.DELETE, modifiers=[SpecialKeys.CTRL, SpecialKeys.ALT])  # Ctrl-Alt-Delete
             self.reset_input_context()
         elif self.buffer == '\x05ckw':
