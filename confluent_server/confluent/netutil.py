@@ -956,7 +956,7 @@ nlhdrsz = struct.calcsize('IHHII')
 ifaddrsz = struct.calcsize('BBBBI')
 
 async def get_my_addresses(idx=0, family=0, matchlla=None):
-    return neighutil.get_my_addresses(idx=idx, family=family, matchlla=matchlla)
+    return await neighutil.get_my_addresses(idx=idx, family=family, matchlla=matchlla)
 
 
 async def get_prefix_len_for_ip(ip):
