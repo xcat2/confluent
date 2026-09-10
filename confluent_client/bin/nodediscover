@@ -371,8 +371,8 @@ async def assign_discovery(options, session, needid=True):
     if exitcode:
         sys.exit(exitcode)
 
-async def blocking_scan(session):
-    list([x async for x in session.update('/discovery/rescan', {'rescan': 'start'})])
+async def blocking_scan(session, aggressive=False):
+    list([x async for x in session.update('/discovery/rescan', {'rescan': 'aggressive' if aggressive else 'start'})])
     while(list([x async for x in session.read('/discovery/rescan')])[0].get('scanning', False)):
         await asyncio.sleep(0.5)
     list([x async for x in session.update('/networking/macs/rescan', {'rescan': 'start'})])
@@ -388,6 +388,9 @@ async def main():
     # flush to clear old data out?  (e.g. no good way to age pxe data)
     # also delete discovery datum... more targeted
     # defect: -t lenovo-imm returns all
+    parser.add_option('-a', '--aggresive', dest='aggressive',
+                      help='Use aggressive scanning and fingerprinting that is slower and more intrusive',
+                      action='store_true')
     parser.add_option('-m', '--model', dest='model',
                       help='Operate with nodes matching the specified model '
                        'number', metavar='MODEL')
@@ -443,7 +446,7 @@ async def main():
     if args[0] == 'unsubscribe':
         await subscribe_discovery(options, session, False, args[1])
     if args[0] == 'rescan':
-        await blocking_scan(session)
+        await blocking_scan(session, aggressive=options.aggressive)
         print("Rescan complete")
 
 

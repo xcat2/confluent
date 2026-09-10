@@ -75,6 +75,9 @@ the nodes.
 
 ## OPTIONS
 
+* `-a`, `--aggressive`:
+  Perform more aggressive scanning and fingerprinting.  This will probe as many addresses as it can find with ssh and https connections.  By default more targeted measures are used
+  that will only tend to probe things that are easily detectable as devices implementing explicit mechanisms for detection and identification.
 * `-m MODEL`, `--model=MODEL`:
   Operate with nodes matching the specified model number
 * `-s SERIAL`, `--serial=SERIAL`:

@@ -95,6 +95,8 @@ import socket
 import socket as nsocket
 import aiohmi.util.webclient as webclient
 
+from confluent import netutil, neighutil
+
 
 autosensors = set()
 scanner = None
@@ -574,9 +576,13 @@ async def handle_api_request(configmanager, inputdata, operation, pathcomponents
         return handle_read_api_request(pathcomponents)
     elif (operation in ('update', 'create') and
             pathcomponents == ['discovery', 'rescan']):
-        if inputdata != {'rescan': 'start'}:
+        rescanmode = inputdata.get('rescan', None)
+        if rescanmode == 'aggressive':
+            await rescan(aggressive=True)
+        elif rescanmode == 'start':
+            await rescan()
+        else:
             raise exc.InvalidArgumentException()
-        await rescan()
         return (msg.KeyValueData({'rescan': 'started'}),)
     elif operation in ('update', 'create') and pathcomponents[:2] == ['discovery', 'subscriptions']:
         target = pathcomponents[2]
@@ -1669,13 +1675,13 @@ async def _periodic_recheck(configmanager):
                                          configmanager)
 
 
-async def rescan():
+async def rescan(aggressive=False):
     _map_unique_ids()
     global scanner
     if scanner:
         return
     else:
-        scanner = tasks.spawn_task(blocking_scan())
+        scanner = tasks.spawn_task(blocking_scan(aggressive))
     await remotescan()
 
 async def remotescan():
@@ -1688,14 +1694,39 @@ async def remotescan():
             log.log({'error': 'Unexpected problem asking {} for discovery notifications'.format(remagent)})
 
 
-async def blocking_scan():
+async def blocking_scan(aggressive=False):
     global scanner
+    if aggressive:
+        pingscan = tasks.spawn_task(netutil.ping_everywhere())
     slpscan = tasks.spawn_task(slp.active_scan(safe_detected, slp))
     ssdpscan = tasks.spawn_task(ssdp.active_scan(safe_detected, ssdp))
     await slpscan
     await ssdpscan
-    #ssdpscan.wait()
+    if aggressive:
+        pingscan_result = await pingscan
+    else:
+        pingscan_result = {}
+    gencheckers = []
+    for iface in pingscan_result:
+        for ipa in pingscan_result[iface]:
+            hwaddr = await neighutil.get_hwaddr(ipa)
+            if not hwaddr:
+                continue
+            if hwaddr in known_info:
+                continue
+            gencheckers.append(generic_eval(ipa))
+    if gencheckers:
+        await asyncio.gather(*gencheckers, return_exceptions=True)
     scanner = None
+
+
+async def generic_eval(address):
+    peerdata = {'addresses': [(address, 443)]}
+    resdata = await ssdp.check_fish(('/redfish/v1/', peerdata))
+    if not resdata:
+        return None
+    safe_detected(resdata)
+
 
 def start_detection():
     global attribwatcher

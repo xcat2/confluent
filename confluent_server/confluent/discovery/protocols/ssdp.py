@@ -127,7 +127,10 @@ def _process_snoop(peer, rsp, mac, known_peers, newmacs, peerbymacaddress, byeha
             tasks.spawn(check_fish_handler(handler, peerdata, known_peers, newmacs, peerbymacaddress, machandlers, mac, peer, targurl, targtype))
 
 async def check_fish_handler(handler, peerdata, known_peers, newmacs, peerbymacaddress, machandlers, mac, peer, targurl, targtype):
-    retdata = await check_fish((targurl, peerdata, targtype))
+    try:
+        retdata = await check_fish((targurl, peerdata, targtype))
+    except Exception:
+        return
     if retdata:
         known_peers.add(peer)
         newmacs.add(mac)
@@ -533,7 +536,7 @@ async def check_fish(urldata, port=443, verifycallback=None):
         url, data = urldata
         targtype = 'service:redfish-bmc'
     try:
-        wc = webclient.WebConnection(_get_svrip(data), port, verifycallback=verifycallback)
+        wc = webclient.WebConnection(_get_svrip(data), port, verifycallback=verifycallback, timeout=3)
         peerinfo = await wc.grab_json_response(url, headers={'Accept': 'application/json', 'Host': 'credible-bmc'})
     except socket.error:
         return None
@@ -588,6 +591,8 @@ async def check_fish(urldata, port=443, verifycallback=None):
             else:
                 data['services'] = [targtype]
             data['uuid'] = peerinfo['UUID'].lower()
+            if len(data['uuid']) == 32:  # add hyphens to match standard UUID format
+                data['uuid'] = '-'.join([data['uuid'][:8], data['uuid'][8:12], data['uuid'][12:16], data['uuid'][16:20], data['uuid'][20:]])
             return data
     return None
 
