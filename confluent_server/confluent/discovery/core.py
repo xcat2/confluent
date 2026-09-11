@@ -62,6 +62,7 @@
 #     - Apply defined configuration to endpoint
 
 import asyncio
+import asyncssh
 import base64
 import confluent.config.configmanager as cfm
 import confluent.collective.manager as collective
@@ -86,6 +87,7 @@ import confluent.networking.macmap as macmap
 import confluent.noderange as noderange
 import confluent.tasks as tasks
 import confluent.util as util
+import hashlib
 import inspect
 import json
 import traceback
@@ -133,6 +135,7 @@ nodehandlers = {
     'generic-redfish': None,
     'generic-https': None,
     'generic-ssh': None,
+    'nvos-switch': None,
     #'openbmc': None,
     'service:io-device.Lenovo:management-module': None,
     'service:thinkagile-storage': cpstorage,
@@ -153,6 +156,7 @@ servicenames = {
     'megware-chassis': 'megware-chassis',
     'generic-redfish': 'generic-redfish',
     'generic-https': 'generic-https',
+    'nvos-switch': 'nvos-switch',
     'generic-ssh': 'generic-ssh',
     #'openbmc': 'openbmc',
     'service:management-hardware.IBM:integrated-management-module2': 'lenovo-imm2',
@@ -176,6 +180,7 @@ servicebyname = {
     'generic-https': 'generic-https',
     'generic-ssh': 'generic-ssh',
     'megware-chassis': 'megware-chassis',
+    'nvos-switch': 'nvos-switch',
     'lenovo-imm2': 'service:management-hardware.IBM:integrated-management-module2',
     'lenovo-switch': 'service:io-device.Lenovo:management-module',
     'thinkagile-storage': 'service:thinkagile-storagebmc',
@@ -219,6 +224,52 @@ known_nodes = nesteddict()
 unknown_info = {}
 pending_nodes = {}
 pending_by_uuid = {}
+
+
+
+class CancelSsh(Exception):
+    pass
+
+class MyClient(asyncssh.SSHClient):
+    def validate_host_public_key(self, host, addr, port, key):
+        #print(repr(key))
+        return True
+
+    def auth_banner_received(self, msg, lang):
+        if hasattr(self, 'confluent_custom_ctx'):
+            self.confluent_custom_ctx['banner'] = msg
+
+    def password_auth_requested(self):
+        raise CancelSsh("noauth")
+
+    def password_change_requested(self, prompt, lang):
+        print(repr(prompt))
+        print(repr(lang))
+
+    def password_change_failed(self):
+        print("pcf")
+
+    def password_changed(self):
+        print("pc")
+
+    def confluent_set_context(self, ctx):
+        self.confluent_custom_ctx = ctx
+
+async def get_ssh_banner(target):
+    mycontext = {}
+    def make_client():
+        client = MyClient()
+        client.confluent_set_context(mycontext)
+        return client
+    sco = asyncssh.SSHClientConnectionOptions(client_factory=make_client, x509_trusted_cert_paths=None, known_hosts=None)
+    try:
+        async with asyncssh.connect(target, options=sco):
+            pass
+    except CancelSsh:
+        pass
+    return mycontext.get('banner')
+
+
 
 
 def register_affluent(affluenthdl):
@@ -550,7 +601,8 @@ async def register_remote_addrs(addresses, configmanager):
         try:
             sd = await ssdp.check_fish(('/DeviceDescription.json', nd))
             if not sd:
-                return addr, False
+                hwaddr = ':'.join(['{:02x}'.format(x) for x in hashlib.sha256(addr.encode('utf-8')).digest()[:6]])
+                return addr, await generic_eval(addr, hwaddr)
             if 'macaddress' in sd['attributes']:
                 sd['hwaddr'] = sd['attributes']['macaddress']
             else:
@@ -1712,7 +1764,11 @@ async def blocking_scan(aggressive=False):
     await slpscan
     await ssdpscan
     if aggressive:
-        pingscan_result = await pingscan
+        try:
+            pingscan_result = await pingscan
+        except Exception as e:
+            print(repr(e))  # test with restricted ping_group_range sysctl
+            pingscan_result = {}
     else:
         pingscan_result = {}
     gencheckers = []
@@ -1735,7 +1791,7 @@ async def generic_eval(address, hwaddr):
         return None
     cloop = asyncio.get_running_loop()
     addrinfo = await cloop.getaddrinfo(
-            address, 443, family=socket.AF_INET6, type=socket.SOCK_STREAM)
+            address, 443, family=socket.AF_UNSPEC, type=socket.SOCK_STREAM)
     
     if not addrinfo:
         return None
@@ -1746,12 +1802,19 @@ async def generic_eval(address, hwaddr):
         if resdata:
             return safe_detected(resdata)
         peerdata['services'] = ['generic-https']
-    if 'services' not in peerdata and 22 in ports:
+    if 22 in ports:
         sockaddr = (sockaddr[0], 22) + tuple(sockaddr[2:])
-        peerdata['addresses'] = [sockaddr]
-        peerdata['services'] = ['generic-ssh']
+        banner = await get_ssh_banner(address)
+        if 'addresses' not in peerdata:
+            peerdata['addresses'] = [sockaddr]
+        if banner and banner.strip() == 'NVOS switch':
+            peerdata['services'] = ['nvos-switch']
+        if 'services' not in peerdata:
+            peerdata['services'] = ['generic-ssh']
     if 'services' in peerdata:
         safe_detected(peerdata)
+        return True
+    return False
 
 
 def start_detection():
