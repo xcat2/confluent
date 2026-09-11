@@ -672,6 +672,16 @@ node = {
         'description': ('Password to use when connecting to the hardware '
                         'manager.  Aliases for this attribute include bmcpass and switchpass'),
     },
+    'secret.initialhardwaremanagementuser': {
+        'description': ('The initial username to use when connecting to the hardware '
+                        'manager before any changes are made to the hardware management '
+                        'user configuration'),
+    },
+    'secret.initialhardwaremanagementpassword': {
+        'description': ('The initial password to use when connecting to the hardware '
+                        'manager before any changes are made to the hardware management '
+                        'user configuration'),
+    },
     'ssh.trustnodes': {
         'description': ('Nodes that are allowed to ssh into the node, '
                         'expressed in noderange syntax.  This is used during '

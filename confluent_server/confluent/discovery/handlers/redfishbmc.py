@@ -22,6 +22,7 @@ import json
 
 import aiohmi.util.webclient as webclient
 
+
 async def get_host_interface_urls(wc, mginfo):
     returls = []
     hifurl = mginfo.get('HostInterfaces', {}).get('@odata.id', None)
@@ -79,7 +80,7 @@ class NodeHandler(generic.NodeHandler):
 
 
     def get_firmware_default_account_info(self):
-        raise Exception('This must be subclassed')
+        raise Exception('secret.initialhardwaremanagementuser and secret.initialhardwaremanagementpassword must be set')
 
     async def scan(self):
         await self.get_https_cert()
@@ -214,12 +215,21 @@ class NodeHandler(generic.NodeHandler):
         creds = self.configmanager.get_node_attributes(
             nodename, ['secret.hardwaremanagementuser',
                        'secret.hardwaremanagementpassword',
+                       'secret.initialhardwaremanagementuser',
+                       'secret.initialhardwaremanagementpassword',
                        'hardwaremanagement.manager',
                        'hardwaremanagement.method',
                        'console.method'],
             True)
         cd = creds.get(nodename, {})
-        defuser, defpass = self.get_firmware_default_account_info()
+        defuser = cd.get('secret.initialhardwaremanagementuser', {}).get('value', None)
+        defpass = cd.get('secret.initialhardwaremanagementpassword', {}).get('value', None)
+        if defuser is None or defpass is None:
+            ndefuser, ndefpass = self.get_firmware_default_account_info()
+            if not defuser:
+                defuser = ndefuser
+            if not defpass:
+                defpass = ndefpass
         user, passwd, _ = self.get_node_credentials(
                 nodename, creds, defuser, defpass)
         user = util.stringify(user)
