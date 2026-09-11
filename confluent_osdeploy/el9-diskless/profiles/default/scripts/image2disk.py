@@ -192,7 +192,7 @@ def fixup(rootdir, vols):
             elif ent.startswith('rd.lvm.lv='):
                 nent = convert_lv(ent)
                 if nent:
-                    newkcmdlineent.append(ent)
+                    newkcmdlineent.append(nent)
                 else:
                     newkcmdlineent.append(ent)
             else:
