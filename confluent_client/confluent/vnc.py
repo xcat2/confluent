@@ -51,7 +51,7 @@ class VNCClient:
         return False
     
     @classmethod
-    async def create(cls, url, outputfile=None, fps=30):
+    async def create(cls, url, outputfile=None, fps=15):
         self = cls()
         self.outputfile = outputfile
         self.fps = fps
@@ -249,19 +249,18 @@ class VNCClient:
     def _video_worker(self):
         cv2 = self._cv2
         while True:
-            item = self._video_queue.get()
-            if item is None:
+            frame, now = self._video_queue.get()
+            if frame is None:
                 # Flush the final frame for the time it stayed on screen
                 if self.video_writer is not None and self._last_frame is not None:
                     nframes = max(1, round(
-                        (time.monotonic() - self._last_frame_time) * self.fps))
+                        (now - self._last_frame_time) * self.fps))
                     for _ in range(nframes):
                         self.video_writer.write(self._last_frame)
                 if self.video_writer is not None:
                     self.video_writer.release()
                     self.video_writer = None
                 return
-            frame, now = item
             if self.video_writer is None:
                 self._video_size = (frame.shape[1], frame.shape[0])
                 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
@@ -340,7 +339,7 @@ class VNCClient:
     async def close(self):
         if self._video_thread is not None:
             # Signal the writer thread to flush and finalize the file
-            self._video_queue.put(None)
+            self._video_queue.put((None, time.monotonic()))
             await asyncio.to_thread(self._video_thread.join)
             self._video_thread = None
         self.writer.close()
