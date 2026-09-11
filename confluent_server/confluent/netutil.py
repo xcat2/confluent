@@ -92,7 +92,7 @@ async def peer_reachable(address):
             try:
                 conn = await asyncio.wait_for(
                     asyncio.open_connection(address, port), timeout=0.5)
-                return True
+                return port
             except Exception:
                 return False
             finally:
@@ -101,7 +101,11 @@ async def peer_reachable(address):
                     await conn[1].wait_closed()
         testtasks.append(check_port(port))
     results = await asyncio.gather(*testtasks, return_exceptions=True)
-    return any(not isinstance(r, Exception) and r for r in results)
+    reachable_ports = []
+    for res in results:
+        if not isinstance(res, Exception) and res:
+            reachable_ports.append(res)
+    return reachable_ports
 
 
 async def add_zone(lla):

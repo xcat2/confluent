@@ -130,6 +130,9 @@ nodehandlers = {
     'onie-switch': None,
     'cumulus-switch': None,
     'affluent-switch': None,
+    'generic-redfish': None,
+    'generic-https': None,
+    'generic-ssh': None,
     #'openbmc': None,
     'service:io-device.Lenovo:management-module': None,
     'service:thinkagile-storage': cpstorage,
@@ -148,6 +151,9 @@ servicenames = {
     'lenovo-xcc3': 'lenovo-xcc3',
     'megarac-bmc': 'megarac-bmc',
     'megware-chassis': 'megware-chassis',
+    'generic-redfish': 'generic-redfish',
+    'generic-https': 'generic-https',
+    'generic-ssh': 'generic-ssh',
     #'openbmc': 'openbmc',
     'service:management-hardware.IBM:integrated-management-module2': 'lenovo-imm2',
     'service:io-device.Lenovo:management-module': 'lenovo-switch',
@@ -166,6 +172,9 @@ servicebyname = {
     'lenovo-xcc': 'lenovo-xcc',
     'lenovo-xcc3': 'lenovo-xcc3',
     'megarac-bmc': 'megarac-bmc',
+    'generic-redfish': 'generic-redfish',
+    'generic-https': 'generic-https',
+    'generic-ssh': 'generic-ssh',
     'megware-chassis': 'megware-chassis',
     'lenovo-imm2': 'service:management-hardware.IBM:integrated-management-module2',
     'lenovo-switch': 'service:io-device.Lenovo:management-module',
@@ -1714,18 +1723,35 @@ async def blocking_scan(aggressive=False):
                 continue
             if hwaddr in known_info:
                 continue
-            gencheckers.append(generic_eval(ipa))
+            gencheckers.append(generic_eval(ipa, hwaddr))
     if gencheckers:
         await asyncio.gather(*gencheckers, return_exceptions=True)
     scanner = None
 
 
-async def generic_eval(address):
-    peerdata = {'addresses': [(address, 443)]}
-    resdata = await ssdp.check_fish(('/redfish/v1/', peerdata))
-    if not resdata:
+async def generic_eval(address, hwaddr):
+    ports = await netutil.peer_reachable(address)
+    if not ports:
         return None
-    safe_detected(resdata)
+    cloop = asyncio.get_running_loop()
+    addrinfo = await cloop.getaddrinfo(
+            address, 443, family=socket.AF_INET6, type=socket.SOCK_STREAM)
+    
+    if not addrinfo:
+        return None
+    sockaddr = addrinfo[0][4]
+    peerdata = {'addresses': [sockaddr], 'hwaddr': hwaddr, 'openports': ports}
+    if 443 in ports:
+        resdata = await ssdp.check_fish(('/redfish/v1/', peerdata))
+        if resdata:
+            return safe_detected(resdata)
+        peerdata['services'] = ['generic-https']
+    if 'services' not in peerdata and 22 in ports:
+        sockaddr = (sockaddr[0], 22) + tuple(sockaddr[2:])
+        peerdata['addresses'] = [sockaddr]
+        peerdata['services'] = ['generic-ssh']
+    if 'services' in peerdata:
+        safe_detected(peerdata)
 
 
 def start_detection():
