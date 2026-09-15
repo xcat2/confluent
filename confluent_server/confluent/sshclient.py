@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import asyncssh
+import asyncssh.known_hosts as known_hosts
+import confluent.tasks as tasks
 import hashlib
 
 _hashes = {'sha256': hashlib.sha256, 'sha384': hashlib.sha384, 'sha512': hashlib.sha512}
@@ -30,6 +32,16 @@ class _MyClient(asyncssh.SSHClient):
 
     def set_configmanager(self, configmanager):
         self.confluent_configmanager = configmanager
+
+    def validate_host_ca_key(self, host, addr, port, key):
+        kh = None
+        with open('/etc/ssh/ssh_known_hosts', 'r') as skh:
+            kh = known_hosts.import_known_hosts(skh.read())
+        matchca = kh.match(host, addr, port)
+        for ca in matchca[1]:
+            if ca == key:
+                return True
+        return False
 
     def validate_host_public_key(self, host, addr, port, key):
         if hasattr(self, 'confluent_validate_hostkey'):
@@ -54,7 +66,7 @@ class _MyClient(asyncssh.SSHClient):
         elif policy == 'tofu':
             keyfingerprint = hashlib.sha512(key.public_data).hexdigest()
             fprint = 'sha512$' + keyfingerprint
-            cfg.set_node_attributes(nodename, {self.confluent_keyattrib: {'value': fprint}})
+            tasks.spawn_task(cfg.set_node_attributes({nodename: {self.confluent_keyattrib: {'value': fprint}}}))
             return True
         return False
 
@@ -95,7 +107,7 @@ class _MyClient(asyncssh.SSHClient):
         self.confluent_custom_ctx = ctx
 
 
-def connect(target, context=None, disable_hostkey_validation=False, known_hosts='/etc/ssh/ssh_known_hosts', nodename=None, configmanager=None, keyattrib='pubkeys.ssh', **kwargs):
+def connect(target, context=None, disable_hostkey_validation=False, known_hosts=(), nodename=None, configmanager=None, keyattrib='pubkeys.ssh', **kwargs):
     if context is None:
         context = {}
     def make_client():
@@ -118,7 +130,7 @@ def connect(target, context=None, disable_hostkey_validation=False, known_hosts=
 async def get_ssh_banner(target):
     mycontext = {'nologon': True}
     try:
-        async with connect(target, disable_hostkey_validation=True, known_hosts=(), context=mycontext):
+        async with connect(target, disable_hostkey_validation=True, context=mycontext):
             pass
     except _CancelSsh:
         pass
