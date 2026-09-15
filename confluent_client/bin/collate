@@ -24,6 +24,7 @@ import os
 import re
 import select
 import sys
+import csv
 
 path = os.path.dirname(os.path.realpath(__file__))
 path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
@@ -51,6 +52,8 @@ argparser.add_option('-s', '--skipcommon', action='store_true',
                           'groups, useful when combined with -d')
 argparser.add_option('-c', '--count', action='store_true',
                      help='Also display count of nodes in a given group')
+argparser.add_option('-t', '--tabular', action='store_true',
+                     help='Output in CSV format')
 argparser.add_option('-r', '--reverse', action='store_true',
                      help='Reverse sort order to show biggest output group '
                           'last')
@@ -68,13 +71,30 @@ if options.abbreviate:
 else:
     grouped = tg.GroupedData()
 
-def print_current():
+def print_current(tabular=False):
     if options.diff:
         grouped.print_deviants(skipmodal=options.skipcommon, count=options.count,
                           reverse=options.reverse, basenode=options.base)
     elif options.groupcount:
         grouped.generate_byoutput()
         print(len(grouped.byoutput))
+    elif tabular:
+        databynode = {}
+        fields = ['node']
+        for n in grouped.bynode:
+            for ln in grouped.bynode[n]:
+                label, value = ln.split(':', 1)
+                label = label.strip()
+                value = value.strip()
+                databynode.setdefault(n, {})[label] = value
+                if label not in fields:
+                    fields.append(label)
+        writer = csv.DictWriter(sys.stdout, fieldnames=fields)
+        writer.writeheader()
+        for n in databynode:
+            row = dict(databynode[n])
+            row['node'] = n
+            writer.writerow(row)
     else:
         grouped.print_all(skipmodal=options.skipcommon,
                                count=options.count,
@@ -125,5 +145,5 @@ while fullline:
 if printpending:
     if clearpending:
         sys.stdout.write('\x1b[2J\x1b[;H')  # clear screen
-    print_current()
+    print_current(options.tabular)
 
