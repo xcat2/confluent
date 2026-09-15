@@ -25,7 +25,7 @@ import confluent.tasks as tasks
 
 import sys
 sys.modules['gssapi'] = None
-import asyncssh
+import confluent.sshclient as sshclient
 
 
 
@@ -81,18 +81,10 @@ class SshShell(conapi.Console):
         tasks.spawn(self.do_logon())
     
     async def do_logon(self):
-        sco = asyncssh.SSHClientConnectionOptions()
-        #The below would be to support the confluent db, and only fallback if the SSH CA do not work
-        # have to catch the valueerror and use ssh-keyscan to trigger this, asyncssh host key handling
-        # is a bit more limited compared to paramiko
-
-        #but... leverage /etc/ssh/ssh_known_hosts, we can try that way, and if it fails, fallback to our
-        #confluent db based handler
-        #sco.client_fatory = SSHKnownHostsLookup
         try:
             await self.datacallback('\r\nConnecting to {}...'.format(self.node))
             try:
-                self.ssh = await asyncssh.connect(self.node, username=self.username.decode(), password=self.password.decode(), known_hosts='/etc/ssh/ssh_known_hosts')
+                self.ssh = await sshclient.connect(self.node, username=self.username.decode(), password=self.password.decode(), configmanager=self.nodeconfig, nodename=self.node)
             except ValueError:
                 #TODO: non-cert ssh targets
                 raise

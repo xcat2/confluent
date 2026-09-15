@@ -62,7 +62,7 @@
 #     - Apply defined configuration to endpoint
 
 import asyncio
-import asyncssh
+import confluent.sshclient as sshclient
 import base64
 import confluent.config.configmanager as cfm
 import confluent.collective.manager as collective
@@ -224,53 +224,6 @@ known_nodes = nesteddict()
 unknown_info = {}
 pending_nodes = {}
 pending_by_uuid = {}
-
-
-
-class CancelSsh(Exception):
-    pass
-
-class MyClient(asyncssh.SSHClient):
-    def validate_host_public_key(self, host, addr, port, key):
-        #print(repr(key))
-        return True
-
-    def auth_banner_received(self, msg, lang):
-        if hasattr(self, 'confluent_custom_ctx'):
-            self.confluent_custom_ctx['banner'] = msg
-
-    def password_auth_requested(self):
-        raise CancelSsh("noauth")
-
-    def password_change_requested(self, prompt, lang):
-        print(repr(prompt))
-        print(repr(lang))
-
-    def password_change_failed(self):
-        print("pcf")
-
-    def password_changed(self):
-        print("pc")
-
-    def confluent_set_context(self, ctx):
-        self.confluent_custom_ctx = ctx
-
-async def get_ssh_banner(target):
-    mycontext = {}
-    def make_client():
-        client = MyClient()
-        client.confluent_set_context(mycontext)
-        return client
-    sco = asyncssh.SSHClientConnectionOptions(client_factory=make_client, x509_trusted_cert_paths=None, known_hosts=None)
-    try:
-        async with asyncssh.connect(target, options=sco):
-            pass
-    except CancelSsh:
-        pass
-    return mycontext.get('banner')
-
-
-
 
 def register_affluent(affluenthdl):
     global affluent
@@ -1804,7 +1757,7 @@ async def generic_eval(address, hwaddr):
         peerdata['services'] = ['generic-https']
     if 22 in ports:
         sockaddr = (sockaddr[0], 22) + tuple(sockaddr[2:])
-        banner = await get_ssh_banner(address)
+        banner = await sshclient.get_ssh_banner(address)
         if 'addresses' not in peerdata:
             peerdata['addresses'] = [sockaddr]
         if banner and banner.strip() == 'NVOS switch':
