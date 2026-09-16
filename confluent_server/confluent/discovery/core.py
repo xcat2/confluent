@@ -87,7 +87,6 @@ import confluent.networking.macmap as macmap
 import confluent.noderange as noderange
 import confluent.tasks as tasks
 import confluent.util as util
-import hashlib
 import inspect
 import json
 import traceback
