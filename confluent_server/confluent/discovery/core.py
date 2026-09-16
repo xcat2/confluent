@@ -1738,17 +1738,19 @@ async def blocking_scan(aggressive=False):
     else:
         pingscan_result = {}
     gencheckers = []
-    for iface in pingscan_result:
-        for ipa in pingscan_result[iface]:
-            hwaddr = await neighutil.get_hwaddr(ipa)
-            if not hwaddr:
-                continue
-            if hwaddr in known_info:
-                continue
-            gencheckers.append(generic_eval(ipa, hwaddr))
-    if gencheckers:
-        await asyncio.gather(*gencheckers, return_exceptions=True)
-    scanner = None
+    try:
+        for iface in pingscan_result:
+            for ipa in pingscan_result[iface]:
+                hwaddr = await neighutil.get_hwaddr(ipa)
+                if not hwaddr:
+                    continue
+                if hwaddr in known_info:
+                    continue
+                gencheckers.append(generic_eval(ipa, hwaddr))
+        if gencheckers:
+            await asyncio.gather(*gencheckers, return_exceptions=True)
+    finally:
+        scanner = None
 
 
 async def generic_eval(address, hwaddr=None):

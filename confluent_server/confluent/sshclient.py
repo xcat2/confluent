@@ -123,7 +123,9 @@ def connect(target, context=None, disable_hostkey_validation=False, known_hosts=
     sco = asyncssh.SSHClientConnectionOptions(
         client_factory=make_client,
         x509_trusted_cert_paths=None,
-        known_hosts=known_hosts)
+        known_hosts=known_hosts,
+        login_timeout=3,
+        connect_timeout=2)
     return asyncssh.connect(target, options=sco, **kwargs)
 
 
