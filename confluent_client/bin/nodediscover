@@ -81,16 +81,16 @@ async def subscribe_discovery(options, session, subscribe, targ):
             if 'status' in rsp:
                 print(rsp['status'])
     
-async def print_disco(options, session, currmac, outhandler, columns):
+async def print_disco(options, session, currid, outhandler, columns):
     procinfo = {}
-    async for tmpinfo in session.read('/discovery/by-mac/{0}'.format(currmac)):
+    async for tmpinfo in session.read('/discovery/by-id/{0}'.format(currid)):
         procinfo.update(tmpinfo)
     if 'Switch' in columns or 'Port' in columns:
         if 'switch' in procinfo:
             procinfo['port'] = procinfo['switchport']
         else:
             async for tmpinfo in session.read(
-                    '/networking/macs/by-mac/{0}'.format(currmac)):
+                    '/networking/macs/by-id/{0}'.format(currid)):
                 if 'ports' in tmpinfo:
                     # The api sorts so that the most specific available value
                     # is last
@@ -164,7 +164,7 @@ async def search_record(datum, options, session):
         options.__dict__[searchkey] = None
     for searchkey in searchkeys & set(datum):
         options.__dict__[searchkey] = datum[searchkey]
-    return [x async for x in list_matching_macs(options, session)]
+    return [x async for x in list_matching_ents(options, session)]
 
 
 def datum_to_attrib(datum):
@@ -259,7 +259,7 @@ async def assign_macs(maclist, nodename, assignlimit):
         # time and the caller's is busy defining the remaining nodes
         mysess = client.Command()
         for mac in maclist:
-            async for res in mysess.update('/discovery/by-mac/{0}'.format(mac),
+            async for res in mysess.update('/discovery/by-id/{0}'.format(mac),
                                            {'node': nodename}):
                 if 'error' in res:
                     sys.stderr.write(res['error'] + '\n')
@@ -288,8 +288,8 @@ async def list_discovery(options, session):
             if options.order.lower() == field.lower():
                 orderby = field
     outhandler = client.Tabulator(columns)
-    for mac in [x async for x in list_matching_macs(options, session)]:
-        await print_disco(options, session, mac, outhandler, columns)
+    for infoid in [x async for x in list_matching_ents(options, session)]:
+        await print_disco(options, session, infoid, outhandler, columns)
     if options.csv:
         outhandler.write_csv(sys.stdout, orderby)
     else:
@@ -297,15 +297,15 @@ async def list_discovery(options, session):
             print(row)
 
 async def clear_discovery(options, session):
-    allmacs = [x async for x in list_matching_macs(options, session)]
-    for mac in allmacs:
-        async for res in session.delete('/discovery/by-mac/{0}'.format(mac)):
+    allidentifiers = [x async for x in list_matching_ents(options, session)]
+    for infoid in allidentifiers:
+        async for res in session.delete('/discovery/by-id/{0}'.format(infoid)):
             if 'deleted' in res:
                 print('Cleared info for {0}'.format(res['deleted']))
             else:
                 print(repr(res))
 
-async def list_matching_macs(options, session, node=None, checknode=True):
+async def list_matching_ents(options, session, node=None, checknode=True):
     path = '/discovery/'
     if node:
         path += 'by-node/{0}/'.format(node)
@@ -324,14 +324,14 @@ async def list_matching_macs(options, session, node=None, checknode=True):
             options.state = 'unidentified'
         path += 'by-state/{0}/'.format(options.state).lower()
     if options.mac:
-        path += 'by-mac/{0}'.format(options.mac)
+        path += 'by-id/{0}'.format(options.mac)
         result = list([x async for x in session.read(path)])[0]
         if 'error' in result:
             return
         yield options.mac.replace(':', '-')
         return
     else:
-        path += 'by-mac/'
+        path += 'by-id/'
         async for x in session.read(path):
             if 'item' in x and 'href' in x['item']:
                 yield x['item']['href']
@@ -350,16 +350,16 @@ async def assign_discovery(options, session, needid=True):
         abort = True
     if abort:
         sys.exit(1)
-    matches = [x async for x in list_matching_macs(options, session, None if needid else options.node, False)]
+    matches = [x async for x in list_matching_ents(options, session, None if needid else options.node, False)]
     if not matches:
         # Do a rescan to catch missing requested data
         await blocking_scan(session)
-        matches = [x async for x in list_matching_macs(options, session, None if needid else options.node, False)]
+        matches = [x async for x in list_matching_ents(options, session, None if needid else options.node, False)]
     if not matches:
         sys.stderr.write("No matching discovery candidates found\n")
         sys.exit(1)
     exitcode = 0
-    async for res in session.update('/discovery/by-mac/{0}'.format(matches[0]),
+    async for res in session.update('/discovery/by-id/{0}'.format(matches[0]),
                    {'node': options.node}):
         if 'assigned' in res:
             print('Assigned: {0}'.format(res['assigned']))
@@ -405,8 +405,8 @@ async def main():
                            'UUID', metavar='UUID')
     parser.add_option('-n', '--node', help='Operate with the given nodename')
     parser.add_option('-e', '--ethaddr', dest='mac',
-                      help='Operate against the system with the specified MAC '
-                           'address', metavar='MAC')
+                      help='Operate against the system with the specified MAC or IP '
+                           'address if mac not available', metavar='MAC')
     parser.add_option('-t', '--type', dest='type',
                       help='Operate against the system of the specified type',
                       metavar='TYPE')

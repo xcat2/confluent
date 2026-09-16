@@ -368,8 +368,18 @@ def list_matching_states(criteria):
 def list_matching_macs(criteria):
     for mac in sorted(list(known_info)):
         info = known_info[mac]
+        if 'hwaddr' not in info:
+            continue
         if _info_matches(info, criteria):
             yield msg.ChildCollection(mac.replace(':', '-'))
+
+def list_matching_ids(criteria):
+    for info_id in sorted(list(known_info)):
+        info = known_info[info_id]
+        if 'info_identifier' not in info:
+            continue
+        if _info_matches(info, criteria):
+            yield msg.ChildCollection(info_id)
 
 
 def list_matching_types(criteria):
@@ -414,6 +424,7 @@ list_info = {
     'by-mac': list_matching_macs,
     'by-state': list_matching_states,
     'by-uuid': list_matching_uuids,
+    'by-id': list_matching_ids,
 }
 
 multi_selectors = set([
@@ -432,6 +443,7 @@ node_selectors = set([
 
 single_selectors = set([
     'by-mac',
+    'by-id',
 ])
 
 
@@ -554,8 +566,7 @@ async def register_remote_addrs(addresses, configmanager):
         try:
             sd = await ssdp.check_fish(('/DeviceDescription.json', nd))
             if not sd:
-                hwaddr = ':'.join(['{:02x}'.format(x) for x in hashlib.sha256(addr.encode('utf-8')).digest()[:6]])
-                return addr, await generic_eval(addr, hwaddr)
+                return addr, await generic_eval(addr)
             if 'macaddress' in sd['attributes']:
                 sd['hwaddr'] = sd['attributes']['macaddress']
             else:
@@ -676,7 +687,7 @@ def handle_read_api_request(pathcomponents):
         dirlist.append(msg.ChildCollection('subscriptions/'))
         return dirlist
     if not coll:
-        return show_info(queryparms['by-mac'])
+        return show_info(queryparms.get('by-id', queryparms.get('by-mac')))
     if not indexof:
         return [msg.ChildCollection(x + '/') for x in sorted(list(subcats))]
     if indexof not in list_info:
@@ -765,23 +776,21 @@ async def _recheck_single_unknown_info(configmanager, info):
     handler = info['handler'].NodeHandler(info, configmanager)
     if handler.https_supported and not await handler.get_https_cert():
         if handler.cert_fail_reason == 'unreachable':
-            log.log(
-                {
-                    'info': '{0} with hwaddr {1} is not reachable at {2}'
-                            ''.format(
-                        handler.devname, info['hwaddr'], handler.ipaddr
-                    )})
+            if info.get('hwaddr'):
+                infotxt = f'{handler.devname} with hwaddr {info["hwaddr"]} is not reachable at {handler.ipaddr}'
+            else:
+                infotxt = f'{handler.devname} is not reachable at {handler.ipaddr}'
+            log.log({'info': infotxt})
             # addresses data is bad, delete the offending ip
             info['addresses'] = [x for x in info.get('addresses', []) if x != handler.ipaddr]
             # TODO(jjohnson2):  rescan due to bad peer addr data?
             # not just wait around for the next announce
             return
-        log.log(
-            {
-                'info': '{0} with hwaddr {1} at address {2} is not yet running '
-                        'https, will examine later'.format(
-                    handler.devname, info['hwaddr'], handler.ipaddr
-                )})
+        if info.get('hwaddr'):
+            infotxt = f'{handler.devname} with hwaddr {info["hwaddr"]} at address {handler.ipaddr} is not yet running https, will examine later'
+        else:
+            infotxt = f'{handler.devname} at address {handler.ipaddr} is not yet running https, will examine later'
+        log.log({'info': infotxt})
         if rechecker is not None and rechecktime > util.monotonic_time() + 300:
             rechecker.cancel()
         # if cancel did not result in dead, then we are in progress
@@ -806,12 +815,14 @@ async def _recheck_single_unknown_info(configmanager, info):
 
 
 def safe_detected(info):
-    if 'hwaddr' not in info or not info['hwaddr']:
+    infoid = info.get('hwaddr', info.get('addresses', [[None]])[0][0])
+    if not infoid:
         return
-    if info['hwaddr'] in runningevals:
+    if infoid in runningevals:
         # Do not evaluate the same mac multiple times at once
         return
-    runningevals[info['hwaddr']] = tasks.spawn_task(eval_detected(info))
+    info['info_identifier'] = infoid
+    runningevals[info['info_identifier']] = tasks.spawn_task(eval_detected(info))
 
 
 async def eval_detected(info):
@@ -819,7 +830,7 @@ async def eval_detected(info):
         await detected(info)
     except Exception:
         traceback.print_exc()
-    del runningevals[info['hwaddr']]
+    del runningevals[info['info_identifier']]
 
 
 async def detected(info):
@@ -843,7 +854,7 @@ async def detected(info):
         tasks.spawn_after(10, info['protocol'].fix_info, info,
                              safe_detected)
         return
-    if info['hwaddr'] in known_info and 'addresses' in info:
+    if info['info_identifier'] in known_info and 'addresses' in info:
         # we should tee these up for parsing when an enclosure comes up
         # also when switch config parameters change, should discard
         # and there's also if wiring is fixed...
@@ -854,7 +865,7 @@ async def detected(info):
         # bz 93219, fix submitted, but not in builds yet
         # strictly speaking, going ipv4 only legitimately is mistreated here,
         # but that should be an edge case
-        oldaddr = known_info[info['hwaddr']].get('addresses', [])
+        oldaddr = known_info[info['info_identifier']].get('addresses', [])
         for addr in info['addresses']:
             if addr[0].startswith('fe80::'):
                 break
@@ -862,14 +873,14 @@ async def detected(info):
             for addr in oldaddr:
                 if addr[0].startswith('fe80::'):
                     info['addresses'].append(addr)
-        if known_info[info['hwaddr']].get(
+        if known_info[info['info_identifier']].get(
                 'addresses', []) == info['addresses']:
             # if the ip addresses match, then assume no changes
             # now something resetting to defaults could, in theory
             # have the same address, but need to be reset
             # in that case, however, a user can clear pubkeys to force a check
             return
-    known_info[info['hwaddr']] = info
+    known_info[info['info_identifier']] = info
     cfg = cfm.ConfigManager(None)
     if handler:
         handler = handler.NodeHandler(info, cfg)
@@ -894,7 +905,7 @@ async def detected(info):
         known_serials[info['serialnumber']] = info
     uuid = info.get('uuid', None)
     if uuid_is_valid(uuid):
-        known_uuids[uuid][info['hwaddr']] = info
+        known_uuids[uuid][info['info_identifier']] = info
     info['otheraddresses'] = set([])
     for i4addr in info.get('attributes', {}).get('ipv4-address', []):
         info['otheraddresses'].add(i4addr)
@@ -920,7 +931,7 @@ async def detected(info):
         if rechecker is None or rechecker.done():
             rechecktime = util.monotonic_time() + 300
             rechecker = tasks.spawn_task_after(300, _periodic_recheck, cfg)
-        unknown_info[info['hwaddr']] = info
+        unknown_info[info['info_identifier']] = info
         info['discostatus'] = 'unidentified'
         #TODO, spawn after to recheck sooner, or somehow else
         # influence periodic recheck to shorten delay?
@@ -934,7 +945,7 @@ async def detected(info):
                                           {}).get('value', None)
         if util.cert_matches(lastfp, await handler.get_https_cert()):
             info['nodename'] = nodename
-            known_nodes[nodename][info['hwaddr']] = info
+            known_nodes[nodename][info['info_identifier']] = info
             info['discostatus'] = 'discovered'
             uuid = info.get('uuid', None)
             if uuid:
@@ -960,7 +971,7 @@ async def detected(info):
         #                handler.devname, info['hwaddr'], handler.ipaddr
         #              )})
         info['discostatus'] = 'unidentified'
-        unknown_info[info['hwaddr']] = info
+        unknown_info[info['info_identifier']] = info
 
 
 
@@ -1143,8 +1154,11 @@ async def get_nodename(cfg, handler, info):
     if not nodename:  # as a last resort, search switches for info
         # This is the slowest potential operation, so we hope for the
         # best to occur prior to this
-        nodename, macinfo = await macmap.find_nodeinfo_by_mac(info['hwaddr'], cfg)
-        maccount = macinfo['maccount']
+        if 'hwaddr' in info:
+            nodename, macinfo = await macmap.find_nodeinfo_by_mac(info['hwaddr'], cfg)
+            maccount = macinfo['maccount']
+        else:
+            maccount = None
         if nodename:
             if handler.devname in ('SMM', 'SMM3'):
                 nl = list(cfg.filter_node_attributes(
@@ -1282,12 +1296,12 @@ async def eval_node(cfg, handler, info, nodename, manual=False):
         # do some preconfig, for example, to bring a SMM online if applicable
         await handler.preconfig(nodename)
     except Exception:
-        unknown_info[info['hwaddr']] = info
+        unknown_info[info['info_identifier']] = info
         info['discostatus'] = 'unidentified'
         errorstr = 'An error occurred during discovery, check the ' \
                    'trace and stderr logs, mac was {0} and ip was {1}' \
                    ', the node or the containing enclosure was {2}' \
-                   ''.format(info['hwaddr'], handler.ipaddr, nodename)
+                   ''.format(info['info_identifier'], handler.ipaddr, nodename)
         traceback.print_exc()
         if manual:
             raise exc.InvalidArgumentException(errorstr)
@@ -1297,7 +1311,7 @@ async def eval_node(cfg, handler, info, nodename, manual=False):
     # switch, it is probably the enclosure manager and not
     # the node directly.  switch is ambiguous and we should leave it alone
     if 'enclosure.bay' in info and handler.is_enclosure:
-        unknown_info[info['hwaddr']] = info
+        unknown_info[info['info_identifier']] = info
         info['discostatus'] = 'unidentified'
         log.log({'error': 'Something that is an enclosure reported a bay, '
                           'not possible'})
@@ -1318,10 +1332,10 @@ async def eval_node(cfg, handler, info, nodename, manual=False):
                     pending_nodes[match[2]] = info
                 return
         if 'enclosure.bay' not in info:
-            unknown_info[info['hwaddr']] = info
+            unknown_info[info['info_identifier']] = info
             info['discostatus'] = 'unidentified'
-            errorstr = '{2} with mac {0} is in {1}, but unable to ' \
-                       'determine bay number'.format(info['hwaddr'],
+            errorstr = '{2} with info identifier {0} is in {1}, but unable to ' \
+                       'determine bay number'.format(info['info_identifier'],
                                                      nodename,
                                                      handler.ipaddr)
             if manual:
@@ -1384,7 +1398,7 @@ async def eval_node(cfg, handler, info, nodename, manual=False):
             if manual:
                 raise exc.InvalidArgumentException(errorstr)
             log.log({'error': errorstr})
-            unknown_info[info['hwaddr']] = info
+            unknown_info[info['info_identifier']] = info
             info['discostatus'] = 'unidentified'
             return
         nodename = nl[0]
@@ -1440,9 +1454,9 @@ async def discover_node(cfg, handler, info, nodename, manual):
                     raise exc.InvalidArgumentException(
                     'Attempt to assign {0} conflicts with existing node {1} '
                     'based on TLS certificate.'.format(nodename, prevnode))
-    known_nodes[nodename][info['hwaddr']] = info
-    if info['hwaddr'] in unknown_info:
-        del unknown_info[info['hwaddr']]
+    known_nodes[nodename][info['info_identifier']] = info
+    if info['info_identifier'] in unknown_info:
+        del unknown_info[info['info_identifier']]
     info['discostatus'] = 'identified'
     dp = cfg.get_node_attributes(
         [nodename], ('discovery.policy', 'id.uuid',
@@ -1738,7 +1752,7 @@ async def blocking_scan(aggressive=False):
     scanner = None
 
 
-async def generic_eval(address, hwaddr):
+async def generic_eval(address, hwaddr=None):
     ports = await netutil.peer_reachable(address)
     if not ports:
         return None
@@ -1749,7 +1763,9 @@ async def generic_eval(address, hwaddr):
     if not addrinfo:
         return None
     sockaddr = addrinfo[0][4]
-    peerdata = {'addresses': [sockaddr], 'hwaddr': hwaddr, 'openports': ports}
+    peerdata = {'addresses': [sockaddr], 'openports': ports}
+    if hwaddr:
+        peerdata['hwaddr'] = hwaddr
     if 443 in ports:
         resdata = await ssdp.check_fish(('/redfish/v1/', peerdata))
         if resdata:
