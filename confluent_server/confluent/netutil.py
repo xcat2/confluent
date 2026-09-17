@@ -406,6 +406,21 @@ class NetManager(object):
         self.myattribs = {}
         self.consumednames4 = set([])
         self.consumednames6 = set([])
+        self.consumedaddrs = set([])
+
+    async def finalize(self):
+        for netname in self.myattribs:
+            myattribs = self.myattribs[netname]
+            if 'ipv4_address_from_name' in myattribs:
+                if myattribs['ipv4_address_from_name'] in self.consumedaddrs:
+                    del myattribs['ipv4_address']
+                    del myattribs['ipv4_method']
+                del myattribs['ipv4_address_from_name']
+            if 'ipv6_address_from_name' in myattribs:
+                if myattribs['ipv6_address_from_name'] in self.consumedaddrs:
+                    del myattribs['ipv6_address']
+                    del myattribs['ipv6_method']
+                del myattribs['ipv6_address_from_name']
 
     async def allmyaddrs(self):
         if not self._allmyaddrs:
@@ -448,13 +463,18 @@ class NetManager(object):
                         ipv4addr.replace(luaddr, ai[-1][0])
                 except socket.gaierror:
                     pass
+                if ipv4addr:
+                    self.consumedaddrs.add(ipv4addr.split('/', 1)[0])
             else:
                 currname = attribs.get('hostname', self.node).split()[0]
                 if currname and currname not in self.consumednames4:
                     try:
                         for ai in await asyncio.get_running_loop().getaddrinfo(currname, 0, family=socket.AF_INET, type=socket.SOCK_STREAM):
-                            ipv4addr = ai[-1][0]
-                            self.consumednames4.add(currname)
+                            if ai[-1][0] not in self.consumedaddrs:
+                                ipv4addr = ai[-1][0]
+                                self.consumednames4.add(currname)
+                        if ipv4addr:
+                            myattribs['ipv4_address_from_name'] = ipv4addr
                     except socket.gaierror:
                         pass
             if ipv4addr:
@@ -473,15 +493,20 @@ class NetManager(object):
                         ipv6addr = ai[-1][0]
                 except socket.gaierror:
                     pass
+                if ipv6addr:
+                    self.consumedaddrs.add(ipv6addr.split('/', 1)[0])
             else:
                 currname = attribs.get('hostname', self.node).split()[0]
                 if currname and currname not in self.consumednames6:
                     try:
                         for ai in await asyncio.get_running_loop().getaddrinfo(currname, 0, family=socket.AF_INET6, type=socket.SOCK_STREAM):
-                            ipv6addr = ai[-1][0]
-                            self.consumednames6.add(currname)
+                            if ai[-1][0] not in self.consumedaddrs:
+                                ipv6addr = ai[-1][0]
+                                self.consumednames6.add(currname)
                     except socket.gaierror:
                         pass
+                    if ipv6addr:
+                        myattribs['ipv6_address_from_name'] = ipv6addr
             if ipv6addr:
                 myattribs['ipv6_method'] = 'static'
                 myattribs['ipv6_address'] = ipv6addr
@@ -598,6 +623,7 @@ async def get_full_net_config(configmanager, node, serverip=None):
     for netname in sorted(attribs):
         ppool.schedule(nm.process_attribs, netname, attribs[netname])
     await ppool.waitall()
+    await nm.finalize()
     for iface in list(nm.myattribs):
         if bmc4 and nm.myattribs[iface].get('ipv4_address', None) == bmc4:
             del nm.myattribs[iface]
