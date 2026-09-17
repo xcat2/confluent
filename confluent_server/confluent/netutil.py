@@ -435,6 +435,9 @@ class NetManager(object):
         hwaddr = attribs.get('hwaddr', None)
         if hwaddr:
             myattribs['hwaddr'] = hwaddr
+        lease_time = attribs.get('lease_time', None)
+        if lease_time:
+            myattribs['lease_time'] = lease_time
         conname = attribs.get('connection_name', None)
         if conname:
             myattribs['connection_name'] = conname

@@ -505,6 +505,9 @@ node = {
                        'This would be the default name per the deployed OS and can be a comma delimited list to denote members of '
                        'a team/bond or a single interface for VLAN/PKEY connections.'
     },
+    'net.lease_time': {
+        'description': 'Lease time for DHCP assigned addresses on this interface.  Assigning this triggers confluent to offer to arbitrary matching DHCP requests, which may conflict with other DHCP servers on the network.  This allows confluent to provide DHCP services on a fixed-address basis only if no other DHCP server is on the network.  This option is not required even if there is no other DHCP server for static address management, only if you want to leave the node using DHCP to acquire an address.',
+    },
     'net.mtu': {
             'description': 'MTU to apply to this connection',
     },
@@ -617,15 +620,16 @@ node = {
 #    'id.modelname': {
 #        'description': 'The manufacturer model label for the node',
 #    },
-#    'id.snmpengineid': {
-#        'description': 'The SNMP Engine id used by this node',
-#    },
-#    'secret.snmpuser': {
-#        'description': 'The user to use for SNMPv3 access to this node',
-#    },
-#    'secret.snmppassword': {
-#        'description': 'The password to use for SNMPv3 access to this node',
-#    },
+    'secret.adminuser': {
+        'description': 'The username for the administrative account on the node.  This is not used for OS deployment configuration,'
+                       'Instead, it is used to access systems using API or SSH. For example, network switches with BMCs where the hardwaremanagement user'
+                       'applies to the BMC, but need to refer to the switch separately',
+    },
+    'secret.adminpassword': {
+        'description': 'The password for the administrative account on the node.  This is not used for OS deployment configuration,'
+                       'Instead, it is used to access systems using API or SSH. For example, network switches with BMCs where the hardwaremanagement password'
+                       'applies to the BMC, but need to refer to the switch separately',
+    },
     'secret.selfapiarmtoken': {
         'description': 'A one-time use shared secret to authenticate a node api token',
     },
