@@ -1,4 +1,4 @@
-# Copyright 2019-2022 Lenovo Corporation
+# Copyright 2019-2026 Lenovo Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,8 +30,26 @@ from aiohmi.util.parse import parse_time
 from datetime import datetime
 from datetime import timedelta
 from dateutil import tz
+import re
 import socket
 
+
+# A sensor from the modern Sensors collection describes itself by its redfish
+# reading type, while a sensor from the older Thermal and Power documents, and
+# every sensor over ipmi, is described by the ipmi sensor type.  Callers ask
+# for a category by the latter, so translate, and a sensor means the same thing
+# whichever document it was read from.
+_readingtypes = {
+    'Temperature': 'Temperature',
+    'Rotational': 'Fan',
+    'AirFlow': 'Cooling Device',
+    'Voltage': 'Voltage',
+    'Current': 'Current',
+    'Power': 'Power',
+    'EnergyJoules': 'Energy',
+    'EnergykWh': 'Energy',
+    'EnergyWh': 'Energy',
+}
 
 def _maybe_transient(theexc):
     """Whether a request might succeed if it were simply asked again.
@@ -66,6 +84,30 @@ def _pem_to_dict(pemdata, uefi=False):
     if uefi:
         cert_dict['UefiSignatureOwner'] = str(uuid.uuid4())
     return cert_dict
+
+numregex = re.compile('([0-9]+)')
+
+def naturalize_string(key):
+    """Analyzes string in a human way to enable natural sort
+
+    :param nodename: The node name to analyze
+    :returns: A structure that can be consumed by 'sorted'
+    """
+    return [int(text) if text.isdigit() else text.lower()
+            for text in re.split(numregex, key)]
+
+
+def natural_sort(iterable):
+    """Return a sort using natural sort if possible
+
+    :param iterable:
+    :return:
+    """
+    try:
+        return sorted(iterable, key=naturalize_string)
+    except TypeError:
+        # The natural sort attempt failed, fallback to ascii sort
+        return sorted(iterable)
 
 class SensorReading(object):
     def __init__(self, healthinfo, sensor=None, value=None, units=None,
@@ -238,6 +280,8 @@ class OEMHandler(object):
     @classmethod
     async def create(cls, sysinfo, sysurl, webclient, cache, gpool=None, rootinfo={}):
         self = cls()
+        self._varsensormap = {}
+        self._varsensormapvintage = 0
         self._gpool = gpool
         self._varsysinfo = sysinfo
         self._varsysurl = sysurl
@@ -342,7 +386,7 @@ class OEMHandler(object):
         cputemps = []
         sysinfo = await fishclient.sysinfo()
         for chassis in sysinfo.get('Links', {}).get('Chassis', []):
-            thermals = await fishclient._get_thermals(chassis)
+            thermals = await self._get_thermals(chassis)
             for temp in thermals:
                 if temp.get('PhysicalContext', '') != 'CPU':
                     continue
@@ -1895,3 +1939,128 @@ class OEMHandler(object):
     async def reseat_bay(self, bay):
         raise exc.UnsupportedFunctionality(
             'Reseat not supported on this platform')
+    
+    async def get_sensor_descriptions(self):
+        sensormap = await self._sensormap()
+        for sensor in natural_sort(sensormap):
+            yield sensormap[sensor]
+
+    async def get_sensor_reading(self, sensorname):
+        sensormap = await self._sensormap()
+        if sensorname not in sensormap:
+            raise Exception('Sensor not found')
+        sensor = sensormap[sensorname]
+        if 'sensedata' in sensor:
+            reading = sensor['sensedata']
+        else:
+            reading = await self._do_web_request(sensor['url'], cache=1)
+        return self._extract_reading(sensor, reading)
+
+    async def get_sensor_data(self):
+        for sensor in natural_sort(await self._sensormap()):
+            yield await self.get_sensor_reading(sensor)
+
+    async def _sensormap(self):
+        if self._varsensormapvintage < time.time() - 2:
+            self._varsensormap = {}
+        if not self._varsensormap:
+            sysinfo = await self.sysinfo()
+            if sysinfo:
+                for chassis in sysinfo.get('Links', {}).get('Chassis', []):
+                    await self._mapchassissensors(chassis)
+            else:  # no system, but check if this is a singular chassis
+                rootinfo = await self._do_web_request('/redfish/v1/')
+                chassiscol = rootinfo.get('Chassis', {}).get('@odata.id', '')
+                if chassiscol:
+                    chassislist = await self._do_web_request(chassiscol)
+                    if len(chassislist.get('Members', [])) == 1:
+                        await self._mapchassissensors(chassislist['Members'][0])
+        self._varsensormapvintage = time.time()
+        return self._varsensormap
+
+    async def _mapchassissensors(self, chassis):
+        chassisurl = chassis['@odata.id']
+        chassisinfo = await self._do_web_request(chassisurl)
+        sensors = None
+        if self.usegenericsensors:
+            sensors = chassisinfo.get('Sensors', {}).get('@odata.id', '')
+        if sensors:
+            self._invalidate_url_cache(sensors)
+            sensorinf = await self._get_expanded_data(sensors)
+            vintage = time.time()
+            for sensedata in sensorinf.get('Members', []):
+                if 'Name' in sensedata:
+                    sensetype = sensedata.get('ReadingType', 'Unknown')
+                    sensetype = _readingtypes.get(sensetype, sensetype)
+                    self._varsensormap[sensedata['Name']] = {
+                        'name': sensedata['Name'], 'type': sensetype,
+                        'url': sensedata['@odata.id'], 'generic': True, 'sensedata': sensedata, 'vintage': vintage}
+        else:
+            powurl = chassisinfo.get('Power', {}).get('@odata.id', '')
+            if powurl:
+                powinf = await self._do_web_request(powurl)
+                for voltage in powinf.get('Voltages', []):
+                    if 'Name' in voltage:
+                        self._varsensormap[voltage['Name']] = {
+                            'name': voltage['Name'], 'url': powurl,
+                            'type': 'Voltage'}
+            thermurl = chassisinfo.get('Thermal', {}).get('@odata.id', '')
+            if thermurl:
+                therminf = await self._do_web_request(thermurl)
+                for fan in therminf.get('Fans', []):
+                    if 'Name' in fan:
+                        self._varsensormap[fan['Name']] = {
+                            'name': fan['Name'], 'type': 'Fan',
+                            'url': thermurl}
+                for temp in therminf.get('Temperatures', []):
+                    if 'Name' in temp:
+                        self._varsensormap[temp['Name']] = {
+                            'name': temp['Name'], 'type': 'Temperature',
+                            'url': thermurl}      
+        for subchassis in chassisinfo.get('Links', {}).get('Contains', []):
+            await self._mapchassissensors(subchassis)
+
+    async def _get_thermals(self, chassis):
+        chassisurl = chassis['@odata.id']
+        chassisinfo = await self._do_web_request(chassisurl)
+        thermurl = chassisinfo.get('Thermal', {}).get('@odata.id', '')
+        if thermurl:
+            therminf = await self._do_web_request(thermurl, cache=1)
+            return therminf.get('Temperatures', [])
+
+    def _extract_reading(self, sensor, reading):
+        if sensor.get('generic', False):  # generic sensor
+            val = reading.get('Reading', None)
+            unavail = val is None
+            units = reading.get('ReadingUnits', None)
+            if units == 'Cel':
+                units = '°C'
+            if units == 'cft_i/min':
+                units = 'CFM'
+            return SensorReading(reading, None, value=val, units=units,
+                          unavailable=unavail)
+        if sensor['type'] == 'Fan':
+            for fan in reading['Fans']:
+                if fan['Name'] == sensor['name']:
+                    val = fan.get('Reading', None)
+                    unavail = val is None
+                    units = fan.get('ReadingUnits', None)
+                    return SensorReading(
+                        None, sensor, value=val, units=units,
+                        unavailable=unavail)
+        elif sensor['type'] == 'Temperature':
+            for temp in reading['Temperatures']:
+                if temp['Name'] == sensor['name']:
+                    val = temp.get('ReadingCelsius', None)
+                    unavail = val is None
+                    return SensorReading(
+                        None, sensor, value=val, units='°C',
+                        unavailable=unavail)
+        elif sensor['type'] == 'Voltage':
+            for volt in reading['Voltages']:
+                if volt['Name'] == sensor['name']:
+                    val = volt.get('ReadingVolts', None)
+                    unavail = val is None
+                    return SensorReading(
+                        None, sensor, value=val, units='V',
+                        unavailable=unavail)

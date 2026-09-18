@@ -71,6 +71,9 @@ class OEMHandler(generic.OEMHandler):
         self.datacache = {}
         return self
 
+    async def get_default_sysurl(self):
+        return '/redfish/v1/Systems/1'
+
     async def weblogout(self):
         if self.webclient:
             try:
