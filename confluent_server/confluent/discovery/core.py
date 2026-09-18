@@ -662,9 +662,9 @@ async def handle_api_request(configmanager, inputdata, operation, pathcomponents
 
 def _get_mac_from_query(pathcomponents):
     _, queryparms, _, _ = _parameterize_path(pathcomponents[1:])
-    if 'by-mac' not in queryparms:
-        raise exc.InvalidArgumentException('Must target using "by-mac"')
-    mac = queryparms['by-mac'].replace('-', ':')
+    if 'by-id' not in queryparms and 'by-mac' not in queryparms:
+        raise exc.InvalidArgumentException('Must target using "by-mac" or "by-id"')
+    mac = queryparms.get('by-mac', queryparms.get('by-id', '')).replace('-', ':')
     if mac not in known_info:
         raise exc.NotFoundException('{0} not found'.format(mac))
     return mac
