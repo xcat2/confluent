@@ -107,7 +107,7 @@ class _MyClient(asyncssh.SSHClient):
         self.confluent_custom_ctx = ctx
 
 
-def connect(target, context=None, disable_hostkey_validation=False, known_hosts=(), nodename=None, configmanager=None, keyattrib='pubkeys.ssh', **kwargs):
+def connect(target, context=None, disable_hostkey_validation=False, known_hosts=(), nodename=None, configmanager=None, keyattrib='pubkeys.ssh', quickquit=False, **kwargs):
     if context is None:
         context = {}
     def make_client():
@@ -120,19 +120,24 @@ def connect(target, context=None, disable_hostkey_validation=False, known_hosts=
 
         client.confluent_set_context(context)
         return client
+    login_timeout=30
+    connect_timeout=30
+    if quickquit:
+        login_timeout=2
+        connect_timeout=2
     sco = asyncssh.SSHClientConnectionOptions(
         client_factory=make_client,
         x509_trusted_cert_paths=None,
         known_hosts=known_hosts,
-        login_timeout=3,
-        connect_timeout=2)
+        login_timeout=login_timeout,
+        connect_timeout=connect_timeout)
     return asyncssh.connect(target, options=sco, **kwargs)
 
 
 async def get_ssh_banner(target):
     mycontext = {'nologon': True}
     try:
-        async with connect(target, disable_hostkey_validation=True, context=mycontext):
+        async with connect(target, disable_hostkey_validation=True, quickquit=True, context=mycontext):
             pass
     except _CancelSsh:
         pass

@@ -79,6 +79,7 @@ import confluent.discovery.handlers.xcc as xcc
 import confluent.discovery.handlers.xcc3 as xcc3
 import confluent.discovery.handlers.smm3 as smm3
 import confluent.discovery.handlers.megarac as megarac
+import confluent.discovery.handlers.nvos as nvos
 import confluent.discovery.handlers.eureka as eureka
 import confluent.exceptions as exc
 import confluent.log as log
@@ -134,7 +135,7 @@ nodehandlers = {
     'generic-redfish': None,
     'generic-https': None,
     'generic-ssh': None,
-    'nvos-switch': None,
+    'nvos-switch': nvos,
     #'openbmc': None,
     'service:io-device.Lenovo:management-module': None,
     'service:thinkagile-storage': cpstorage,

@@ -140,6 +140,17 @@ def mac2lla(mac):
     lla = f'fe80::{first_half[0:4]}:{first_half[4:]}ff:fe{second_half[0:2]}:{second_half[2:6]}'
     return lla
 
+async def my_ip_facing(target):
+    addrinfo = await asyncio.get_running_loop().getaddrinfo(
+                            target, 0, type=socket.SOCK_DGRAM)
+    family, socktype, proto, _, destination = addrinfo[0]
+    myip = None
+    with socket.socket(family, socktype, proto) as sock:
+        # UDP connect selects the route and local address without
+        # transmitting a packet.
+        sock.connect(destination)
+        myip = sock.getsockname()[0]
+    return myip
 
 async def mac2ip(mac):
     lla = None
@@ -778,6 +789,7 @@ async def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
         'ipv6_address': None,
         'ipv6_method': None,
         'lease_time': None,
+        'config_name': None,
     }
     myaddrs = []
     if ifidx is not None:
@@ -876,6 +888,7 @@ async def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
                         if ((isremote and ipn_on_same_subnet(fam, clientipn, candipn, int(candprefix)))
                                 or ipn_on_same_subnet(fam, bootsvrip, candipn, prefix)):
                             bestsrvbyfam[fam] = svrip
+                            cfgdata['config_name'] = candidate
                             cfgdata['ipv{}_address'.format(nver)] = candip
                             cfgdata['ipv{}_method'.format(nver)] = ipmethod
                             cfgdata['ipv{}_gateway'.format(nver)] = cfgbyname[candidate].get(
