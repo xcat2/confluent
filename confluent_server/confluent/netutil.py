@@ -859,7 +859,7 @@ async def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
                 cfgdata[srvkey] = socket.inet_ntop(fam, svrip)
             for candidate in cfgbyname:
                 ipmethod = cfgbyname[candidate].get('ipv{}_method'.format(nver), 'static')
-                leasetime = cfgbyname[candidate].get('lease_time'.format(nver), None)
+                leasetime = cfgbyname[candidate].get('lease_time', None)
                 if leasetime:
                     cfgdata['lease_time'] = leasetime
                 if not ipmethod:

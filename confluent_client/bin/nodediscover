@@ -353,7 +353,10 @@ async def assign_discovery(options, session, needid=True):
     matches = [x async for x in list_matching_ents(options, session, None if needid else options.node, False)]
     if not matches:
         # Do a rescan to catch missing requested data
-        await blocking_scan(session)
+        if needid and options.mac and '.' in options.mac:
+            await register_endpoint(options, session, options.mac)
+        else:
+            await blocking_scan(session)
         matches = [x async for x in list_matching_ents(options, session, None if needid else options.node, False)]
     if not matches:
         sys.stderr.write("No matching discovery candidates found\n")

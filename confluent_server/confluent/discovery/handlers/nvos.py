@@ -47,7 +47,7 @@ class NodeHandler(generic.NodeHandler):
                 async with sshclient.connect(myaddress, username='admin', password='admin', nodename=nodename, configmanager=self.configmanager) as conn:
                     res = await conn.run(f"nv set system aaa user admin password '{adminpass}'")
                     if res.exit_status == 0:
-                        res = await conn.run(f'nv config apply')
+                        res = await conn.run('nv config apply')
                     if res.exit_status != 0:
                         raise RuntimeError("Failed to apply NVOS configuration")
                     
