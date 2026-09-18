@@ -591,34 +591,42 @@ myipbypeer = {}
 async def check_reply(node, info, packet, sock, cfg, reqview, addr, requestor):
     if not requestor:
         requestor = ('0.0.0.0', None)
+    isboot = True
     if requestor[0] == '0.0.0.0' and not info.get('uuid', None):
-        return  # ignore DHCP from local non-PXE segment
-
-    httpboot = info.get('architecture', None) == 'uefi-httpboot'
+        isboot = False
+        if addr:
+            niccfg = await netutil.get_nic_config(cfg, node, ifidx=addr[-1], onlyfamily=socket.AF_INET6)
+        else:
+            niccfg = await netutil.get_nic_config(cfg, node, ifidx=info['netinfo']['ifidx'], onlyfamily=socket.AF_INET)
+        if not niccfg.get('lease_time'):
+            return  # ignore DHCP from local non-PXE segment
     cfd = cfg.get_node_attributes(node, ('deployment.*', 'collective.managercandidates'))
     profile, stgprofile = get_deployment_profile(node, cfg, cfd)
-    if ((not profile)
-            and (requestor[0] == '0.0.0.0' or not stgprofile)):
-        if time.time() > ignoremacs.get(info['hwaddr'], 0) + 90:
-            ignoremacs[info['hwaddr']] = time.time()
-            log.log({'info': 'Ignoring boot attempt by {0} no deployment profile specified (uuid {1}, hwaddr {2})'.format(
-                node, info.get('uuid', 'NA'), info['hwaddr']
-            )})
-        return
+    if isboot:
+        if ((not profile)
+                and (requestor[0] == '0.0.0.0' or not stgprofile)):
+            if time.time() > ignoremacs.get(info['hwaddr'], 0) + 90:
+                ignoremacs[info['hwaddr']] = time.time()
+                log.log({'info': 'Ignoring boot attempt by {0} no deployment profile specified (uuid {1}, hwaddr {2})'.format(
+                    node, info.get('uuid', 'NA'), info['hwaddr']
+                )})
+            return
     if addr:
         if packet['vci'] and packet['vci'].startswith('PXEClient'):
             log.log({'info': 'IPv6 PXE boot attempt by {0}, but IPv6 PXE is not supported, try IPv6 HTTP boot or IPv4 boot'.format(node)})
             return
         return await reply_dhcp6(node, addr, cfg, packet, cfd, profile, sock)
     else:
-        return await reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, sock, requestor)
+        httpboot = info.get('architecture', None) == 'uefi-httpboot'
+        return await reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, sock, requestor, niccfg=niccfg)
 
-async def reply_dhcp6(node, addr, cfg, packet, cfd, profile, sock):
+async def reply_dhcp6(node, addr, cfg, packet, cfd, profile, sock, niccfg=None):
     myaddrs = await netutil.get_my_addresses(addr[-1], socket.AF_INET6)
     if not myaddrs:
         log.log({'info': 'Unable to provide IPv6 boot services to {0}, no viable IPv6 configuration on interface index "{1}" to respond through.'.format(node, addr[-1])})
         return
-    niccfg = await netutil.get_nic_config(cfg, node, ifidx=addr[-1], onlyfamily=socket.AF_INET6)
+    if not niccfg:
+        niccfg = await netutil.get_nic_config(cfg, node, ifidx=addr[-1], onlyfamily=socket.AF_INET6)
     ipv6addr = niccfg.get('ipv6_address', None)
     ipv6prefix = niccfg.get('ipv6_prefix', None)
     ipv6method = niccfg.get('ipv6_method', 'static')
@@ -698,7 +706,7 @@ def get_my_duid():
 
 _recent_txids = {}
 
-async def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, sock=None, requestor=None):
+async def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, sock=None, requestor=None, niccfg=None):
     replen = 275  # default is going to be 286
     # while myipn is describing presumed destination, it's really
     # vague in the face of aliases, need to convert to ifidx and evaluate
@@ -737,8 +745,8 @@ async def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, 
     repview[10:11] = b'\x80'  # always set broadcast
     repview[28:44] = reqview[28:44]  # copy chaddr field
     relayip = reqview[24:28].tobytes()
-    if (not isboot) and relayip == b'\x00\x00\x00\x00':
-        # Ignore local DHCP packets if it isn't a firmware request
+    if (not isboot) and relayip == b'\x00\x00\x00\x00' and not (niccfg and niccfg.get('lease_time')):
+        # Ignore local DHCP packets if it isn't a firmware request and operator didn't opt into lease_time
         return
     relayipa = None
     if relayip != b'\x00\x00\x00\x00':
@@ -823,7 +831,11 @@ async def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, 
         repview[242:243] = b'\x05'
     repview[243:245] = b'\x36\x04' # DHCP server identifier
     repview[245:249] = myipn
-    repview[249:255] = b'\x33\x04\x00\x00\x00\xf0'  # fixed short lease time
+    if niccfg.get('lease_time'):
+        leasetime = int(niccfg['lease_time'])
+        repview[249:255] = b'\x33\x04' + struct.pack('!I', leasetime)        
+    else:
+        repview[249:255] = b'\x33\x04\x00\x00\x00\xf0'  # fixed short lease time
     repview[255:257] = b'\x61\x11'
     if packet.get(97, None) is not None:
         repview[257:274] = packet[97]
@@ -941,6 +953,8 @@ def ack_request(pkt, rq, info, sock=None, requestor=None):
     hwaddr = rq[28:28+hwlen].tobytes()
     relayip = rq[24:28].tobytes()
     myipn = myipbypeer.get(hwaddr, None)
+    #TODO(jjohnson2): This only works for the discover/offer/request/ack sequence, the renewal is broken
+    # Will need to refactor the reply_dhcp logic to generate a new reply for other request
     if not myipn or pkt.get(54, None) != myipn:
         return
     assigninfo = staticassigns.get(hwaddr, None)

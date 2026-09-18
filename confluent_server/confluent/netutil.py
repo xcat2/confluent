@@ -777,6 +777,7 @@ async def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
         'ipv6_prefix': None,
         'ipv6_address': None,
         'ipv6_method': None,
+        'lease_time': None,
     }
     myaddrs = []
     if ifidx is not None:
@@ -846,6 +847,9 @@ async def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
                 cfgdata[srvkey] = socket.inet_ntop(fam, svrip)
             for candidate in cfgbyname:
                 ipmethod = cfgbyname[candidate].get('ipv{}_method'.format(nver), 'static')
+                leasetime = cfgbyname[candidate].get('lease_time'.format(nver), None)
+                if leasetime:
+                    cfgdata['lease_time'] = leasetime
                 if not ipmethod:
                     ipmethod = 'static'
                 if ipmethod == 'dhcp':
