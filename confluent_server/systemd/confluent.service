@@ -11,6 +11,7 @@ RuntimeDirectory=confluent
 CacheDirectory=confluent
 LogsDirectory=confluent
 ConfigurationDirectory=confluent
+ConfigurationDirectoryMode=0700
 ExecStart=/opt/confluent/bin/confluent -f
 ExecStop=/opt/confluent/bin/confetty shutdown /
 Restart=on-failure
