@@ -30,7 +30,6 @@ from aiohmi.util.parse import parse_time
 from datetime import datetime
 from datetime import timedelta
 from dateutil import tz
-import re
 import socket
 
 
@@ -954,10 +953,10 @@ class OEMHandler(object):
                                    etag='*') # thetag)
         return {'bootdev': reqbootdev}
 
-    def _get_cache(self, url):
+    def _get_cache(self, url, maxage=30):
         now = os.times()[4]
         cachent = self._urlcache.get(url, None)
-        if cachent and cachent['vintage'] > now - 30:
+        if cachent and cachent['vintage'] > now - maxage:
             return cachent['contents']
         return None
 
@@ -1816,7 +1815,9 @@ class OEMHandler(object):
     async def _do_web_request(self, url, payload=None, method=None, cache=True, etag=None):
         res = None
         if cache and payload is None and method is None:
-            res = self._get_cache(url)
+            if cache is True:
+                cache = 30
+            res = self._get_cache(url, maxage=cache)
         if res:
             return res
         # If doing a method that may change remote url state, invalidate cache
@@ -1953,7 +1954,7 @@ class OEMHandler(object):
         if 'sensedata' in sensor:
             reading = sensor['sensedata']
         else:
-            reading = await self._do_web_request(sensor['url'], cache=1)
+            reading = await self._do_web_request(sensor['url'], cache=False)
         return self._extract_reading(sensor, reading)
 
     async def get_sensor_data(self):
@@ -1961,7 +1962,7 @@ class OEMHandler(object):
             yield await self.get_sensor_reading(sensor)
 
     async def _sensormap(self):
-        if self._varsensormapvintage < time.time() - 2:
+        if self._varsensormapvintage < time.monotonic() - 2:
             self._varsensormap = {}
         if not self._varsensormap:
             sysinfo = await self.sysinfo()
@@ -1975,7 +1976,7 @@ class OEMHandler(object):
                     chassislist = await self._do_web_request(chassiscol)
                     if len(chassislist.get('Members', [])) == 1:
                         await self._mapchassissensors(chassislist['Members'][0])
-        self._varsensormapvintage = time.time()
+            self._varsensormapvintage = time.monotonic()
         return self._varsensormap
 
     async def _mapchassissensors(self, chassis):
@@ -1987,7 +1988,7 @@ class OEMHandler(object):
         if sensors:
             self._invalidate_url_cache(sensors)
             sensorinf = await self._get_expanded_data(sensors)
-            vintage = time.time()
+            vintage = time.monotonic()
             for sensedata in sensorinf.get('Members', []):
                 if 'Name' in sensedata:
                     sensetype = sensedata.get('ReadingType', 'Unknown')
@@ -1998,7 +1999,7 @@ class OEMHandler(object):
         else:
             powurl = chassisinfo.get('Power', {}).get('@odata.id', '')
             if powurl:
-                powinf = await self._do_web_request(powurl)
+                powinf = await self._do_web_request(powurl, cache=1)
                 for voltage in powinf.get('Voltages', []):
                     if 'Name' in voltage:
                         self._varsensormap[voltage['Name']] = {
@@ -2006,7 +2007,7 @@ class OEMHandler(object):
                             'type': 'Voltage'}
             thermurl = chassisinfo.get('Thermal', {}).get('@odata.id', '')
             if thermurl:
-                therminf = await self._do_web_request(thermurl)
+                therminf = await self._do_web_request(thermurl, cache=1)
                 for fan in therminf.get('Fans', []):
                     if 'Name' in fan:
                         self._varsensormap[fan['Name']] = {
