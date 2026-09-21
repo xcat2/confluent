@@ -37,8 +37,16 @@ async def get_handler(sysinfo, sysurl, webclient, cache, cmd, rootinfo={}):
         if status != 200:
             mgrinfo = {}
     if not leninf:
-        bmcinfo = await cmd.bmcinfo()
-        if 'Ami' in bmcinfo.get('Oem', {}):
+        mgrcollection, status = await webclient.grab_json_response_with_status('/redfish/v1/Managers')
+        if status != 200:
+            mgrcollection = {}
+        managers = mgrcollection.get('Members', [])
+        if len(managers) != 1:
+            raise exc.PyghmiException('Unexpected number of managers found')
+        mgrinfo, status = await webclient.grab_json_response_with_status(managers[0].get('@odata.id', ''))
+        if status != 200:
+            mgrinfo = {}
+        if 'Ami' in mgrinfo.get('Oem', {}):
             return await tsma.TsmHandler.create(sysinfo, sysurl, webclient, cache, gpool=cmd._gpool)
     elif 'xclarity controller' in mgrinfo.get('Model', '').lower():
         if mgrinfo['Model'].endswith('3'):
