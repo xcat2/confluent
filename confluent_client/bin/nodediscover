@@ -88,9 +88,9 @@ async def print_disco(options, session, currid, outhandler, columns):
     if 'Switch' in columns or 'Port' in columns:
         if 'switch' in procinfo:
             procinfo['port'] = procinfo['switchport']
-        else:
+        elif ':' in currid:
             async for tmpinfo in session.read(
-                    '/networking/macs/by-id/{0}'.format(currid)):
+                    '/networking/macs/by-mac/{0}'.format(currid)):
                 if 'ports' in tmpinfo:
                     # The api sorts so that the most specific available value
                     # is last
