@@ -592,6 +592,7 @@ async def check_reply(node, info, packet, sock, cfg, reqview, addr, requestor):
     if not requestor:
         requestor = ('0.0.0.0', None)
     isboot = True
+    niccfg = None
     if requestor[0] == '0.0.0.0' and not info.get('uuid', None):
         isboot = False
         if addr:
