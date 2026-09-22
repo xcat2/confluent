@@ -707,8 +707,8 @@ def get_my_duid():
 
 _recent_txids = {}
 
-async def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, sock=None, requestor=None, niccfg=None):
-    replen = 275  # default is going to be 286
+async def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, sock=None, requestor=None, niccfg=None, broadcast=True):
+    replen = 256 # 275  # default is going to be 286
     # while myipn is describing presumed destination, it's really
     # vague in the face of aliases, need to convert to ifidx and evaluate
     # aliases for best match to guess
@@ -743,7 +743,10 @@ async def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, 
     repview[0:1] = b'\x02'
     repview[1:10] = reqview[1:10] # duplicate txid, hwlen, and others
     thistxid = bytes(repview[4:8])
-    repview[10:11] = b'\x80'  # always set broadcast
+    if broadcast:
+        repview[10:11] = b'\x80'  # set broadcast
+    else:
+        repview[10:11] = b'\x00'  # clear broadcast if not set
     repview[28:44] = reqview[28:44]  # copy chaddr field
     relayip = reqview[24:28].tobytes()
     if (not isboot) and relayip == b'\x00\x00\x00\x00' and not (niccfg and niccfg.get('lease_time')):
@@ -765,6 +768,7 @@ async def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, 
     clipn = None
     if niccfg['ipv4_method'] == 'firmwarenone':
         return
+    repview[12:16] = reqview[12:16]
     if niccfg['ipv4_address'] and niccfg['ipv4_method'] != 'firmwaredhcp':
         clipn = socket.inet_aton(niccfg['ipv4_address'])
         repview[16:20] = clipn
@@ -837,9 +841,10 @@ async def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, 
         repview[249:255] = b'\x33\x04' + struct.pack('!I', leasetime)        
     else:
         repview[249:255] = b'\x33\x04\x00\x00\x00\xf0'  # fixed short lease time
-    repview[255:257] = b'\x61\x11'
     if packet.get(97, None) is not None:
+        repview[255:257] = b'\x61\x11'
         repview[257:274] = packet[97]
+        replen += 19
     # Note that sending PXEClient kicks off the proxyDHCP procedure, ignoring
     # boot filename and such in the DHCP packet
     # we will simply always do it to provide the boot payload in a consistent
@@ -887,7 +892,7 @@ async def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, 
     datasum = ~datasum & 0xffff
     repview[26:28] = struct.pack('!H', datasum)
     if clipn:
-        staticassigns[fulladdr] = (clipn, repview[:replen + 28].tobytes())
+        staticassigns[fulladdr] = (clipn, repview[:replen + 28].tobytes(), node, cfg)
     elif fulladdr in staticassigns:
         del staticassigns[fulladdr]
     if httpboot:
@@ -905,10 +910,10 @@ async def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, 
         ipinfo = 'without address, served from {0}'.format(myip)
     if relayipa:
         ipinfo += ' (relayed to {} via {})'.format(relayipa, requestor[0])
-    tasks.spawn(send_rsp(repview, replen, requestor, relayip, reqview, info, deferanswer, isboot, node, boottype, ipinfo, sock))
+    tasks.spawn(send_rsp(repview, replen, requestor, relayip, reqview, info, deferanswer, isboot, node, boottype, ipinfo, sock, broadcast))
 
 
-async def send_rsp(repview, replen, requestor, relayip, reqview, info, defertxid, isboot, node, boottype, ipinfo, sock):
+async def send_rsp(repview, replen, requestor, relayip, reqview, info, defertxid, isboot, node, boottype, ipinfo, sock, broadcast=True):
     if defertxid:
         await asyncio.sleep(0.5)
         if defertxid in _recent_txids:
@@ -920,7 +925,7 @@ async def send_rsp(repview, replen, requestor, relayip, reqview, info, defertxid
     else:
         log.log({
             'info': 'Offering DHCP {} to {}'.format(ipinfo, node)})
-    if relayip != b'\x00\x00\x00\x00':
+    if relayip != b'\x00\x00\x00\x00' or not broadcast:
         sock.sendto(repview[28:28 + replen], requestor)
     else:
         send_raw_packet(repview, replen + 28, reqview, info)
@@ -949,13 +954,30 @@ def send_raw_packet(repview, replen, reqview, info):
     sendto(tsock.fileno(), pkt, replen, 0, ctypes.byref(targ),
            ctypes.sizeof(targ))
 
-def ack_request(pkt, rq, info, sock=None, requestor=None):
+
+async def ack_request_full(pkt, rq, info, sock, requestor, hwaddr, addr):
+    if hwaddr not in staticassigns:  # no static assignment for mac, ignore
+        return
+    clientipn, origreply, node, cfg = staticassigns[hwaddr]
+    if addr:
+        return # TODO(jjohnson2): Handle IPv6 requests
+        #niccfg = await netutil.get_nic_config(cfg, node, ifidx=addr[-1], onlyfamily=socket.AF_INET6)
+    else:
+        niccfg = await netutil.get_nic_config(cfg, node, ifidx=info['netinfo']['ifidx'], onlyfamily=socket.AF_INET)
+    leasetime = niccfg.get('lease_time')
+    if not leasetime:
+        return  # ignore open ended requests when we don't have lease_time
+    await reply_dhcp4(node, info, pkt, cfg, rq, False, {}, None, sock=sock, requestor=requestor, niccfg=niccfg, broadcast=False)
+    
+async def ack_request(pkt, rq, info, sock=None, requestor=None, addr=None):
     hwlen = bytearray(rq[2:3].tobytes())[0]
     hwaddr = rq[28:28+hwlen].tobytes()
     relayip = rq[24:28].tobytes()
-    myipn = myipbypeer.get(hwaddr, None)
+    if 54 not in pkt:
+        return await ack_request_full(pkt, rq, info, sock, requestor, hwaddr, addr)
     #TODO(jjohnson2): This only works for the discover/offer/request/ack sequence, the renewal is broken
     # Will need to refactor the reply_dhcp logic to generate a new reply for other request
+    myipn = myipbypeer.get(hwaddr, None)
     if not myipn or pkt.get(54, None) != myipn:
         return
     assigninfo = staticassigns.get(hwaddr, None)
@@ -980,13 +1002,11 @@ def ack_request(pkt, rq, info, sock=None, requestor=None):
 
 async def consider_discover(info, packet, sock, cfg, reqview, nodeguess, addr=None, requestor=None):
     if packet.get(53, None) == b'\x03':
-        ack_request(packet, reqview, info, sock, requestor)
+        await ack_request(packet, reqview, info, sock, requestor)
     elif info.get('hwaddr', None) in macmap: #  and info.get('uuid', None):
         await check_reply(macmap[info['hwaddr']], info, packet, sock, cfg, reqview, addr, requestor)
     elif info.get('uuid', None) in uuidmap:
         await check_reply(uuidmap[info['uuid']], info, packet, sock, cfg, reqview, addr, requestor)
-    elif packet.get(53, None) == b'\x03':
-        ack_request(packet, reqview, info, sock, requestor)
     elif info.get('uuid', None) and info.get('hwaddr', None):
         if time.time() > ignoremacs.get(info['hwaddr'], 0) + 90:
             ignoremacs[info['hwaddr']] = time.time()
