@@ -248,6 +248,10 @@ async def update_boot_linux(profiledir, profile, label):
         ipxeout.write('imgfetch boot/kernel ' + ipxeargs + '\n')
         for initramfs in initrds:
             ipxeout.write('imgfetch boot/initramfs/{0}\n'.format(initramfs))
+        for shimpossible in glob.glob(profiledir + '/boot/efi/boot/*'):
+            shimbasename = os.path.basename(shimpossible)
+            if shimbasename.lower() in ('bootaa64.efi', 'bootx64.efi'):
+                ipxeout.write('shim boot/efi/boot/{0}\n'.format(shimbasename))
         ipxeout.write('imgload kernel\nimgexec kernel\n')
     finally:
         ipxeout.close()

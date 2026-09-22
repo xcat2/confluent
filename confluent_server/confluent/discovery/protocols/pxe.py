@@ -353,11 +353,11 @@ async def proxydhcp(handler, nodeguess):
                 myip = socket.inet_ntoa(myipn)
                 bootfile = 'http://{0}/confluent-public/os/{1}/boot.ipxe'.format(myip, profile).encode('utf8')
             elif disco['arch'] == 'uefi-x64':
-                bootfile = b'confluent/x86_64/ipxe.efi'
+                bootfile = b'confluent/x86_64/ipxe-shim.efi'
             elif disco['arch'] == 'bios-x86':
                 bootfile = b'confluent/x86_64/ipxe.kkpxe'
             elif disco['arch'] == 'uefi-aarch64':
-                bootfile = b'confluent/aarch64/ipxe.efi'
+                bootfile = b'confluent/aarch64/ipxe-shim.efi'
             if len(bootfile) > 127:
                 if bootfile.startswith(b'http'):
                     bootfile = register_shorturl(bootfile.decode('utf8')).encode('utf8')
@@ -821,7 +821,7 @@ async def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, 
                 return
             bootfile = 'http://{0}/confluent-public/os/{1}/boot.ipxe'.format(myipn, profile).encode('utf8')
         else:
-            bootfile = b'confluent/aarch64/ipxe.efi'
+            bootfile = b'confluent/aarch64/ipxe-shim.efi'
         repview[108:108 + len(bootfile)] = bootfile
     myip = myipn
     myipn = socket.inet_aton(myipn)

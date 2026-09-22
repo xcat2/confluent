@@ -278,8 +278,10 @@ async def install_tftp_content():
             raise
     shutil.copy('/opt/confluent/lib/ipxe/ipxe.efi', tftplocation)
     shutil.copy('/opt/confluent/lib/ipxe/ipxe.kkpxe', tftplocation)
+    shutil.copy('/opt/confluent/lib/ipxe/ipxe-shim.efi', tftplocation)
     if os.path.exists('/opt/confluent/lib/ipxe/ipxe-aarch64.efi'):
         shutil.copy('/opt/confluent/lib/ipxe/ipxe-aarch64.efi', os.path.join(armtftplocation, 'ipxe.efi'))
+        shutil.copy('/opt/confluent/lib/ipxe/ipxe-aarch64-shim.efi', os.path.join(armtftplocation, 'ipxe-shim.efi'))
 
 
 
