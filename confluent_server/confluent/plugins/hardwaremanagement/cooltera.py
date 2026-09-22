@@ -178,7 +178,7 @@ async def retrieve(nodes, element, configmanager, inputdata):
         taskargs = []
         for node in nodes:
             taskargs.append((element, node, configmanager))
-        gp = tasks.starmap(read_sensors, taskargs)
+        gp = tasks.task_starmap(read_sensors, taskargs)
         async for rsp in gp:
             for datum in rsp:
                 yield datum
