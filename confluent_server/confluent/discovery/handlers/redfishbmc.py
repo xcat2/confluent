@@ -89,6 +89,8 @@ class NodeHandler(generic.NodeHandler):
         c = webclient.WebConnection(self.ipaddr, 443, verifycallback=self.validate_cert)
         i = await c.grab_json_response('/redfish/v1/')
         uuid = i.get('UUID', None)
+        if uuid and len(uuid) == 32:
+            uuid = '{}-{}-{}-{}-{}'.format(uuid[0:8], uuid[8:12], uuid[12:16], uuid[16:20], uuid[20:32])
         if uuid:
             self.info['uuid'] = uuid.lower()
 
