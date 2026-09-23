@@ -126,7 +126,7 @@ def initialize_genesis(arch='x86_64'):
         util.mkdirp(f'/var/lib/confluent/public/os/genesis-{arch}/boot/efi/boot', 0o755)
         util.mkdirp(f'/var/lib/confluent/public/os/genesis-{arch}/boot/initramfs', 0o755)
         symlinkp(f'/opt/confluent/genesis/{arch}/boot/efi/boot/BOOT{uefisuffix.upper()}.EFI',
-                f'/var/lib/confluent/public/os/genesis-{arch}/boot/efi/boot/BOOT{uefisuffix}.EFI')
+                f'/var/lib/confluent/public/os/genesis-{arch}/boot/efi/boot/BOOT{uefisuffix.upper()}.EFI')
         symlinkp(f'/opt/confluent/genesis/{arch}/boot/efi/boot/grub{uefisuffix}.efi',
                 f'/var/lib/confluent/public/os/genesis-{arch}/boot/efi/boot/grub{uefisuffix}.efi')
         symlinkp(f'/opt/confluent/genesis/{arch}/boot/efi/boot/mm{uefisuffix}.efi',
