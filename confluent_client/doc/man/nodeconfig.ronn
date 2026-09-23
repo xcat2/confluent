@@ -51,6 +51,10 @@ actually be in effect until a reboot.
   Request that the specified component of the targeted nodes will have its
   configuration reset to default.  The component may be "uefi" or "bmc".
 
+* `-p, --pending`:
+   When possible, indicate only the settings that are awaiting a reboot to take effect.  Note that not all nodes will differentiate between
+   pending and current settings, and for such platforms this will come up empty.
+
 * `-m MAXNODES`, `--maxnodes=MAXNODES`:
   Specify a maximum number of nodes to configure, prompting if over 
   the threshold  
