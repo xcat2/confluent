@@ -78,6 +78,7 @@ import confluent.discovery.handlers.smm as smm
 import confluent.discovery.handlers.xcc as xcc
 import confluent.discovery.handlers.xcc3 as xcc3
 import confluent.discovery.handlers.smm3 as smm3
+import confluent.discovery.handlers.redfishbmc as redfishbmc
 import confluent.discovery.handlers.megarac as megarac
 import confluent.discovery.handlers.nvos as nvos
 import confluent.discovery.handlers.eureka as eureka
@@ -132,7 +133,7 @@ nodehandlers = {
     'onie-switch': None,
     'cumulus-switch': None,
     'affluent-switch': None,
-    'generic-redfish': None,
+    'generic-redfish': redfishbmc,
     'generic-https': None,
     'generic-ssh': None,
     'nvos-switch': nvos,

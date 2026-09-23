@@ -54,6 +54,8 @@ class NodeHandler(generic.NodeHandler):
         self.atdefault = True
         self._srvroot = None
         self._mgrinfo = None
+        self.defuser = None
+        self.defpass = None
         super(NodeHandler, self).__init__(info, configmanager)
 
     async def srvroot(self, wc):
@@ -117,13 +119,20 @@ class NodeHandler(generic.NodeHandler):
 
     async def _get_wc(self):
         await self.get_https_cert()
-        defuser, defpass = self.get_firmware_default_account_info()
         wc = webclient.WebConnection(self.ipaddr, 443, verifycallback=self.validate_cert)
-        wc.set_basic_credentials(defuser, defpass)
+        wc.set_basic_credentials(self.targuser, self.targpass)
         wc.set_header('Content-Type', 'application/json')
         wc.set_header('Accept', 'application/json')
         wc.set_header('Host', 'credible-bmc')
+        rsp, status = await wc.grab_json_response_with_status('/redfish/v1/Managers')
+        if status >= 200 and status < 300:
+            self.trieddefault = True
+            self.curruser = self.targuser
+            self.currpass = self.targpass
+            return wc
         if not self.trieddefault:
+            defuser, defpass = self.defuser, self.defpass
+            wc.set_basic_credentials(defuser, defpass)
             rsp, status = await wc.grab_json_response_with_status('/redfish/v1/Managers')
             if status == 403:
                 self.trieddefault = True
@@ -230,6 +239,12 @@ class NodeHandler(generic.NodeHandler):
                 defuser = ndefuser
             if not defpass:
                 defpass = ndefpass
+        if not isinstance(defuser, str) and isinstance(defuser, bytes):
+            defuser = defuser.decode('utf-8')
+        if not isinstance(defpass, str) and isinstance(defpass, bytes):
+            defpass = defpass.decode('utf-8')
+        self.defuser = defuser
+        self.defpass = defpass
         user, passwd, _ = self.get_node_credentials(
                 nodename, creds, defuser, defpass)
         user = util.stringify(user)
