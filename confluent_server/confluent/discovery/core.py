@@ -1776,7 +1776,11 @@ async def generic_eval(address, hwaddr=None):
         peerdata['services'] = ['generic-https']
     if 22 in ports:
         sockaddr = (sockaddr[0], 22) + tuple(sockaddr[2:])
-        banner = await sshclient.get_ssh_banner(address)
+        banner = None
+        try:
+            banner = await sshclient.get_ssh_banner(address)
+        except Exception:
+            banner = None  # ignore details of ssh failures, too many possible
         if 'addresses' not in peerdata:
             peerdata['addresses'] = [sockaddr]
         if banner and banner.strip() == 'NVOS switch':
