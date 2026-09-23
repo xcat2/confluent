@@ -78,6 +78,9 @@ argparser.add_option('-m', '--maxnodes', type='int',
                      help='Specify a maximum number of '
                           'nodes to configure, '
                           'prompting if over the threshold')
+argparser.add_option('-p', '--pending', dest='showpending',
+                     action='store_true', default=False,
+                     help='Show pending changes for attributes')
 (options, args) = argparser.parse_args()
 
 cfgpaths = {
@@ -304,21 +307,21 @@ async def main():
             if options.comparedefault:
                 continue
             rcode |= await client.print_attrib_path(path, session, list(queryparms[path]),
-                                        NullOpt(), queryparms[path])
+                                        NullOpt(), queryparms[path], showpending=options.showpending)
         if printsys == 'all' or printextbmc or printbmc or printallbmc:
             if printbmc or not printextbmc:
                 rcode |= await client.print_attrib_path(
                             '/noderange/{0}/configuration/management_controller/extended/all'.format(noderange),
-                            session, printbmc, options, attrprefix='bmc.')
+                            session, printbmc, options, attrprefix='bmc.', showpending=options.showpending)
             if options.extra:
                 if options.advanced:
                         rcode |= await client.print_attrib_path(
                             '/noderange/{0}/configuration/management_controller/extended/extra_advanced'.format(noderange),
-                            session, printextbmc, options)
+                            session, printextbmc, options, showpending=options.showpending)
                 else:
                     rcode |= await client.print_attrib_path(
                             '/noderange/{0}/configuration/management_controller/extended/extra'.format(noderange),
-                            session, printextbmc, options)
+                            session, printextbmc, options, showpending=options.showpending)
         if printsys or options.exclude:
             if printsys == 'all':
                 printsys = []
@@ -328,7 +331,7 @@ async def main():
                 path = '/noderange/{0}/configuration/system/advanced'.format(
                     noderange)
             rcode |= await client.print_attrib_path(path, session, printsys,
-                                            options)
+                                            options, showpending=options.showpending)
     sys.exit(rcode)
 
 if __name__ == '__main__':

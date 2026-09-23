@@ -523,7 +523,21 @@ def _sort_attrib(k):
         return sortutil.naturalize_string('{}'.format(k[1]['sortid']))
     return sortutil.naturalize_string(k[0])
 
-async def print_attrib_path(path, session, requestargs, options, rename=None, attrprefix=None):
+def _is_nondefault(currattr):
+    if currattr.get('default', None) is None:
+        return False  # no default specified cannot tell
+    if 'value' not in currattr:  # can't compare if no value specified
+        return False
+    if currattr['value'] != currattr['default']:
+        return True
+    # ok, the potentially pending value is the same, but check active
+    if 'active' not in currattr:
+        return False
+    if currattr['active'] != currattr['default']:
+        return True
+    return False
+
+async def print_attrib_path(path, session, requestargs, options, rename=None, attrprefix=None, showpending=False):
     exitcode = 0
     seenattributes = NestedDict()
     allnodes = set([])
@@ -551,12 +565,26 @@ async def print_attrib_path(path, session, requestargs, options, rename=None, at
                 currattr = res['databynode'][node][attr]
                 if show_attr(attr, requestargs, seenattributes, options, node):
                     if 'value' in currattr:
-                        if currattr['value'] is not None:
-                            val = currattr['value']
-                            if isinstance(val, list):
-                                val = ','.join(val)
+                        currval = currattr.get('value', None)
+                        if isinstance(currval, list):
+                            currval = ','.join(currval)
+                        activeval = currattr.get('active', currval)
+                        if isinstance(activeval, list):
+                            activeval = ','.join(activeval)
+                        if activeval != currval:
+                            if currval is None:
+                                currval = ''
+                            if activeval is None:
+                                activeval = ''
+                            if showpending:
+                                attrout = f'{node}: {printattr}: {activeval} -> {currval}'
+                            else:
+                                attrout = f'{node}: {printattr}: {currval} (Pending)'                                
+                        elif showpending:
+                            continue
+                        elif currval is not None:
                             attrout = '{0}: {1}: {2}'.format(
-                                node, printattr, val).strip()
+                                                            node, printattr, currval).strip()
                         else:
                             attrout = '{0}: {1}:'.format(node, printattr)
                     elif 'isset' in currattr:
@@ -604,15 +632,19 @@ async def print_attrib_path(path, session, requestargs, options, rename=None, at
                         except AttributeError:
                             exclude = False
                         if ((requestargs and not exclude) or
-                                (currattr.get('default', None) is not None and
-                                currattr.get('value', None) is not None and
-                                currattr['value'] != currattr['default'])):
-                            cval = ','.join(currattr['value']) if isinstance(
+                                _is_nondefault(currattr)):
+                            currval = ','.join(currattr['value']) if isinstance(
                                 currattr['value'], list) else currattr['value']
+                            activeval = ','.join(currattr['active']) if isinstance(
+                                currattr.get('active'), list) else currattr.get('active')
                             dval = ','.join(currattr['default']) if isinstance(
                                 currattr['default'], list) else currattr['default']
-                            cprint('{0}: {1}: {2} (Default: {3})'.format(
-                                node, printattr, cval, dval))
+                            outmsg = '{0}: {1}: {2} (Default: {3}'.format(
+                                node, printattr, currval, dval)
+                            if 'active' in currattr:
+                                outmsg += ', Pending change from: {0}'.format(activeval)
+                            outmsg += ')'
+                            cprint(outmsg)
                     else:
 
                         try:
