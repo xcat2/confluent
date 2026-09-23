@@ -95,10 +95,16 @@ def symlinkp(src, trg):
         if e.errno != 17:
             raise
 
-def initialize_genesis():
-    if not os.path.exists('/opt/confluent/genesis/x86_64/boot/kernel'):
-        emprint('Install the confluent-genesis package to have the '
-                         'resources for a genesis profile')
+def initialize_genesis(arch='x86_64'):
+    if arch == 'x86_64':
+        uefisuffix = 'x64'
+    elif arch == 'aarch64':
+        uefisuffix = 'aa64'
+    else:
+        raise ValueError(f"Unsupported architecture: {arch}")
+    if not os.path.exists(f'/opt/confluent/genesis/{arch}/boot/kernel'):
+        emprint(f'Install the confluent-genesis-{arch} package to have the '
+                         f'resources for a genesis profile for {arch}')
         return 1
     hasconfluentuser = None
     try:
@@ -117,29 +123,29 @@ def initialize_genesis():
             os.setgid(hasconfluentuser.pw_gid)
             os.setuid(hasconfluentuser.pw_uid)
         os.umask(0o22)
-        util.mkdirp('/var/lib/confluent/public/os/genesis-x86_64/boot/efi/boot', 0o755)
-        util.mkdirp('/var/lib/confluent/public/os/genesis-x86_64/boot/initramfs', 0o755)
-        symlinkp('/opt/confluent/genesis/x86_64/boot/efi/boot/BOOTX64.EFI',
-                '/var/lib/confluent/public/os/genesis-x86_64/boot/efi/boot/BOOTX64.EFI')
-        symlinkp('/opt/confluent/genesis/x86_64/boot/efi/boot/grubx64.efi',
-                '/var/lib/confluent/public/os/genesis-x86_64/boot/efi/boot/grubx64.efi')
-        symlinkp('/opt/confluent/genesis/x86_64/boot/efi/boot/mmx64.efi',
-                '/var/lib/confluent/public/os/genesis-x86_64/boot/efi/boot/mmx64.efi')
-        symlinkp('/opt/confluent/genesis/x86_64/boot/initramfs/distribution',
-                '/var/lib/confluent/public/os/genesis-x86_64/boot/initramfs/distribution')
+        util.mkdirp(f'/var/lib/confluent/public/os/genesis-{arch}/boot/efi/boot', 0o755)
+        util.mkdirp(f'/var/lib/confluent/public/os/genesis-{arch}/boot/initramfs', 0o755)
+        symlinkp(f'/opt/confluent/genesis/{arch}/boot/efi/boot/BOOT{uefisuffix.upper()}.EFI',
+                f'/var/lib/confluent/public/os/genesis-{arch}/boot/efi/boot/BOOT{uefisuffix}.EFI')
+        symlinkp(f'/opt/confluent/genesis/{arch}/boot/efi/boot/grub{uefisuffix}.efi',
+                f'/var/lib/confluent/public/os/genesis-{arch}/boot/efi/boot/grub{uefisuffix}.efi')
+        symlinkp(f'/opt/confluent/genesis/{arch}/boot/efi/boot/mm{uefisuffix}.efi',
+                f'/var/lib/confluent/public/os/genesis-{arch}/boot/efi/boot/mm{uefisuffix}.efi')
+        symlinkp(f'/opt/confluent/genesis/{arch}/boot/initramfs/distribution',
+                f'/var/lib/confluent/public/os/genesis-{arch}/boot/initramfs/distribution')
         symlinkp('/var/lib/confluent/public/site/initramfs.cpio',
-                '/var/lib/confluent/public/os/genesis-x86_64/boot/initramfs/site.cpio')
+                f'/var/lib/confluent/public/os/genesis-{arch}/boot/initramfs/site.cpio')
         symlinkp('/opt/confluent/lib/osdeploy/genesis/initramfs/addons.cpio',
-                '/var/lib/confluent/public/os/genesis-x86_64/boot/initramfs/addons.cpio')
-        symlinkp('/opt/confluent/genesis/x86_64/boot/kernel',
-                '/var/lib/confluent/public/os/genesis-x86_64/boot/kernel')
-        if not os.path.exists('/var/lib/confluent/public/os/genesis-x86_64/ansible/'):
+                f'/var/lib/confluent/public/os/genesis-{arch}/boot/initramfs/addons.cpio')
+        symlinkp(f'/opt/confluent/genesis/{arch}/boot/kernel',
+                f'/var/lib/confluent/public/os/genesis-{arch}/boot/kernel')
+        if not os.path.exists(f'/var/lib/confluent/public/os/genesis-{arch}/ansible/'):
             shutil.copytree('/opt/confluent/lib/osdeploy/genesis/profiles/default/ansible/',
-                            '/var/lib/confluent/public/os/genesis-x86_64/ansible/')
+                            f'/var/lib/confluent/public/os/genesis-{arch}/ansible/')
             shutil.copytree('/opt/confluent/lib/osdeploy/genesis/profiles/default/scripts/',
-                            '/var/lib/confluent/public/os/genesis-x86_64/scripts/')
+                            f'/var/lib/confluent/public/os/genesis-{arch}/scripts/')
             shutil.copyfile('/opt/confluent/lib/osdeploy/genesis/profiles/default/profile.yaml',
-                            '/var/lib/confluent/public/os/genesis-x86_64/profile.yaml')
+                            f'/var/lib/confluent/public/os/genesis-{arch}/profile.yaml')
     except Exception as e:
         sys.stderr.write(str(e) + '\n')
         retcode = 1
@@ -406,14 +412,16 @@ async def initialize(cmdset):
                 cacert = b'@cert-authority * ' + cacert
                 skh.write(cacert)
     if cmdset.g:
-        rc = initialize_genesis()
-        if rc != 0:
-            sys.exit(rc)
+        initialize_genesis('x86_64')
+        initialize_genesis('aarch64')
     if cmdset.r:
         didsomething = True
     if not didsomething and (cmdset.k or cmdset.l or cmdset.g or cmdset.p):
         if cmdset.g:
-            await updateboot('genesis-x86_64')
+            if os.path.exists('/var/lib/confluent/public/os/genesis-x86_64'):
+                await updateboot('genesis-x86_64')
+            if os.path.exists('/var/lib/confluent/public/os/genesis-aarch64'):
+                await updateboot('genesis-aarch64')
         sys.exit(0)
     if not didsomething:
         sys.stderr.write('Nothing was done, use initialize -i for '
