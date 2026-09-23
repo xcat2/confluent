@@ -34,7 +34,7 @@ set_tpm_hashalgo() {
 }
 
 mkdir -p /etc/confluent
-if ! grep console= /proc/cmdline >& /dev/null; then
+if ! grep console= /proc/cmdline >& /dev/null && ! [ -e /dev/ttyAMA0 ] ; then
     autocons=$(/opt/confluent/bin/autocons)
     echo console=$autocons |sed -e 's!/dev/!!' >> /tmp/01-autocons.conf
     autocons=${autocons%,*}

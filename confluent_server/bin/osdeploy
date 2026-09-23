@@ -135,7 +135,10 @@ def initialize_genesis(arch='x86_64'):
                 f'/var/lib/confluent/public/os/genesis-{arch}/boot/initramfs/distribution')
         symlinkp('/var/lib/confluent/public/site/initramfs.cpio',
                 f'/var/lib/confluent/public/os/genesis-{arch}/boot/initramfs/site.cpio')
-        symlinkp('/opt/confluent/lib/osdeploy/genesis/initramfs/addons.cpio',
+        addons = '/opt/confluent/lib/osdeploy/genesis/initramfs/addons.cpio'
+        if os.path.exists(f'/opt/confluent/lib/osdeploy/genesis/initramfs/{arch}/addons.cpio'):
+            addons = f'/opt/confluent/lib/osdeploy/genesis/initramfs/{arch}/addons.cpio'
+        symlinkp(addons,
                 f'/var/lib/confluent/public/os/genesis-{arch}/boot/initramfs/addons.cpio')
         symlinkp(f'/opt/confluent/genesis/{arch}/boot/kernel',
                 f'/var/lib/confluent/public/os/genesis-{arch}/boot/kernel')
