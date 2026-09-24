@@ -27,6 +27,28 @@ import aiohmi.constants as const
 class OEMHandler(generic.OEMHandler):
     usegenericsensors = True
 
+    async def supports_expand(self, url):
+        """Whether url answers $expand=. with its members inlined.
+
+        Only the sensor collection is worth it (668 members, one GET
+        each otherwise). Firmware that ignores $expand answers with
+        plain links, so the answer is probed once per collection and
+        such firmware keeps the per-member reads.
+        """
+        if not url.rstrip('/').endswith('/Sensors'):
+            return False
+        if not hasattr(self, '_expandsupport'):
+            self._expandsupport = {}
+        if url not in self._expandsupport:
+            try:
+                rsp = await self._do_web_request(url + '?$expand=.')
+            except Exception:
+                rsp = {}
+            members = rsp.get('Members', [])
+            self._expandsupport[url] = bool(members) and all(
+                'Name' in member for member in members)
+        return self._expandsupport[url]
+
     async def get_default_sysurl(self):
         """Return the system URL for the first available node.
 
