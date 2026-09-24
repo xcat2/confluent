@@ -391,7 +391,7 @@ async def main():
     # flush to clear old data out?  (e.g. no good way to age pxe data)
     # also delete discovery datum... more targeted
     # defect: -t lenovo-imm returns all
-    parser.add_option('-a', '--aggresive', dest='aggressive',
+    parser.add_option('-a', '--aggressive', dest='aggressive',
                       help='Use aggressive scanning and fingerprinting that is slower and more intrusive',
                       action='store_true')
     parser.add_option('-m', '--model', dest='model',
