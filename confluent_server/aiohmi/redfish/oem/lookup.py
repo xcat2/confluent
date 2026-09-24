@@ -61,7 +61,8 @@ async def get_oem_handler(sysinfo, sysurl, webclient, cache, cmd, rootinfo={}):
                         bmcinfo = mgrinfo
                     break
     else:
-        bmcinfo = await cmd.bmcinfo()
+        if await cmd.get_bmcurl():
+            bmcinfo = await cmd.bmcinfo()
     for oem in bmcinfo.get('Oem', {}):
         if oem in OEMMAP:
             return await OEMMAP[oem].get_handler(sysinfo, sysurl, webclient, cache,

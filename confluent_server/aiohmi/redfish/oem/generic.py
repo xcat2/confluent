@@ -398,9 +398,16 @@ class OEMHandler(object):
     
     async def get_bmcurl(self):
         if not self._varbmcurl:
-            self._varbmcurl = (await self.sysinfo()).get('Links', {}).get(
-                'ManagedBy', [{}])[0].get('@odata.id', None)
+            self._varbmcurl = ((await self.sysinfo()).get('Links', {}).get(
+                'ManagedBy') or [{}])[0].get('@odata.id', None)
         return self._varbmcurl
+
+    async def _bmcinfo(self):
+        bmcurl = await self.get_bmcurl()
+        if not bmcurl:
+            raise exc.UnsupportedFunctionality(
+                'Unable to identify the manager of this system')
+        return await self._do_web_request(bmcurl)
 
     
     async def sysinfo(self):
@@ -554,7 +561,7 @@ class OEMHandler(object):
         await self._do_web_request(replacecerturl, certpayload)
 
     async def add_trusted_ca(self, pemdata):
-        mgrinfo = await self._do_web_request(await self.get_bmcurl())
+        mgrinfo = await self._bmcinfo()
         secpolicy = mgrinfo.get('SecurityPolicy', {}).get('@odata.id', None)
         if secpolicy:
             secinfo = await self._do_web_request(secpolicy)
@@ -568,7 +575,7 @@ class OEMHandler(object):
         raise exc.PyghmiException('Platform does not support adding trusted CAs')
 
     async def del_trusted_ca(self, certid):
-        mgrinfo = await self._do_web_request(await self.get_bmcurl())
+        mgrinfo = await self._bmcinfo()
         secpolicy = mgrinfo.get('SecurityPolicy', {}).get('@odata.id', None)
         if secpolicy:
             secinfo = await self._do_web_request(secpolicy)
@@ -585,7 +592,7 @@ class OEMHandler(object):
         raise exc.PyghmiException(f'No such certificate found: {certid}')
 
     async def get_trusted_cas(self):
-        mgrinfo = await self._do_web_request(await self.get_bmcurl())
+        mgrinfo = await self._bmcinfo()
         secpolicy = mgrinfo.get('SecurityPolicy', {}).get('@odata.id', None)
         if secpolicy:
             secinfo = await self._do_web_request(secpolicy)
@@ -654,7 +661,10 @@ class OEMHandler(object):
         return collections
 
     async def get_event_log(self, clear=False, fishclient=None, extraurls=[]):
-        bmcinfo = await self._do_web_request(await fishclient.get_bmcurl())
+        bmcurl = await fishclient.get_bmcurl()
+        # ManagedBy is optional, and a system without it may still keep logs
+        # under itself or its chassis, which the fallback below looks for
+        bmcinfo = await self._do_web_request(bmcurl) if bmcurl else {}
         # A manager need not publish log services at all, and one that does not
         # is the clearest case of a platform keeping its event log elsewhere, so
         # carry on to the fallback below rather than answering with nothing
@@ -1196,6 +1206,8 @@ class OEMHandler(object):
 
     async def list_media(self, fishclient, cache=True):
         bmcurl = await fishclient.get_bmcurl()
+        if not bmcurl:
+            return
         bmcinfo = await fishclient._do_web_request(bmcurl, cache=cache)
         vmcoll = bmcinfo.get('VirtualMedia', {}).get('@odata.id', None)
         if vmcoll:
