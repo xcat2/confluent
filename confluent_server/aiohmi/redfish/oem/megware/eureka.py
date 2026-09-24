@@ -117,10 +117,12 @@ class OEMHandler(generic.OEMHandler):
         return cputemps
 
     async def reseat_bay(self, bay):
-        """Power cycle a specific node in the EUREKA enclosure.
+        """Reseat a specific node in the EUREKA enclosure.
 
-        Uses ComputerSystem.Reset with ForceRestart on the target node.
-        bay=-1 (enclosure-level) is not supported.
+        Uses ComputerSystem.Reset with the EUREKA specific Reseat type,
+        which removes all power from the slot, node BMC included.
+        ForceRestart only restarts the host. bay=-1 (enclosure-level)
+        is not supported.
         """
         if bay == -1:
             raise exc.UnsupportedFunctionality(
@@ -128,7 +130,7 @@ class OEMHandler(generic.OEMHandler):
         nodeurl = '/redfish/v1/Systems/Node{}'.format(bay)
         await self._do_web_request(
             nodeurl + '/Actions/ComputerSystem.Reset',
-            {'ResetType': 'ForceRestart'},
+            {'ResetType': 'Reseat'},
             method='POST')
 
     async def get_health(self, fishclient, verbose=True):
