@@ -111,6 +111,7 @@ def natural_sort(iterable):
 class SensorReading(object):
     def __init__(self, healthinfo, sensor=None, value=None, units=None,
                  unavailable=False):
+        self.states = []
         if sensor:
             self.name = sensor['name']
         else:
@@ -119,8 +120,8 @@ class SensorReading(object):
                 'Status', {}).get('Health', None), const.Health.Warning)
             self.states = [healthinfo.get('Status', {}).get('Health',
                                                             'Unknown')]
-            self.health = _healthmap[healthinfo['Status']['Health']]
-            self.states = [healthinfo['Status']['Health']]
+            if self.health == const.Health.Ok:
+                self.states = []
         self.value = value
         self.state_ids = None
         self.imprecision = None
