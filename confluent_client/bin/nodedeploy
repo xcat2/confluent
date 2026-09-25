@@ -189,6 +189,8 @@ def main(args):
                     profile = databynode[node].get('deployment.profile', '')
                     if profile:
                         profile = 'completed: {}'.format(profile)
+                    elif args.clear:
+                        profile = 'No profile applied, any pending profile has been cleared'
                     else:
                         profile= 'No profile pending or applied'
             armed = databynode[node].get('deployment.apiarmed', '')
