@@ -177,12 +177,18 @@ class OEMHandler(generic.OEMHandler):
             note_issue('Chassis', const.Health.Warning, 'Unreachable')
 
         for sysurl in self._allsysurls:
+            name = sysurl.rstrip('/').rsplit('/', 1)[-1]
             try:
                 sysinfo = await self._do_web_request(sysurl)
             except Exception:
+                note_issue(name, const.Health.Warning, 'Unreachable')
                 continue
-            state = sysinfo.get('Status', {}).get('State', 'Absent')
-            name = sysurl.rstrip('/').rsplit('/', 1)[-1]
+            status = sysinfo.get('Status', {})
+            state = status.get('State', 'Absent')
+            health = status.get('Health', 'OK')
             if state != 'Enabled':
                 note_issue(name, const.Health.Warning, state)
+            elif health != 'OK':
+                note_issue(name, generic._healthmap.get(
+                    health, const.Health.Warning), health)
         return summary
