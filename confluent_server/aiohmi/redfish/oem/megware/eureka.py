@@ -27,6 +27,28 @@ import aiohmi.constants as const
 class OEMHandler(generic.OEMHandler):
     usegenericsensors = True
 
+    async def supports_expand(self, url):
+        """Whether url answers $expand=. with its members inlined.
+
+        Only the sensor collection is worth it (668 members, one GET
+        each otherwise). Firmware that ignores $expand answers with
+        plain links, so the answer is probed once per collection and
+        such firmware keeps the per-member reads.
+        """
+        if not url.rstrip('/').endswith('/Sensors'):
+            return False
+        if not hasattr(self, '_expandsupport'):
+            self._expandsupport = {}
+        if url not in self._expandsupport:
+            try:
+                rsp = await self._do_web_request(url + '?$expand=.')
+            except Exception:
+                rsp = {}
+            members = rsp.get('Members', [])
+            self._expandsupport[url] = bool(members) and all(
+                'Name' in member for member in members)
+        return self._expandsupport[url]
+
     async def get_default_sysurl(self):
         """Return the system URL for the first available node.
 
@@ -86,7 +108,9 @@ class OEMHandler(generic.OEMHandler):
         """Read CPU temperatures from EUREKA BMC sensor endpoints.
 
         Reads BMC{N}CPU0Temp and BMC{N}CPU1Temp sensors from
-        /redfish/v1/Chassis/1/Sensors/.
+        /redfish/v1/Chassis/1/Sensors/. Nodes whose BMC is not
+        currently reporting (HasBMCMetrics false) are skipped, as
+        their sensors read a meaningless 0.
         """
         cputemps = []
         for sysurl in self._allsysurls:
@@ -94,27 +118,33 @@ class OEMHandler(generic.OEMHandler):
             nodeid = nodeid.replace('Node', '')
             if not nodeid.isdigit():
                 continue
+            try:
+                sysinfo = await fishclient._do_web_request(sysurl)
+            except Exception:
+                continue
+            if not sysinfo.get('Oem', {}).get('Megware', {}).get(
+                    'HasBMCMetrics', True):
+                continue
             for cpu in ('CPU0', 'CPU1'):
                 try:
-                    sensor_url = '/redfish/v1/Chassis/1/Sensors/BMC{}Cpu{}Temp'.format(nodeid, cpu)
+                    sensor_url = '/redfish/v1/Chassis/1/Sensors/BMC{}{}Temp'.format(nodeid, cpu)
                     sensor = await fishclient._do_web_request(sensor_url)
                     if sensor and 'Reading' in sensor:
                         cputemps.append({
-                            'name': 'CPU {} Node {}'.format(cpu, nodeid),
-                            'value': float(sensor['Reading']),
-                            'state_ids': [],
-                            'units': const.SensorUnits.Celsius,
-                            'imprecision': None,
+                            'Name': '{} Node {}'.format(cpu, nodeid),
+                            'ReadingCelsius': float(sensor['Reading']),
                         })
                 except Exception:
                     pass
         return cputemps
 
     async def reseat_bay(self, bay):
-        """Power cycle a specific node in the EUREKA enclosure.
+        """Reseat a specific node in the EUREKA enclosure.
 
-        Uses ComputerSystem.Reset with ForceRestart on the target node.
-        bay=-1 (enclosure-level) is not supported.
+        Uses ComputerSystem.Reset with the EUREKA specific Reseat type,
+        which removes all power from the slot, node BMC included.
+        ForceRestart only restarts the host. bay=-1 (enclosure-level)
+        is not supported.
         """
         if bay == -1:
             raise exc.UnsupportedFunctionality(
@@ -122,33 +152,43 @@ class OEMHandler(generic.OEMHandler):
         nodeurl = '/redfish/v1/Systems/Node{}'.format(bay)
         await self._do_web_request(
             nodeurl + '/Actions/ComputerSystem.Reset',
-            {'ResetType': 'ForceRestart'},
+            {'ResetType': 'Reseat'},
             method='POST')
 
     async def get_health(self, fishclient, verbose=True):
         """Gather health status for the EUREKA chassis and all nodes."""
-        issues = []
+        summary = {'badreadings': [], 'health': const.Health.Ok}
+
+        def note_issue(name, health, state):
+            summary['health'] |= health
+            if verbose:
+                reading = generic.SensorReading(None, {'name': name})
+                reading.health = health
+                reading.states = [state]
+                summary['badreadings'].append(reading)
+
         try:
             chassis = await self._do_web_request('/redfish/v1/Chassis/1')
             health = chassis.get('Status', {}).get('Health', 'OK')
             if health != 'OK':
-                issues.append('Chassis health: {}'.format(health))
+                note_issue('Chassis', generic._healthmap.get(
+                    health, const.Health.Warning), health)
         except Exception:
-            issues.append('Cannot reach chassis health endpoint')
+            note_issue('Chassis', const.Health.Warning, 'Unreachable')
 
         for sysurl in self._allsysurls:
+            name = sysurl.rstrip('/').rsplit('/', 1)[-1]
             try:
                 sysinfo = await self._do_web_request(sysurl)
             except Exception:
+                note_issue(name, const.Health.Warning, 'Unreachable')
                 continue
-            state = sysinfo.get('Status', {}).get('State', 'Absent')
-            name = sysurl.rstrip('/').rsplit('/', 1)[-1]
-            if state == 'Absent':
-                issues.append('{}: Absent'.format(name))
-            elif state != 'Enabled':
-                issues.append('{}: {}'.format(name, state))
-
-        health = 0
-        if issues:
-            health = 1
-        return {'badreadings': [], 'health': health}
+            status = sysinfo.get('Status', {})
+            state = status.get('State', 'Absent')
+            health = status.get('Health', 'OK')
+            if state != 'Enabled':
+                note_issue(name, const.Health.Warning, state)
+            elif health != 'OK':
+                note_issue(name, generic._healthmap.get(
+                    health, const.Health.Warning), health)
+        return summary
