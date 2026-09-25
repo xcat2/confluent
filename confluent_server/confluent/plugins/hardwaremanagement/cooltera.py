@@ -166,11 +166,11 @@ async def read_sensors(element, node, configmanager):
     if len(element) == 3:
         # the names are only known after reading the device, as the sensor
         # set depends on the model
-        for sensor in sn[0] if sn else ():
-            yield msg.ChildCollection(simplify_name(sensor['name']))
-        return
+        if not sn:
+            return []
+        return [msg.ChildCollection(simplify_name(sensor['name'])) for sensor in sn[0] if sn]
     if sn:
-        yield msg.SensorReadings(sn[0], name=node)
+        return [msg.SensorReadings(sn[0], name=node)]
 
 
 async def retrieve(nodes, element, configmanager, inputdata):
