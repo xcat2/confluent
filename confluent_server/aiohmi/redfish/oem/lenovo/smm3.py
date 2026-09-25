@@ -107,6 +107,17 @@ class OEMHandler(generic.OEMHandler):
             url = '/redfish/v1/Chassis/chassis1/Oem/Lenovo/Nodes/{}'.format(nodeid)
             await self._do_web_request(url, parms, method='PATCH')
 
+    async def get_inventory(self, withids=False):
+            chassinfo = await self._do_web_request('/redfish/v1/Chassis/chassis1')
+            sysinfo = {
+                'UUID': chassinfo.get('UUID', ''),
+                'Serial Number': chassinfo.get('SerialNumber', ''),
+                'Manufacturer': chassinfo.get('Manufacturer', ''),
+                'Product name': chassinfo.get('Oem', {}).get('Lenovo', {}).get('ProductName', ''),
+                'Model': chassinfo.get('Model', ''),
+            }
+            yield ('System', sysinfo)
+
     async def _get_cpu_inventory(self, withids=False):
         # Empty generator: no CPU inventory items for this OEM handler.
         if False:
