@@ -488,7 +488,10 @@ class Command(object):
         return await self._do_web_request(bmcurl)
 
     async def get_power(self):
-        currinfo = await self._do_web_request(self._system_url(), cache=False)
+        try:
+            currinfo = await self._do_web_request(self._system_url(), cache=False)
+        except exc.UnsupportedFunctionality:
+            raise exc.UnsupportedFunctionality('Power status and control not supported')
         return {'powerstate': str(currinfo['PowerState'].lower())}
 
     async def reseat_bay(self, bay):
