@@ -21,6 +21,7 @@ sensor readings. It does NOT support IPMI, NIC configuration,
 firmware update, or other BMC-specific operations.
 """
 
+import json
 import confluent.discovery.handlers.generic as generic
 import confluent.util as util
 import aiohmi.util.webclient as webclient
@@ -105,16 +106,18 @@ class NodeHandler(generic.NodeHandler):
             elif status == 401:
                 self.trieddefault = True
                 try:
-                    errinfo = util.json_loads(body)
+                    errinfo = json.loads(body)
                     for msg in errinfo.get('@Message.ExtendedInfo', []):
                         if 'PasswordChangeRequired' in msg.get('MessageId', ''):
                             chgurl = msg.get('MessageArgs', [None])[0]
                             if chgurl and self.targpass and self.targpass != defpass:
                                 wc.set_basic_credentials(defuser, defpass)
-                                wc.set_header('If-Match', '*')
+                                # If-Match only on the PATCH: wc is handed
+                                # back for every later request
                                 rsp, chgstatus = await wc.grab_json_response_with_status(
                                     chgurl,
                                     {'Password': self.targpass},
+                                    headers=dict(wc.stdheaders, **{'If-Match': '*'}),
                                     method='PATCH')
                                 if chgstatus >= 200 and chgstatus < 300:
                                     body, status, headers = \
@@ -226,9 +229,10 @@ class NodeHandler(generic.NodeHandler):
                             acctdata, acctstatus = \
                                 await wc.grab_json_response_with_status(accturl)
                             if acctdata.get('UserName') == self.curruser:
-                                wc.set_header('If-Match', '*')
                                 rsp, status = await wc.grab_json_response_with_status(
-                                    accturl, authupdate, method='PATCH')
+                                    accturl, authupdate,
+                                    headers=dict(wc.stdheaders, **{'If-Match': '*'}),
+                                    method='PATCH')
                                 if status >= 200 and status < 300:
                                     self.curruser = user
                                     self.currpass = passwd
