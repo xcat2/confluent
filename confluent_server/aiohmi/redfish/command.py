@@ -482,7 +482,9 @@ class Command(object):
     async def bmcinfo(self):
         bmcurl = await self.get_bmcurl()
         if not bmcurl:
-            raise exc.PyghmiException('Unable to identify BMC')
+            # ManagedBy is optional, and without it there is no manager to ask
+            raise exc.UnsupportedFunctionality(
+                'Unable to identify the manager of this system')
         return await self._do_web_request(bmcurl)
 
     async def get_power(self):
@@ -699,8 +701,8 @@ class Command(object):
     async def get_bmcurl(self):
         if not self._varbmcurl:
             sysinfo = await self.sysinfo()
-            self._varbmcurl = sysinfo.get('Links', {}).get(
-                'ManagedBy', [{}])[0].get('@odata.id', None)
+            self._varbmcurl = (sysinfo.get('Links', {}).get(
+                'ManagedBy') or [{}])[0].get('@odata.id', None)
         return self._varbmcurl
 
     async def get_bmcnicurl(self):
@@ -709,8 +711,7 @@ class Command(object):
         return self._varbmcnicurl
 
     async def list_network_interface_names(self):
-        bmcurl = await self.get_bmcurl()
-        bmcinfo = await self._do_web_request(bmcurl)
+        bmcinfo = await self.bmcinfo()
         nicurl = bmcinfo.get('EthernetInterfaces', {}).get('@odata.id', None)
         if not nicurl:
             return
@@ -722,7 +723,7 @@ class Command(object):
             yield curl.rsplit('/', 1)[1]
 
     async def _get_bmc_nic_url(self, name=None):
-        bmcinfo = await self._do_web_request(await self.get_bmcurl())
+        bmcinfo = await self.bmcinfo()
         nicurl = bmcinfo.get('EthernetInterfaces', {}).get('@odata.id', None)
         if not nicurl:
             # Also optional. The None went straight into a request and
@@ -783,7 +784,7 @@ class Command(object):
 
     async def _bmcresetinfo(self):
         if not self._varresetbmcurl:
-            bmcinfo = await self._do_web_request(await self.get_bmcurl())
+            bmcinfo = await self.bmcinfo()
             resetinf = bmcinfo.get('Actions', {}).get('#Manager.Reset', {})
             url = resetinf.get('target', '')
             valid = resetinf.get('ResetType@Redfish.AllowableValues', [])
@@ -948,7 +949,7 @@ class Command(object):
         return await oem.set_system_configuration(changeset, self)
 
     async def get_ntp_enabled(self):
-        bmcinfo = await self._do_web_request(await self.get_bmcurl())
+        bmcinfo = await self.bmcinfo()
         netprotocols = bmcinfo.get('NetworkProtocol', {}).get('@odata.id', None)
         if netprotocols:
             netprotoinfo = await self._do_web_request(netprotocols)
@@ -957,7 +958,7 @@ class Command(object):
         return False
 
     async def set_ntp_enabled(self, enable):
-        bmcinfo = await self._do_web_request(await self.get_bmcurl())
+        bmcinfo = await self.bmcinfo()
         netprotocols = bmcinfo.get('NetworkProtocol', {}).get('@odata.id', None)
         if netprotocols:
             request = {'NTP':{'ProtocolEnabled': enable}}
@@ -966,7 +967,7 @@ class Command(object):
             await self._do_web_request(netprotocols, cache=0)
 
     async def get_ntp_servers(self):
-        bmcinfo = await self._do_web_request(await self.get_bmcurl())
+        bmcinfo = await self.bmcinfo()
         netprotocols = bmcinfo.get('NetworkProtocol', {}).get('@odata.id', None)
         if not netprotocols:
             return []
@@ -974,7 +975,7 @@ class Command(object):
         return netprotoinfo.get('NTP', {}).get('NTPServers', [])
 
     async def set_ntp_server(self, server, index=None):
-        bmcinfo = await self._do_web_request(await self.get_bmcurl())
+        bmcinfo = await self.bmcinfo()
         netprotocols = bmcinfo.get('NetworkProtocol', {}).get('@odata.id', None)
         currntpservers = await self.get_ntp_servers()
         if index is None:
@@ -1003,7 +1004,7 @@ class Command(object):
         In many cases, this may render remote network access impracticle or
         impossible."
         """
-        bmcinfo = await self._do_web_request(await self.get_bmcurl())
+        bmcinfo = await self.bmcinfo()
         rc = bmcinfo.get('Actions', {}).get('#Manager.ResetToDefaults', {})
         actinf = rc.get('ResetType@Redfish.AllowableValues', [])
         if 'ResetAll' in actinf: 
@@ -1168,7 +1169,7 @@ class Command(object):
                              {'HostName': hostname}, 'PATCH', etag='*')
 
     async def _netprotocolurl(self):
-        bmcinfo = await self._do_web_request(await self.get_bmcurl())
+        bmcinfo = await self.bmcinfo()
         netprotocols = bmcinfo.get('NetworkProtocol', {}).get('@odata.id', None)
         if not netprotocols:
             raise exc.UnsupportedFunctionality(
@@ -1214,7 +1215,7 @@ class Command(object):
                                    method='PATCH', etag='*')
 
     async def get_remote_kvm_available(self):
-        bmcinfo = await self._do_web_request(await self.get_bmcurl())
+        bmcinfo = await self.bmcinfo()
         gconsole = bmcinfo.get('GraphicalConsole', {})
         return bool(gconsole.get('ServiceEnabled', False))
 
@@ -1700,7 +1701,7 @@ class Command(object):
         sysinfo = await self.sysinfo()
         vmcoll = sysinfo.get('VirtualMedia', {}).get('@odata.id', None)
         if not vmcoll:
-            bmcinfo = await self._do_web_request(await self.get_bmcurl())
+            bmcinfo = await self.bmcinfo()
             vmcoll = bmcinfo.get('VirtualMedia', {}).get('@odata.id', None)
         if vmcoll:
             vmlist = await self._do_web_request(vmcoll)
