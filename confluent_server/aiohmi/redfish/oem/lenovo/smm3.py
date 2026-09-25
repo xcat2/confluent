@@ -63,6 +63,12 @@ class OEMHandler(generic.OEMHandler):
         health = healthlookup.get(health, pygconst.Health.Critical)
         return {'health': health}
 
+    async def sysinfo(self):
+        return {}
+
+    async def get_default_sysurl(self):
+        return None
+
     async def set_identify(self, on=True, blink=False):
         if on:
             state = 'On'
