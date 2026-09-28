@@ -1967,7 +1967,7 @@ class OEMHandler(object):
         if 'sensedata' in sensor:
             reading = sensor['sensedata']
         else:
-            reading = await self._do_web_request(sensor['url'], cache=False)
+            reading = await self._do_web_request(sensor['url'], cache=1)
         return self._extract_reading(sensor, reading)
 
     async def get_sensor_data(self):
