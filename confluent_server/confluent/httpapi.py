@@ -509,9 +509,12 @@ async def wsock_handler(req):
         return
     cfgmgr = httpsessions[sessid]['cfgmgr']
     username = httpsessions[sessid]['name']
+    asyncready = False
     if req.rel_url.path == '/sessions/current/async':
         myconsoles = {}
         async def asyncwscallback(rspm):
+            while not asyncready:
+                await asyncio.sleep(0.1)
             rspm = json.dumps(rspm.raw())
             await rsp.send_str(u'!' + rspm)
         currsess['inflight'].add(rsp)
@@ -520,6 +523,7 @@ async def wsock_handler(req):
             for asess in confluent.asynchttp.handle_async(
                     {}, asyncwscallback):
                 await rsp.send_str(u' ASYNCID: {0}'.format(asess.asyncid))
+                asyncready = True
                 clientmsg = True
                 while clientmsg:
                     clientmsg = await rsp.receive()
