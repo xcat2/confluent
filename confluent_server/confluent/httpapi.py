@@ -31,6 +31,7 @@ except ImportError:
     webauthn = None
 import asyncio
 from aiohttp import web, WSMsgType
+import confluent.apikey as apikey
 import confluent.auth as auth
 import confluent.config.attributes as attribs
 import confluent.config.configmanager as configmanager
@@ -338,24 +339,39 @@ async def _authorize_request(req, operation, reqbody):
                 # of a CSRF
                 return {'code': 401}
             return ('logout',)
-        if req.headers['Authorization'].startswith('MultiBasic '):
+        authorization = req.headers['Authorization']
+        if authorization.startswith('Bearer '):
+            name = apikey.validate_bearer_token(
+                authorization[7:], configmanager.ConfigManager(None))
+            if name:
+                authdata = auth.authorize(
+                    name, element=element, operation=operation)
+                if authdata is False:
+                    return {'code': 403}
+                elif not authdata:
+                    return {'code': 401}
+            else:
+                return {'code': 401}
+        elif authorization.startswith('MultiBasic '):
             name, passphrase = base64.b64decode(
-                req.headers['Authorization'].replace('MultiBasic ', '')).split(b':', 1)
+                authorization.replace('MultiBasic ', '')).split(b':', 1)
             passphrase = json.loads(passphrase)
         else:
             name, passphrase = base64.b64decode(
-                req.headers['Authorization'].replace('Basic ', '')).split(b':', 1)
-        try:
-            authdata = await auth.check_user_passphrase(name, passphrase, operation=operation, element=element)
-        except Exception as e:
-            if hasattr(e, 'prompts'):
-                return {'code': 403, 'prompts': e.prompts}
-            raise
-        if authdata is False:
-            return {'code': 403}
-        elif not authdata:
-            return {'code': 401}
-        sessid = _establish_http_session(req, authdata, name, cookie)
+                authorization.replace('Basic ', '')).split(b':', 1)
+        if not authdata and not authorization.startswith('Bearer '):
+            try:
+                authdata = await auth.check_user_passphrase(name, passphrase, operation=operation, element=element)
+            except Exception as e:
+                if hasattr(e, 'prompts'):
+                    return {'code': 403, 'prompts': e.prompts}
+                raise
+            if authdata is False:
+                return {'code': 403}
+            elif not authdata:
+                return {'code': 401}
+        if authdata:
+            sessid = _establish_http_session(req, authdata, name, cookie)
     if authdata and element and element.startswith('/sessions/current/webauthn/validate/'):
         if not webauthn:
             raise exc.NotFoundException('WebAuthn support not available')
@@ -1059,6 +1075,16 @@ async def resourcehandler_backend(req, make_response):
                 sessinfo['sessionid'] = authorized['sessionid']
             tlvdata.unicode_dictvalues(sessinfo)
             await rsp.write(json.dumps(sessinfo).encode('utf8'))
+            return rsp
+        elif url.startswith('/sessions/current/apikey/'):
+            if operation == 'retrieve':
+                rsp = await make_response('text/plain', 405, 'Method Not Allowed')
+                return rsp
+            status, apidata = await apikey.handle_api_request(
+                url, authorized['username'], cfgmgr, reqbody)
+            rsp = await make_response('application/json', status,
+                                      cookies=cookies)
+            await rsp.write(json.dumps(apidata).encode('utf8'))
             return rsp
         elif url.startswith('/sessions/current/webauthn/'):
             if not webauthn:

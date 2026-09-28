@@ -1645,7 +1645,7 @@ class ConfigManager(object):
         except KeyError:
             return []
 
-    def get_user(self, name):
+    def get_user(self, name, decrypt=False):
         """Get user information from DB
 
         :param name: Name of the user
@@ -1657,7 +1657,13 @@ class ConfigManager(object):
 
         """
         try:
-            return copy.deepcopy(self._cfgstore['users'][name])
+            ret = copy.deepcopy(self._cfgstore['users'][name])
+            if decrypt:
+                for key in ret:
+                    if isinstance(ret[key], dict) and 'cryptvalue' in ret[key]:
+                        ret[key]['value'] = decrypt_value(ret[key]['cryptvalue'])
+            return ret
+
         except KeyError:
             return None
 
@@ -1787,6 +1793,12 @@ class ConfigManager(object):
                     pw = pw.encode('utf-8')
                 crypted = hashlib.pbkdf2_hmac('sha256', pw, salt, 10000, dklen=32)
                 user['cryptpass'] = (salt, crypted)
+            elif attribute.startswith('secret.'):
+                if attributemap[attribute] is None:
+                    if attribute in user:
+                        del user[attribute]
+                    continue
+                user[attribute] = {'cryptvalue': crypt_value(attributemap[attribute])}
             else:
                 user[attribute] = attributemap[attribute]
         _mark_dirtykey('users', name, self.tenant)
@@ -2814,7 +2826,7 @@ class ConfigManager(object):
                     displayname = ucfg.get('displayname', None)
                     role = ucfg.get('role', None)
                     await self.create_user(user, uid=uid, displayname=displayname, role=role)
-                    for attrname in ('webauthid', 'authenticators', 'cryptpass'):
+                    for attrname in ('secret.apikey', 'webauthid', 'authenticators', 'cryptpass'):
                         if attrname in tmpconfig[confarea][user]:
                             self._cfgstore['users'][user][attrname] = tmpconfig[confarea][user][attrname]
                             _mark_dirtykey('users', user, self.tenant)
@@ -2854,9 +2866,8 @@ class ConfigManager(object):
                 for attribute in self._cfgstore[confarea][element]:
                     if 'inheritedfrom' in dumpdata[confarea][element][attribute]:
                         del dumpdata[confarea][element][attribute]
-                    elif (attribute == 'cryptpass' or
-                                  'cryptvalue' in
-                                  dumpdata[confarea][element][attribute]):
+                    elif (attribute == 'cryptpass' or (isinstance(dumpdata[confarea][element][attribute], dict) and
+                                  'cryptvalue' in dumpdata[confarea][element][attribute])):
                         if redact is not None:
                             dumpdata[confarea][element][attribute] = '*REDACTED*'
                         else:
