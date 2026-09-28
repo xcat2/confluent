@@ -1077,11 +1077,8 @@ async def resourcehandler_backend(req, make_response):
             await rsp.write(json.dumps(sessinfo).encode('utf8'))
             return rsp
         elif url.startswith('/sessions/current/apikey/'):
-            if operation == 'retrieve':
-                rsp = await make_response('text/plain', 405, 'Method Not Allowed')
-                return rsp
             status, apidata = await apikey.handle_api_request(
-                url, authorized['username'], cfgmgr, reqbody)
+                url, authorized['username'], cfgmgr, reqbody, operation)
             rsp = await make_response('application/json', status,
                                       cookies=cookies)
             await rsp.write(json.dumps(apidata).encode('utf8'))

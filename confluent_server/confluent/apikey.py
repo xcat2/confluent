@@ -111,7 +111,7 @@ def validate_bearer_token(token, cfgmgr):
         return None
     return username
 
-async def handle_api_request(url, username, cfgmgr, reqbody):
+async def handle_api_request(url, username, cfgmgr, reqbody, method):
     """Handle an authenticated API-key request.
 
     The HTTP layer supplies the authenticated request context.  The return
@@ -119,6 +119,14 @@ async def handle_api_request(url, username, cfgmgr, reqbody):
     """
     username = _username_string(username)
     operation = url.removeprefix('/sessions/current/apikey/')
+    if method == 'retrieve':
+        if operation == 'provisioned':
+            user = cfgmgr.get_user(username)
+            if not user or not user.get(_SECRET_ATTRIBUTE):
+                return 200, {'provisioned': False}
+            return 200, {'provisioned': True}
+        else:
+            return 405, {'error': 'Method Not Allowed'}
     if operation == 'create':
         try:
             expiration = _get_expiration(reqbody)
@@ -136,6 +144,11 @@ async def handle_api_request(url, username, cfgmgr, reqbody):
         if isinstance(secret, str):
             secret = secret.encode('utf8')
         return 200, {'jws': _make_jws(username, secret, expiration)}
+    if operation == 'provisioned':
+        user = cfgmgr.get_user(username)
+        if not user or not user.get(_SECRET_ATTRIBUTE):
+            return 200, {'provisioned': False}
+        return 200, {'provisioned': True}
     if operation == 'revokeall':
         user = cfgmgr.get_user(username, decrypt=True)
         if user is None:
