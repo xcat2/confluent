@@ -65,12 +65,42 @@ class NodeHandler(generic.NodeHandler):
                 self._srvroot = srvroot
         return self._srvroot
 
+    def is_current_connection(self, nicinfo):
+        currip = self.ipaddr.replace('[', '').replace(']', '').split('%', 1)[0]
+        if ':' in currip:
+            for candidate in nicinfo.get('IPv6Addresses', []):
+                candip = candidate.get('Address', None)
+                if candip == currip:
+                    return True
+            return False
+        else:
+            for candidate in nicinfo.get('IPv4Addresses', []):
+                candip = candidate.get('Address', None)
+                if candip == currip:
+                    return True
+            return False
+
     async def get_manager_url(self, wc):
         mgrs = (await self.srvroot(wc)).get('Managers', {}).get('@odata.id', None)
         if not mgrs:
             raise Exception("No Managers resource on BMC")
         rsp = await wc.grab_json_response(mgrs)
         if len(rsp.get('Members', [])) != 1:
+            for member in rsp.get('Members', []):
+                mgrurl = member.get('@odata.id', None)
+                if not mgrurl:
+                    continue
+                mginfo = await wc.grab_json_response(mgrurl)
+                if 'EthernetInterfaces' not in mginfo:
+                    continue
+                niclist = await wc.grab_json_response(mginfo['EthernetInterfaces']['@odata.id'])
+                for nic in niclist.get('Members', []):
+                    nicurl = nic.get('@odata.id', None)
+                    if not nicurl:
+                        continue
+                    nicinfo = await wc.grab_json_response(nicurl)
+                    if self.is_current_connection(nicinfo):
+                        return mgrurl
             raise Exception("Can not handle multiple Managers")
         mgrurl = rsp['Members'][0]['@odata.id']
         return mgrurl
