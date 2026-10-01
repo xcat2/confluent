@@ -249,6 +249,10 @@ async def update_boot_linux(profiledir, profile, label):
         for initramfs in initrds:
             ipxeout.write('imgfetch boot/initramfs/{0}\n'.format(initramfs))
         for shimpossible in glob.glob(profiledir + '/boot/efi/boot/*'):
+            for efidir in (profiledir + '/boot/efi', profiledir + '/boot/efi/boot'):
+                mode = os.stat(efidir).st_mode
+                if not mode & 0o001:
+                    os.chmod(efidir, mode | 0o001)
             shimbasename = os.path.basename(shimpossible)
             if shimbasename.lower() in ('bootaa64.efi', 'bootx64.efi'):
                 ipxeout.write('shim boot/efi/boot/{0}\n'.format(shimbasename))
