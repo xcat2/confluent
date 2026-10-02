@@ -16,6 +16,7 @@
 # limitations under the License.
 
 
+import atexit
 import asyncio
 import base64
 import optparse
@@ -1130,7 +1131,10 @@ def draw_node(node, imgdata, errorstr, firstnodename, cwidth, cheight):
 
 def _draw_worker():
     while True:
-        node, imgdata, errorstr, firstnodename, cwidth, cheight = draw_queue.get()
+        item = draw_queue.get()
+        if item is None:
+            break
+        node, imgdata, errorstr, firstnodename, cwidth, cheight = item
         with draw_lock:
             _draw_node(node, imgdata, errorstr, firstnodename, cwidth, cheight)
 
@@ -1160,6 +1164,18 @@ def _draw_node(node, imgdata, errorstr, firstnodename, cwidth, cheight):
 
 draw_thread = threading.Thread(target=_draw_worker, daemon=True)
 draw_thread.start()
+
+def close_draw_thread():
+    global draw_thread
+    if not draw_thread:
+        return
+    mythread = draw_thread
+    draw_thread = None
+    if mythread.is_alive():
+        draw_queue.put(None)
+        mythread.join(15)
+
+atexit.register(close_draw_thread)
 
 if options.screenshot or options.video:
     if not sys.stdout.isatty():
