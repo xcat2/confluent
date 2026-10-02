@@ -8,7 +8,9 @@ import sys
 import time
 import shlex
 import subprocess
+ipaddress = None
 try:
+    import ipaddress
     import yaml
 except ImportError:
     pass
@@ -255,7 +257,10 @@ class NetplanManager(object):
                     else:
                         needcfgwrite = True
                         cfgroutes.append({'via': gwaddr, 'to': 'default'})
-            dnsips = self.deploycfg.get('nameservers', [])
+            if ipaddress:
+                dnsips = stgs.get('ipv4_nameservers', []) + stgs.get('ipv6_nameservers', [])
+            else:
+                dnsips = self.deploycfg.get('nameservers', [])
             dnsdomain = self.deploycfg.get('dnsdomain', '')
             if dnsips:
                 currdnsips = self.getcfgarrpath([devname, 'nameservers', 'addresses'])
@@ -526,16 +531,13 @@ class NetworkManager(object):
             cmdargs['ipv6.gateway'] = stgs['ipv6_gateway']
         if stgs.get('mtu', None):
             cmdargs['802-3-ethernet.mtu'] = stgs['mtu']
-        dnsips = self.deploycfg.get('nameservers', [])
-        if not dnsips:
-            dnsips = []
-        dns4 = []
-        dns6 = []
-        for dnsip in dnsips:
-            if '.' in dnsip:
-                dns4.append(dnsip)
-            elif ':' in dnsip:
-                dns6.append(dnsip)
+        if ipaddress:
+            dns4 = stgs.get('ipv4_nameservers', [])
+            dns6 = stgs.get('ipv6_nameservers', [])
+        else:
+            dnsips = self.deploycfg.get('nameservers', [])
+            dns4 = [ip for ip in dnsips if '.' in ip]
+            dns6 = [ip for ip in dnsips if ':' in ip]
         if dns4:
             cmdargs['ipv4.dns'] = ','.join(dns4)
         if dns6:
@@ -697,6 +699,30 @@ if __name__ == '__main__':
     elif os.path.exists('/usr/sbin/wicked'):
         nm = WickedManager()
     retrynics = []
+    if ipaddress:
+        dnsbynetname = {}
+        dnsips = set(dc.get('nameservers', []))
+        for dnsip in list(dnsips):
+            dnsipaddr = ipaddress.ip_address(dnsip)
+            ipver = f'ipv{dnsipaddr.version}'
+            for netn in netname_to_interfaces:
+                currstgs = netname_to_interfaces[netn]['settings']
+                if currstgs.get(f'{ipver}_method') == 'static':
+                    currip = currstgs.get(f'{ipver}_address')
+                    if currip:
+                        currip = ipaddress.ip_interface(currip)
+                        if dnsipaddr in currip.network:
+                            currstgs.setdefault(f'{ipver}_nameservers', []).append(dnsip)
+                            dnsips.discard(dnsip)
+        for dnsip in dnsips:
+            dnsipaddr = ipaddress.ip_address(dnsip)
+            ipver = f'ipv{dnsipaddr.version}'                    
+            for netn in netname_to_interfaces:
+                currstgs = netname_to_interfaces[netn]['settings']
+                if currstgs.get(f'{ipver}_method') == 'static':
+                    gateway = currstgs.get(f'{ipver}_gateway')
+                    if gateway:
+                        currstgs.setdefault(f'{ipver}_nameservers', []).append(dnsip)
     for netn in netname_to_interfaces:
         redo = nm.apply_configuration(netname_to_interfaces[netn])
         if redo == 1:
