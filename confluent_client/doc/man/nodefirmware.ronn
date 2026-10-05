@@ -7,6 +7,11 @@ nodefirmware(8) -- Report firmware information on confluent nodes
 
 ## DESCRIPTION
 
+**WARNING**
+
+Depending on node vendor, model, and update type, a node may reboot in trying to
+apply an update without warning.
+
 `nodefirmware` reports and updates various firmware on nodes.  By default it
 will retrieve all firmware, but can be directed to fetch specific firmware by
 calling out the name of the firmware (e.g. uefi or xcc) or request reading only

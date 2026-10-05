@@ -57,7 +57,8 @@ components = ['all']
 argparser = optparse.OptionParser(
     usage="Usage: "
           "%prog <noderange> [list][updatestatus][updatetypes][update [--backup] "
-          "[--parameterfile <file>] <file>]|[<components>]")
+          "[--parameterfile <file>] <file>]|[<components>]",
+    epilog='WARNING: updates may cause node reboots unexpectedly')
 argparser.add_option('-b', '--backup', action='store_true',
                      help='Target a backup bank rather than primary')
 argparser.add_option('-p', '--parameterfile', type='string',
