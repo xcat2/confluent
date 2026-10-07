@@ -55,7 +55,9 @@ class KvmConnection:
             'PVEAuthCookie': pac,
             }
         self.protos = ['binary']
-        self.host = host
+        # The manager issued the ticket and owns the pinned fingerprint. It forwards the
+        # websocket to the node running the guest, whose name may not resolve here.
+        self.host = consdata['server']
         self.portnum = 8006
         self.password = consdata['ticket']
 
