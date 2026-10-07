@@ -1,0 +1,2 @@
+#!/bin/sh
+echo $CONFLUENT_SSH_PASSPHRASE

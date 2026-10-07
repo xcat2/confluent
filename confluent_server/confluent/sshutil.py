@@ -156,17 +156,7 @@ async def prep_ssh_key(keyname):
         adding_key = False
         return
     try:
-        os.makedirs('/run/confluent/ssh', mode=0o700)
-    except OSError as e:
-        if e.errno != 17:
-            raise
-    os.chmod('/run/confluent/ssh', 0o700)
-    tmpdir = tempfile.mkdtemp(dir='/run/confluent/ssh', prefix='askpass.')
-    try:
-        askpass = os.path.join(tmpdir, 'askpass.sh')
-        with open(askpass, 'w') as ap:
-            ap.write('#!/bin/sh\necho $CONFLUENT_SSH_PASSPHRASE\nrm {0}\n'.format(askpass))
-        os.chmod(askpass, 0o700)
+        askpass = '/opt/confluent/libexec/confluent_askpass.sh'
         os.environ['CONFLUENT_SSH_PASSPHRASE'] = await get_passphrase()
         olddisplay = os.environ.get('DISPLAY', None)
         oldaskpass = os.environ.get('SSH_ASKPASS', None)
