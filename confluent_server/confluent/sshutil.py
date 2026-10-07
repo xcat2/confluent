@@ -175,7 +175,6 @@ async def prep_ssh_key(keyname):
         ready_keys[keyname] = 1
     finally:
         adding_key = False
-        shutil.rmtree(tmpdir)
 
 async def sign_host_key(pubkey, nodename, principals=()):
     tmpdir = tempfile.mkdtemp()
