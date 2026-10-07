@@ -1336,6 +1336,8 @@ def _decode_attribute(attribute, nodeobj, formatter=None, decrypt=False):
             del retdict['value']
         try:
             retdict['value'] = formatter.format(retdict['expression'])
+            if 'broken' in retdict:
+                del retdict['broken']
         except Exception as e:
             retdict['broken'] = str(e)
         return retdict
