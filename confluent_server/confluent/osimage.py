@@ -240,7 +240,7 @@ async def update_boot_linux(profiledir, profile, label):
     for initramfs in initrds:
         ipxeargs += " initrd=" + initramfs
     oum = os.umask(0o22)
-    ipout = os.open(profiledir + '/boot.ipxe', os.O_WRONLY|os.O_CREAT|os.O_TRUNC, 0o644)
+    ipout = os.open(profiledir + '/boot.ipxe.shim', os.O_WRONLY|os.O_CREAT|os.O_TRUNC, 0o644)
     ipxeout = os.fdopen(ipout, 'w')
     try:
         os.umask(oum)
@@ -256,6 +256,17 @@ async def update_boot_linux(profiledir, profile, label):
             shimbasename = os.path.basename(shimpossible)
             if shimbasename.lower() in ('bootaa64.efi', 'bootx64.efi'):
                 ipxeout.write('shim boot/efi/boot/{0}\n'.format(shimbasename))
+        ipxeout.write('imgload kernel\nimgexec kernel\n')
+    finally:
+        ipxeout.close()
+    ipout = os.open(profiledir + '/boot.ipxe', os.O_WRONLY|os.O_CREAT|os.O_TRUNC, 0o644)
+    ipxeout = os.fdopen(ipout, 'w')
+    try:
+        os.umask(oum)
+        ipxeout.write('#!ipxe\n')
+        ipxeout.write('imgfetch boot/kernel ' + ipxeargs + '\n')
+        for initramfs in initrds:
+            ipxeout.write('imgfetch boot/initramfs/{0}\n'.format(initramfs))
         ipxeout.write('imgload kernel\nimgexec kernel\n')
     finally:
         ipxeout.close()

@@ -351,7 +351,10 @@ async def proxydhcp(handler, nodeguess):
                     log.log({'info': 'No pending profile for {0}, skipping proxyDHCP reply'.format(node)})
                     continue
                 myip = socket.inet_ntoa(myipn)
-                bootfile = 'http://{0}/confluent-public/os/{1}/boot.ipxe'.format(myip, profile).encode('utf8')
+                if disco['arch'] == 'bios-x86':
+                    bootfile = 'http://{0}/confluent-public/os/{1}/boot.ipxe'.format(myip, profile).encode('utf8')
+                else:
+                    bootfile = 'http://{0}/confluent-public/os/{1}/boot.ipxe.shim'.format(myip, profile).encode('utf8')
             elif disco['arch'] == 'uefi-x64':
                 bootfile = b'confluent/x86_64/ipxe-shim.efi'
             elif disco['arch'] == 'bios-x86':
