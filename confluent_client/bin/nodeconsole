@@ -1092,6 +1092,8 @@ async def do_vnc(node, url, outputfile=None):
                 vncclientsbynode[node] = client
                 while True:
                     # Retrieve pixels as a 3D numpy array
+                    while not draw_queue.empty():
+                        await asyncio.sleep(0.05)
                     try:
                         # replace the stock screenshot function with our own
                         # ask for a video refresh, then do reads until the video is complete
@@ -1132,6 +1134,8 @@ def draw_node(node, imgdata, errorstr, firstnodename, cwidth, cheight):
 def _draw_worker():
     while True:
         item = draw_queue.get()
+        while not draw_queue.empty():
+            item = draw_queue.get()
         if item is None:
             break
         node, imgdata, errorstr, firstnodename, cwidth, cheight = item
