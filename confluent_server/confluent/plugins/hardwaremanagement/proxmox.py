@@ -277,12 +277,16 @@ class PmxConsole(conapi.Console):
         pac = self.consdata['pac']  # fortunately, we terminate this on our end, but it does kind of reduce the value of the
         # 'ticket' approach, as the general cookie must be provided as cookie along with the VNC ticket
         cookies = aiohttp.CookieJar(unsafe=True, quote_cookie=False)
-        cookies.update_cookies({'PVEAuthCookie': pac})
+        headers = {}
+        if pac:
+            cookies.update_cookies({'PVEAuthCookie': pac})
+        if self.consdata.get('authorization'):
+            headers['Authorization'] = self.consdata['authorization']
         self.clisess = aiohttp.ClientSession(cookie_jar=cookies)
         try:
             self.ws = await self.clisess.ws_connect(
                 f'wss://{self.bmc}:8006/api2/json/nodes/{host}/{guest}/vncwebsocket?port={port}&vncticket={urlticket}',
-                protocols=['binary'], ssl=self.ssl)
+                protocols=['binary'], ssl=self.ssl, headers=headers)
             await self.ws.send_str(f'{user}:{ticket}\n')
             data = await self.ws.receive()
             if data.data not in (b'OK', 'OK'):
@@ -322,13 +326,18 @@ class PmxConsole(conapi.Console):
         self.datacallback = None
 
 class PmxApiClient:
-    def __init__(self, server, user, password, configmanager):
+    def __init__(self, server, user, password, configmanager, node=None):
         self.user = user
         self.password = password
         self.pac = None
+        pinnode, pinfield = server, 'pubkeys.tls'
+        if configmanager and node is not None and \
+                server not in configmanager.get_node_attributes(server, 'pubkeys.tls'):
+            # Manager is not a confluent node: pin on the guest's node, as the console does.
+            pinnode, pinfield = node, 'pubkeys.tls_hardwaremanager'
         if configmanager:
             cv = util.TLSCertVerifier(
-                configmanager, server, 'pubkeys.tls'
+                configmanager, pinnode, pinfield, subject=server
             ).verify_cert
         else:
             def cv(x):
@@ -343,14 +352,24 @@ class PmxApiClient:
         self.wc = webclient.WebConnection(server, port=8006, verifycallback=cv)
         self.fprint = None
         if configmanager:
-            self.fprint = configmanager.get_node_attributes(server, 'pubkeys.tls').get(server, {}).get('pubkeys.tls', {}).get('value', None)
+            self.fprint = configmanager.get_node_attributes(pinnode, pinfield).get(pinnode, {}).get(pinfield, {}).get('value', None)
         self.vmmap = {}
         self.vmdupes = {}
         self.vmlist = {}
         self.vmbyid = {}
         self.logged = False
 
+    @property
+    def token(self):
+        # 'user@realm!tokenid', secret as the password.
+        return '!' in (self.user or '')
+
     async def login(self):
+        if self.token:
+            # Stateless: no ticket or CSRF token; a bad token is a 401 on first use.
+            self.wc.set_header('Authorization', 'PVEAPIToken={}={}'.format(self.user, self.password))
+            self.logged = True
+            return
         loginform = {
                 'username': self.user,
                 'password': self.password,
@@ -478,6 +497,7 @@ class PmxApiClient:
         consdata['host'] = host
         consdata['guest'] = guest
         consdata['pac'] = self.pac
+        consdata['authorization'] = self.wc.stdheaders.get('Authorization')
         return consdata
 
     async def get_vm_bootdev(self, vm):
@@ -578,7 +598,7 @@ async def prep_proxmox_clients(nodes, configmanager):
         if currpmx not in clientsbypmx:
             user = cfg.get('secret.hardwaremanagementuser', {}).get('value', None)
             passwd = cfg.get('secret.hardwaremanagementpassword', {}).get('value', None)
-            clientsbypmx[currpmx] = PmxApiClient(currpmx, user, passwd, configmanager)
+            clientsbypmx[currpmx] = PmxApiClient(currpmx, user, passwd, configmanager, node)
             try:
                 await clientsbypmx[currpmx].login()
             except exc.TargetEndpointBadCredentials as e:
@@ -645,8 +665,13 @@ async def update(nodes, element, configmanager, inputdata):
                 continue
             yield msg.BootDevice(node, await currclient.get_vm_bootdev(node))
         elif element == ['console', 'ikvm']:
+            currclient = clientsbynode[node]
+            if currclient.token:
+                # vinz forwards a cookie; a token needs a header.
+                yield msg.ConfluentNodeError(node, 'VNC needs a Proxmox user with a password; '
+                                                   'API tokens cannot be passed to the VNC proxy')
+                return
             try:
-                currclient = clientsbynode[node]
                 url = await vinzmanager.get_url(node, inputdata, nodeparmcallback=KvmConnHandler(currclient, node).connect)
             except Exception as e:
                 print(repr(e))
@@ -667,8 +692,13 @@ async def create(nodes, element, configmanager, inputdata):
             yield msg.ConfluentNodeError(node, str(e))
             continue
         if element == ['console', 'ikvm']:
+            currclient = clientsbynode[node]
+            if currclient.token:
+                # vinz forwards a cookie; a token needs a header.
+                yield msg.ConfluentNodeError(node, 'VNC needs a Proxmox user with a password; '
+                                                   'API tokens cannot be passed to the VNC proxy')
+                return
             try:
-                currclient = clientsbynode[node]
                 url = await vinzmanager.get_url(node, inputdata, nodeparmcallback=KvmConnHandler(currclient, node).connect)
             except Exception as e:
                 print(repr(e))
