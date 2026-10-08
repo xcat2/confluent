@@ -13,8 +13,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import asyncssh
-import asyncssh.known_hosts as known_hosts
+import warnings
+
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore")
+    import asyncssh
+    import asyncssh.known_hosts as known_hosts
 import confluent.tasks as tasks
 import hashlib
 

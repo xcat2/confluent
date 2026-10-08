@@ -10,6 +10,7 @@ import os
 import os.path
 import pwd
 import shutil
+import subprocess
 import sys
 
 path = os.path.dirname(os.path.realpath(__file__))
@@ -96,6 +97,10 @@ def symlinkp(src, trg):
             raise
 
 def initialize_genesis(arch='x86_64'):
+    return subprocess.run(
+        [sys.executable, __file__, '--initialize-genesis', arch]).returncode
+
+def _initialize_genesis(arch='x86_64'):
     if arch == 'x86_64':
         uefisuffix = 'x64'
     elif arch == 'aarch64':
@@ -111,10 +116,6 @@ def initialize_genesis(arch='x86_64'):
         hasconfluentuser = pwd.getpwnam('confluent')
     except KeyError:
         pass
-    pid = os.fork()
-    if pid:
-        retval = os.waitpid(pid, 0)
-        return retval[1]
     retcode = 0
     try:
         util.mkdirp('/var/lib/confluent', 0o755)
@@ -152,8 +153,7 @@ def initialize_genesis(arch='x86_64'):
     except Exception as e:
         sys.stderr.write(str(e) + '\n')
         retcode = 1
-    finally:
-        os._exit(retcode)
+    return retcode
 
 
 mynamedone = False
@@ -172,19 +172,17 @@ def init_confluent_myname():
         pass
     if hasconfluentuser:
         print("Ok")
-        pid = os.fork()
-        if pid:
-            os.waitpid(pid, 0)
-        else:
-            exitcode = 0
-            try:
-                os.setgid(hasconfluentuser.pw_gid)
-                os.setuid(hasconfluentuser.pw_uid)
-                collective.get_myname()
-            except Exception:
-                exitcode = 1
-            finally:
-                os._exit(exitcode)
+        subprocess.run([sys.executable, __file__, '--initialize-myname'])
+
+def _initialize_myname():
+    hasconfluentuser = pwd.getpwnam('confluent')
+    try:
+        os.setgid(hasconfluentuser.pw_gid)
+        os.setuid(hasconfluentuser.pw_uid)
+        collective.get_myname()
+    except Exception:
+        return 1
+    return 0
 
 
 async def local_node_trust_setup():
@@ -688,4 +686,8 @@ async def osimport(imagefile, checkonly=False, custname=None):
                 pass
 
 if __name__ == '__main__':
+    if sys.argv[1:2] == ['--initialize-genesis'] and len(sys.argv) == 3:
+        sys.exit(_initialize_genesis(sys.argv[2]))
+    if sys.argv[1:] == ['--initialize-myname']:
+        sys.exit(_initialize_myname())
     asyncio.run(main(sys.argv))
