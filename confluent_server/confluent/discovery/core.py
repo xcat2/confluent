@@ -1790,6 +1790,10 @@ async def generic_eval(address, hwaddr=None):
     if 443 in ports:
         resdata = await ssdp.check_fish(('/redfish/v1/', peerdata))
         if resdata:
+            if resdata.get('vendor') == 'Lenovo':
+                maybedata = await ssdp.check_fish(('/DeviceDescription.json', peerdata))
+                if maybedata:
+                    return safe_detected(maybedata)
             return safe_detected(resdata)
         peerdata['services'] = ['generic-https']
     if 22 in ports:

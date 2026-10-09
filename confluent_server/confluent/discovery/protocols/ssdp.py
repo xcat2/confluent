@@ -587,6 +587,7 @@ async def check_fish(urldata, port=443, verifycallback=None):
         if 'UUID' in peerinfo:
             vendor = peerinfo.get('Vendor', '')
             # NOTE: Specific path for EUREKA MEGWARE Chassis
+            data['vendor'] = vendor
             if vendor == 'Megware':
                 data['services'] = ['megware-chassis']
             else:
