@@ -23,17 +23,20 @@
 
 import asyncio
 import confluent.exceptions as exc
+import inspect
 import socket
 import pysnmp.hlapi.asyncio as snmp
-import pysnmp.smi.rfc1902 as rfc1902
 
 async def _get_transport(name):
     # Annoyingly, pysnmp does not automatically determine ipv6 v ipv4
     res = await asyncio.get_running_loop().getaddrinfo(name, 161, type=socket.SOCK_DGRAM)
     if res[0][0] == socket.AF_INET6:
-        return await snmp.Udp6TransportTarget.create(res[0][4], 2)
+        target = snmp.Udp6TransportTarget
     else:
-        return await snmp.UdpTransportTarget.create(res[0][4], 2)
+        target = snmp.UdpTransportTarget
+    if hasattr(target, 'create'):
+        return await target.create(res[0][4], timeout=2)
+    return target(res[0][4], timeout=2)
 
 
 class Session(object):
@@ -100,33 +103,70 @@ class Session(object):
         if '::' in oid:
             resolvemib = True
             mib, field = oid.split('::')
-            obj = rfc1902.ObjectType(rfc1902.ObjectIdentity(mib, field))
             obj = snmp.ObjectType(snmp.ObjectIdentity(mib, field))
         else:
-            obj = rfc1902.ObjectType(rfc1902.ObjectIdentity(oid))
-        walking = snmp.bulk_walk_cmd(self.eng, self.authdata, tp, ctx, 0, 10, obj,
-                                   lexicographicMode=False, lookupMib=resolvemib)
-        async for rsp in walking:
-            errstr, errnum, erridx, answers = rsp
-            if errstr:
-                errstr = str(errstr)
-                finerr = errstr + ' while trying to connect to ' \
-                                    '{0}'.format(self.server)
-                if errstr in ('Unknown USM user', 'unknownUserName',
-                                'wrongDigest', 'Wrong SNMP PDU digest'):
-                    raise exc.TargetEndpointBadCredentials(finerr)
-                # need to do bad credential versus timeout
-                raise exc.TargetEndpointUnreachable(finerr)
-            elif errnum:
-                raise exc.ConfluentException(errnum.prettyPrint() +
+            obj = snmp.ObjectType(snmp.ObjectIdentity(oid))
+        if hasattr(snmp, 'bulk_walk_cmd'):
+            walking = snmp.bulk_walk_cmd(self.eng, self.authdata, tp, ctx, 0, 10, obj,
+                                        lexicographicMode=False, lookupMib=resolvemib)
+            async for rsp in walking:
+                errstr, errnum, erridx, answers = rsp
+                if errstr:
+                    errstr = str(errstr)
+                    finerr = errstr + ' while trying to connect to ' \
+                                        '{0}'.format(self.server)
+                    if errstr in ('Unknown USM user', 'unknownUserName',
+                                    'wrongDigest', 'Wrong SNMP PDU digest'):
+                        raise exc.TargetEndpointBadCredentials(finerr)
+                    # need to do bad credential versus timeout
+                    raise exc.TargetEndpointUnreachable(finerr)
+                elif errnum:
+                    raise exc.ConfluentException(errnum.prettyPrint() +
                                                 ' while trying to connect to '
                                                 '{0}'.format(self.server))
-            for ans in answers:
-                if not obj[0].isPrefixOf(ans[0]):
-                    # PySNMP returns leftovers in a bulk command
-                    # filter out such leftovers
+                for ans in answers:
+                    if not obj[0].isPrefixOf(ans[0]):
+                        break
+                    yield ans
+        else:  # PySNMP 5 compatibility path for older async
+            root = None
+            while True:
+                rsp = snmp.bulkCmd(self.eng, self.authdata, tp, ctx, 0, 10, obj,
+                                lookupMib=resolvemib)
+                while inspect.isawaitable(rsp):
+                    rsp = await rsp
+                errstr, errnum, erridx, answers = rsp
+                if errstr:
+                    errstr = str(errstr)
+                    finerr = errstr + ' while trying to connect to ' \
+                                        '{0}'.format(self.server)
+                    if errstr in ('Unknown USM user', 'unknownUserName',
+                                    'wrongDigest', 'Wrong SNMP PDU digest'):
+                        raise exc.TargetEndpointBadCredentials(finerr)
+                    # need to do bad credential versus timeout
+                    raise exc.TargetEndpointUnreachable(finerr)
+                elif errnum:
+                    raise exc.ConfluentException(errnum.prettyPrint() +
+                                                    ' while trying to connect to '
+                                                    '{0}'.format(self.server))
+                if not answers:
                     break
-                yield ans
+                if root is None:
+                    root = obj[0]
+                last_identity = None
+                for row in answers:
+                    if snmp.isEndOfMib(row):
+                        return
+                    for ans in row:
+                        if not root.isPrefixOf(ans[0]):
+                            # PySNMP returns leftovers in a bulk command
+                            # filter out such leftovers
+                            return
+                        last_identity = ans[0]
+                        yield ans
+                if last_identity is None:
+                    break
+                obj = snmp.ObjectType(snmp.ObjectIdentity(last_identity))
         #except snmperr.WrongValueError:
         #    raise exc.TargetEndpointBadCredentials('Invalid SNMPv3 password')
 
