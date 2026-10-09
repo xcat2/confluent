@@ -1,5 +1,7 @@
 
 import asyncio
+import base64
+import codecs
 import confluent.exceptions as exc
 import confluent.vinzmanager as vinzmanager
 import confluent.util as util
@@ -10,8 +12,130 @@ import aiohmi.exceptions as pygexc
 import confluent.interface.console as conapi
 import random
 import io
+import json
+import re
 import urllib.parse as urlparse
 import aiohttp
+
+def pve_error(body, status):
+    # Non-2xx bodies arrive as raw bytes: JSON with 'message' and per-field 'errors'.
+    if isinstance(body, bytes):
+        try:
+            body = json.loads(body)
+        except ValueError:
+            body = body.decode('utf8', 'replace')
+    if isinstance(body, dict):
+        message = (body.get('message') or '').strip()
+        errors = body.get('errors')
+        if isinstance(errors, dict):
+            message = '{} ({})'.format(message, ', '.join(
+                '{}: {}'.format(k, str(v).strip()) for k, v in errors.items()))
+        body = message
+    body = str(body or '').strip()
+    return 'HTTP {}{}'.format(status, ': ' + body[:200] if body else '')
+
+
+def next_config(pending):
+    """Config as of the next start, from a /pending listing."""
+    cfg = {}
+    for datum in pending:
+        if datum.get('delete'):
+            continue
+        if 'pending' in datum:
+            cfg[datum['key']] = datum['pending']
+        elif 'value' in datum:
+            cfg[datum['key']] = datum['value']
+    return cfg
+
+
+# PVE's resolve_first_disk order.
+_DRIVEBUSES = ('ide', 'scsi', 'virtio', 'sata')
+
+
+def _devkey(dev):
+    bus, num = re.match(r'([a-z]+)(\d+)$', dev).groups()
+    busrank = _DRIVEBUSES.index(bus) if bus in _DRIVEBUSES else len(_DRIVEBUSES)
+    return busrank, bus, int(num)
+
+
+def boot_devices(cfg):
+    """Boot order as a device list: 'order=a;b' or legacy letters (default 'cdn').
+
+    c: bootdisk or first disk, d: first CD-ROM, n: every NIC.
+    """
+    legacy = 'cdn'
+    for item in (cfg.get('boot') or '').split(','):
+        key, sep, val = item.partition('=')
+        if key == 'order' and sep:
+            return [dev for dev in val.split(';') if dev]
+        if key == 'legacy' and sep:
+            legacy = val
+        elif key and not sep:
+            legacy = key
+    drives = sorted((key for key in cfg if re.match(r'({})\d+$'.format('|'.join(_DRIVEBUSES)), key)),
+                    key=_devkey)
+    cdroms = [key for key in drives if 'media=cdrom' in cfg[key]]
+    disks = [key for key in drives if key not in cdroms]
+    nets = sorted((key for key in cfg if re.match(r'net\d+$', key)), key=_devkey)
+    devices = []
+    for letter in legacy:
+        if letter == 'c':
+            bootdisk = cfg.get('bootdisk') if cfg.get('bootdisk') in disks else None
+            if bootdisk or disks:
+                devices.append(bootdisk or disks[0])
+        elif letter == 'd' and cdroms:
+            devices.append(cdroms[0])
+        elif letter == 'n':
+            devices.extend(nets)
+    return devices
+
+
+_SMBIOSFIELDS = (
+    ('uuid', 'UUID'),
+    ('manufacturer', 'Manufacturer'),
+    ('product', 'Product name'),
+    ('version', 'Version'),
+    ('serial', 'Serial Number'),
+    ('sku', 'SKU'),
+    ('family', 'Family'),
+)
+
+
+def parse_smbios1(text):
+    """smbios1 as a dict; with base64=1 every field but uuid is base64."""
+    fields = {}
+    for item in text.split(','):
+        key, sep, val = item.partition('=')
+        if sep:
+            fields[key] = val
+    if fields.get('base64') == '1':
+        for key, val in fields.items():
+            if key in ('uuid', 'base64'):
+                continue
+            try:
+                fields[key] = base64.b64decode(val, validate=True).decode('utf8')
+            except (ValueError, UnicodeDecodeError):
+                pass
+    return fields
+
+
+# netN options; the remaining 'model=mac' pair is the NIC.
+_NICOPTIONS = ('bridge', 'firewall', 'link_down', 'mtu', 'queues', 'rate', 'tag', 'trunks')
+
+
+def parse_nic(text):
+    """(model, mac) from a netN value: 'virtio=BC:24:..,bridge=vmbr0'."""
+    model = mac = None
+    for item in text.split(','):
+        key, sep, val = item.partition('=')
+        if key == 'model':
+            model = val
+        elif key == 'macaddr':
+            mac = val
+        elif sep and key not in _NICOPTIONS and model is None:
+            model, mac = key, val
+    return model, mac
+
 
 class CustomVerifier(aiohttp.Fingerprint):
     def __init__(self, verifycallback):
@@ -73,6 +197,9 @@ class KvmConnHandler:
         return KvmConnection(consdata)
 
 class PmxConsole(conapi.Console):
+    # termproxy drops idle sessions; xterm.js pings every 30s.
+    keepalive_interval = 30
+
     def __init__(self, consdata, node, configmanager, apiclient):
         self.ws = None
         self.clisess = None
@@ -82,7 +209,18 @@ class PmxConsole(conapi.Console):
         self.bmc = consdata['server']
         self.node = node
         self.recvr = None
+        self.keeper = None
+        self.datacallback = None
         self.apiclient = apiclient
+        # A UTF-8 character may span two writes.
+        self.decoder = codecs.getincrementaldecoder('utf-8')('replace')
+
+    async def lost(self):
+        # Report the disconnect once.
+        callback, self.datacallback = self.datacallback, None
+        self.connected = False
+        if callback:
+            await callback(conapi.ConsoleEvent.Disconnect)
 
     async def recvdata(self):
         try:
@@ -90,17 +228,27 @@ class PmxConsole(conapi.Console):
                 pendingdata = await self.ws.receive()
                 if pendingdata.type == aiohttp.WSMsgType.BINARY:
                     await self.datacallback(pendingdata.data)
-                    continue
                 elif pendingdata.type == aiohttp.WSMsgType.TEXT:
                     await self.datacallback(pendingdata.data.encode())
+                elif pendingdata.type in (aiohttp.WSMsgType.PING, aiohttp.WSMsgType.PONG):
                     continue
-                elif pendingdata.type in (aiohttp.WSMsgType.CLOSE, aiohttp.WSMsgType.CLOSED):
-                    await self.datacallback(conapi.ConsoleEvent.Disconnect)
-                    return
                 else:
-                    print("Unknown response in PmxConsole WSHandler")
+                    # CLOSE, CLOSING, CLOSED or ERROR: session over.
+                    await self.lost()
+                    return
         except asyncio.CancelledError:
             pass
+
+    async def keepalive(self):
+        try:
+            while self.connected:
+                await asyncio.sleep(self.keepalive_interval)
+                if self.connected:
+                    await self.ws.send_str('2')
+        except asyncio.CancelledError:
+            pass
+        except Exception:
+            await self.lost()
 
     async def connect(self, callback):
         if await self.apiclient.get_vm_power(self.node) != 'on':
@@ -129,33 +277,47 @@ class PmxConsole(conapi.Console):
         pac = self.consdata['pac']  # fortunately, we terminate this on our end, but it does kind of reduce the value of the
         # 'ticket' approach, as the general cookie must be provided as cookie along with the VNC ticket
         cookies = aiohttp.CookieJar(unsafe=True, quote_cookie=False)
-        cookies.update_cookies({'PVEAuthCookie': pac})
+        headers = {}
+        if pac:
+            cookies.update_cookies({'PVEAuthCookie': pac})
+        if self.consdata.get('authorization'):
+            headers['Authorization'] = self.consdata['authorization']
         self.clisess = aiohttp.ClientSession(cookie_jar=cookies)
-        self.ws = await self.clisess.ws_connect(
-            f'wss://{self.bmc}:8006/api2/json/nodes/{host}/{guest}/vncwebsocket?port={port}&vncticket={urlticket}',
-            protocols=['binary'], ssl=self.ssl)
-        await self.ws.send_str(f'{user}:{ticket}\n')
-        data = await self.ws.receive()
-        if data.data == b'OK' or data.data == 'OK':
+        try:
+            self.ws = await self.clisess.ws_connect(
+                f'wss://{self.bmc}:8006/api2/json/nodes/{host}/{guest}/vncwebsocket?port={port}&vncticket={urlticket}',
+                protocols=['binary'], ssl=self.ssl, headers=headers)
+            await self.ws.send_str(f'{user}:{ticket}\n')
+            data = await self.ws.receive()
+            if data.data not in (b'OK', 'OK'):
+                raise exc.TargetEndpointUnreachable(
+                    'termproxy refused the session for {}: {!r}'.format(self.node, data.data))
             await self.ws.receive()  # swallow the 'starting serial terminal' message
-            self.connected = True
-            self.recvr = tasks.spawn_task(self.recvdata())
-        else:
-            print(repr(data.data))
-        return
+        except Exception:
+            await self.close()
+            await callback(conapi.ConsoleEvent.Disconnect)
+            return
+        self.connected = True
+        self.recvr = tasks.spawn_task(self.recvdata())
+        self.keeper = tasks.spawn_task(self.keepalive())
 
     async def write(self, data):
         try:
-            dlen = str(len(data))
-            data = data.decode()
-            await self.ws.send_str('0:' + dlen + ':' + data)
+            text = self.decoder.decode(data)
+            if not text:
+                return
+            # Length in UTF-8 bytes, as xterm.js sends it.
+            await self.ws.send_str('0:{}:{}'.format(len(text.encode('utf-8')), text))
         except Exception:
-            await self.datacallback(conapi.ConsoleEvent.Disconnect)
+            await self.lost()
 
     async def close(self):
         if self.recvr:
             self.recvr.cancel()
             self.recvr = None
+        if self.keeper:
+            self.keeper.cancel()
+            self.keeper = None
         if self.ws:
             await self.ws.close()
         if self.clisess:
@@ -164,13 +326,18 @@ class PmxConsole(conapi.Console):
         self.datacallback = None
 
 class PmxApiClient:
-    def __init__(self, server, user, password, configmanager):
+    def __init__(self, server, user, password, configmanager, node=None):
         self.user = user
         self.password = password
         self.pac = None
+        pinnode, pinfield = server, 'pubkeys.tls'
+        if configmanager and node is not None and \
+                server not in configmanager.get_node_attributes(server, 'pubkeys.tls'):
+            # Manager is not a confluent node: pin on the guest's node, as the console does.
+            pinnode, pinfield = node, 'pubkeys.tls_hardwaremanager'
         if configmanager:
             cv = util.TLSCertVerifier(
-                configmanager, server, 'pubkeys.tls'
+                configmanager, pinnode, pinfield, subject=server
             ).verify_cert
         else:
             def cv(x):
@@ -183,83 +350,133 @@ class PmxApiClient:
             pass
         self.server = server
         self.wc = webclient.WebConnection(server, port=8006, verifycallback=cv)
-        self.fprint = configmanager.get_node_attributes(server, 'pubkeys.tls').get(server, {}).get('pubkeys.tls', {}).get('value', None)
+        self.fprint = None
+        if configmanager:
+            self.fprint = configmanager.get_node_attributes(pinnode, pinfield).get(pinnode, {}).get(pinfield, {}).get('value', None)
         self.vmmap = {}
+        self.vmdupes = {}
         self.vmlist = {}
         self.vmbyid = {}
         self.logged = False
 
+    @property
+    def token(self):
+        # 'user@realm!tokenid', secret as the password.
+        return '!' in (self.user or '')
+
     async def login(self):
+        if self.token:
+            # Stateless: no ticket or CSRF token; a bad token is a 401 on first use.
+            self.wc.set_header('Authorization', 'PVEAPIToken={}={}'.format(self.user, self.password))
+            self.logged = True
+            return
         loginform = {
                 'username': self.user,
                 'password': self.password,
             }
         loginbody = urlparse.urlencode(loginform)
         try:
-            rsp = await self.wc.grab_json_response_with_status('/api2/json/access/ticket', loginbody, headers={'Content-Type': 'application/x-www-form-urlencoded'})
-            if rsp[1] == 401:
-                raise exc.TargetEndpointBadCredentials("Bad credentials")
-        except exc.TargetEndpointBadCredentials:
-            raise
+            body, status = await self.wc.grab_json_response_with_status('/api2/json/access/ticket', loginbody, headers={'Content-Type': 'application/x-www-form-urlencoded'})
         except Exception:
             raise exc.TargetEndpointUnreachable("Unable to reach Proxmox server '{}'".format(self.server))
-        self.pac = rsp[0]['data']['ticket']
+        if status == 401:
+            raise exc.TargetEndpointBadCredentials("Bad credentials")
+        data = body.get('data') if isinstance(body, dict) else None
+        if status != 200 or not isinstance(data, dict) or 'ticket' not in data:
+            raise exc.TargetEndpointUnreachable("Proxmox server '{}' refused login: {}".format(
+                self.server, pve_error(body, status)))
+        if data.get('NeedTFA'):
+            raise exc.TargetEndpointBadCredentials(
+                "Proxmox user '{}' requires two-factor authentication, which is not supported".format(self.user))
+        self.pac = data['ticket']
         self.wc.cookies.update_cookies({'PVEAuthCookie': self.pac})
-        self.wc.set_header('CSRFPreventionToken', rsp[0]['data']['CSRFPreventionToken'])
+        self.wc.set_header('CSRFPreventionToken', data['CSRFPreventionToken'])
         self.logged = True
 
+    async def api(self, method, path, data=None, vm=None):
+        """Call the PVE API; returns 'data'.
+
+        With vm, path is relative to /nodes/<node>/qemu/<id>/. Retries once
+        after a 401 (expired ticket) and once after a migration.
+        """
+        retried = set()
+        while True:
+            if not self.logged:
+                await self.login()
+            url = path
+            if vm is not None:
+                host, guest = await self.get_vm(vm)
+                url = f'/api2/json/nodes/{host}/{guest}/{path}'
+            try:
+                body, status = await self.wc.grab_json_response_with_status(url, data, method=method)
+            except Exception:
+                raise exc.TargetEndpointUnreachable("Unable to reach Proxmox server '{}'".format(self.server))
+            if 200 <= status < 300:
+                return body.get('data') if isinstance(body, dict) else body
+            message = pve_error(body, status)
+            if status == 401 and 'login' not in retried:
+                retried.add('login')
+                self.logged = False
+                continue
+            if vm is not None and 'does not exist' in message and 'map' not in retried:
+                retried.add('map')
+                self.vmmap.pop(vm, None)
+                continue
+            if status == 401:
+                raise exc.TargetEndpointBadCredentials(message)
+            raise exc.TargetResourceUnavailable(
+                'Proxmox server {} {} {}: {}'.format(self.server, method, url, message))
 
     def get_screenshot(self, vm, outfile):
         raise Exception("Not implemented")
 
     async def map_vms(self):
-        if not self.logged:
-            await self.login()
-        rsp = await self.wc.grab_json_response('/api2/json/cluster/resources')
-        for datum in rsp.get('data', []):
-            if datum['type'] == 'qemu':
-                self.vmmap[datum['name']] = (datum['node'], datum['id'])
+        resources = await self.api('GET', '/api2/json/cluster/resources')
+        # Names need not be unique; templates are skipped.
+        byname = {}
+        for datum in resources or []:
+            if datum['type'] == 'qemu' and not datum.get('template'):
+                byname.setdefault(datum.get('name'), []).append((datum['node'], datum['id']))
+        self.vmmap = dict((name, vms[0]) for name, vms in byname.items() if len(vms) == 1)
+        self.vmdupes = dict((name, [guest for _, guest in vms]) for name, vms in byname.items() if len(vms) > 1)
         return self.vmmap
 
 
     async def get_vm(self, vm):
         if vm not in self.vmmap:
             await self.map_vms()
+        if vm in self.vmdupes:
+            raise exc.InvalidArgumentException(
+                "VM name {} is used by more than one guest on Proxmox server {} ({}); "
+                "rename all but one".format(vm, self.server, ', '.join(self.vmdupes[vm])))
         if vm not in self.vmmap:
             raise exc.NotFoundException("VM {} not found on Proxmox server {}".format(vm, self.server))
         return self.vmmap[vm]
 
 
     async def get_vm_inventory(self, vm):
-        host, guest = await self.get_vm(vm)
-        cfg = await self.wc.grab_json_response(f'/api2/json/nodes/{host}/{guest}/pending')
-        sysinfo = {'name': 'System', 'present': True, 'information': {
+        # Current config: pending NICs are not present yet.
+        cfg = await self.api('GET', 'config', vm=vm)
+        info = {
             'Product name': 'Proxmox qemu virtual machine',
-            'Manufacturer': 'qemu'
-            }}
-        invitems = [sysinfo]
-        for datum in cfg['data']:
-            if datum['key'] == 'smbios1':
-                smbios = datum['value']
-                for smbio in smbios.split(','):
-                    if '=' in smbio:
-                        k, v = smbio.split('=')
-                        if k == 'uuid':
-                            sysinfo['information']['UUID'] = v
-            elif datum['key'].startswith('net'):
-                label = 'Network adapter {}'.format(datum['key'])
-                niccfg = datum['value']
-                cfgparts = niccfg.split(',')
-                nicmodel, mac = cfgparts[0].split('=')
-                invitems.append({
-                    'present': True,
-                    'name': label,
-                    'information': {
-                        'Type': 'Ethernet',
-                        'Model': nicmodel,
-                        'MAC Address 1': mac,
-                        }
-                    })
+            'Manufacturer': 'qemu',
+            }
+        smbios = parse_smbios1(cfg.get('smbios1', ''))
+        for field, label in _SMBIOSFIELDS:
+            if smbios.get(field):
+                info[label] = smbios[field]
+        invitems = [{'name': 'System', 'present': True, 'information': info}]
+        for key in sorted((k for k in cfg if re.match(r'net\d+$', k)), key=_devkey):
+            model, mac = parse_nic(cfg[key])
+            invitems.append({
+                'present': True,
+                'name': 'Network adapter {}'.format(key),
+                'information': {
+                    'Type': 'Ethernet',
+                    'Model': model,
+                    'MAC Address 1': mac,
+                    }
+                })
         yield msg.KeyValueData({'inventory': invitems}, vm)
 
 
@@ -273,111 +490,102 @@ class PmxApiClient:
         powstate = await self.get_vm_power(vm)
         if powstate != 'on':
             await asyncio.sleep(1 + random.random())
+        consdata = await self.api('POST', f'{constype}proxy', vm=vm)
+        # vmmap is current after api().
         host, guest = await self.get_vm(vm)
-        rsp = await self.wc.grab_json_response_with_status(f'/api2/json/nodes/{host}/{guest}/{constype}proxy', method='POST')
-        consdata = rsp[0]['data']
         consdata['server'] = self.server
         consdata['host'] = host
         consdata['guest'] = guest
         consdata['pac'] = self.pac
+        consdata['authorization'] = self.wc.stdheaders.get('Authorization')
         return consdata
 
     async def get_vm_bootdev(self, vm):
-        host, guest = await self.get_vm(vm)
-        cfg = await self.wc.grab_json_response(f'/api2/json/nodes/{host}/{guest}/pending')
-        for datum in cfg['data']:
-            if datum['key'] == 'boot':
-                bootseq = datum.get('pending', datum['value'])
-                for kv in bootseq.split(','):
-                    k, v = kv.split('=')
-                    if k == 'order':
-                        bootdev = v.split(';')[0]
-                        if bootdev.startswith('net'):
-                            return 'network'
+        cfg = next_config(await self.api('GET', 'pending', vm=vm))
+        devices = boot_devices(cfg)
+        if devices and devices[0].startswith('net'):
+            return 'network'
         return 'default'
 
 
     async def get_vm_power(self, vm):
-        host, guest = await self.get_vm(vm)
-        rsp = await self.wc.grab_json_response(f'/api2/json/nodes/{host}/{guest}/status/current')
-        rsp = rsp['data']
-        currstatus = rsp["qmpstatus"] # stopped, "running"
+        rsp = await self.api('GET', 'status/current', vm=vm)
+        # 'status' is whether the QEMU process exists: any live process is on.
+        currstatus = rsp.get('status')
         if currstatus == 'running':
             return 'on'
         elif currstatus == 'stopped':
             return 'off'
-        raise Exception("Unknown response to status query")
+        raise exc.TargetResourceUnavailable(
+            'Unknown power status {!r} (qmpstatus {!r}) for {}'.format(currstatus, rsp.get('qmpstatus'), vm))
+
+    # Seconds per action; shutdown waits on the guest's ACPI handling.
+    power_timeout = {'start': 60, 'stop': 60, 'shutdown': 300}
 
     async def set_vm_power(self, vm, state):
-        host, guest = await self.get_vm(vm)
         current = None
-        newstate = ''
-        targstate = state
-        if targstate == 'boot':
-            targstate = 'on'
+        if state == 'diag':
+            raise exc.InvalidArgumentException('Proxmox VMs have no diagnostic interrupt')
+        if state not in ('on', 'off', 'shutdown', 'boot', 'reset'):
+            raise exc.InvalidArgumentException('Unsupported power state {}'.format(state))
         if state == 'boot':
             current = await self.get_vm_power(vm)
-            if current == 'on':
-                state = 'reset'
-                newstate = 'reset'
+            action = 'reset' if current == 'on' else 'start'
+        elif state == 'reset':
+            action = 'reset'
+        else:
+            # IPMI semantics: on when on, off when off, is a no-op.
+            target = 'on' if state == 'on' else 'off'
+            if await self.get_vm_power(vm) == target:
+                return target, None
+            action = {'on': 'start', 'off': 'stop', 'shutdown': 'shutdown'}[state]
+        if action == 'reset':
+            # Pending boot order needs a cold start.
+            cfg = await self.api('GET', 'pending', vm=vm)
+            if any(datum['key'] == 'boot' and 'pending' in datum for datum in cfg):
+                await self.set_vm_power(vm, 'off')
+                await self.set_vm_power(vm, 'on')
             else:
-                state = 'start'
-        elif state == 'on':
-            state = 'start'
-        elif state == 'off':
-            state = 'stop'
-        if state == 'reset': # check for pending config
-            cfg = await self.wc.grab_json_response(f'/api2/json/nodes/{host}/{guest}/pending')
-            for datum in cfg['data']:
-                if datum['key'] == 'boot' and 'pending' in datum:
-                    await self.set_vm_power(vm, 'off')
-                    await self.set_vm_power(vm, 'on')
-                    state = ''
-                    newstate = 'reset'
-        if state:
-            await self.wc.grab_json_response_with_status(f'/api2/json/nodes/{host}/{guest}/status/{state}', method='POST')
-        if state and state != 'reset':
+                await self.api('POST', 'status/reset', vm=vm)
+            return 'reset', current
+        await self.api('POST', f'status/{action}', vm=vm)
+        target = 'on' if action == 'start' else 'off'
+        return await self.wait_power(vm, target, self.power_timeout[action]), current
+
+    async def wait_power(self, vm, target, timeout):
+        # Actions return a task id at once; the state follows.
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout
+        while True:
             newstate = await self.get_vm_power(vm)
-            while newstate != targstate:
-                await asyncio.sleep(0.1)
-                newstate = await self.get_vm_power(vm)
-        return newstate, current
+            if newstate == target:
+                return newstate
+            if loop.time() >= deadline:
+                raise exc.TargetResourceUnavailable(
+                    '{} did not reach power state {} within {} seconds'.format(vm, target, timeout))
+            await asyncio.sleep(0.5)
 
     async def set_vm_bootdev(self, vm, bootdev):
-        host, guest = await self.get_vm(vm)
         if bootdev not in ('net', 'network', 'default'):
-            raise Exception('Requested boot device not supported')
-        currcfg = await self.wc.grab_json_response(f'/api2/json/nodes/{host}/{guest}/config')
-        detectednetdevs = []
-        for dev in currcfg.get('data', {}):
-            if dev.startswith('net'):
-                detectednetdevs.append(dev)
-        cfg = await self.wc.grab_json_response(f'/api2/json/nodes/{host}/{guest}/pending')
-        nonnetdevs = []
-        netdevs = []
-        for datum in cfg['data']:
-            if datum['key'] == 'boot':
-                bootseq = datum.get('pending', datum['value'])
-                for item in bootseq.split(','):
-                    if item.startswith('order='):
-                        bootdevs = item.replace('order=', '').split(';')
-                        for cbootdev in bootdevs:
-                            if cbootdev.startswith('net'):
-                                netdevs.append(cbootdev)
-                            else:
-                                nonnetdevs.append(cbootdev)
-                if not netdevs:
-                    netdevs = detectednetdevs
-                if bootdev in ('net', 'network'):
-                    newbootdevs = netdevs + nonnetdevs
-                else:
-                    newbootdevs = nonnetdevs + netdevs
-                neworder = 'order=' + ';'.join(newbootdevs)
-        self.wc.set_header('Content-Type', 'application/json')
-        try:
-            await self.wc.grab_json_response_with_status(f'/api2/json/nodes/{host}/{guest}/config', {'boot': neworder}, method='PUT')
-        finally:
-            del self.wc.stdheaders['Content-Type']
+            raise exc.InvalidArgumentException('Requested boot device not supported')
+        cfg = next_config(await self.api('GET', 'pending', vm=vm))
+        devices = boot_devices(cfg)
+        # Only the NICs move; disks stay in the order.
+        netdevs = [dev for dev in devices if dev.startswith('net')]
+        if not netdevs:
+            netdevs = sorted((key for key in cfg if re.match(r'net\d+$', key)), key=_devkey)
+        others = [dev for dev in devices if not dev.startswith('net')]
+        if bootdev in ('net', 'network'):
+            if not netdevs:
+                raise exc.InvalidArgumentException('{} has no network device to boot from'.format(vm))
+            newbootdevs = netdevs + others
+        else:
+            newbootdevs = others + netdevs
+        neworder = 'order=' + ';'.join(newbootdevs)
+        if neworder == cfg.get('boot'):
+            return
+        # Dict body goes as JSON; shared headers stay untouched.
+        await self.api('PUT', 'config', {'boot': neworder}, vm=vm)
 
 
 async def prep_proxmox_clients(nodes, configmanager):
@@ -390,7 +598,7 @@ async def prep_proxmox_clients(nodes, configmanager):
         if currpmx not in clientsbypmx:
             user = cfg.get('secret.hardwaremanagementuser', {}).get('value', None)
             passwd = cfg.get('secret.hardwaremanagementpassword', {}).get('value', None)
-            clientsbypmx[currpmx] = PmxApiClient(currpmx, user, passwd, configmanager)
+            clientsbypmx[currpmx] = PmxApiClient(currpmx, user, passwd, configmanager, node)
             try:
                 await clientsbypmx[currpmx].login()
             except exc.TargetEndpointBadCredentials as e:
@@ -442,14 +650,28 @@ async def update(nodes, element, configmanager, inputdata):
             yield msg.ConfluentNodeError(node, str(e))
             continue
         if element == ['power', 'state']:
-            newstate, oldstate = await currclient.set_vm_power(node, inputdata.powerstate(node))
+            # One failing guest must not abort the rest.
+            try:
+                newstate, oldstate = await currclient.set_vm_power(node, inputdata.powerstate(node))
+            except exc.ConfluentException as e:
+                yield msg.ConfluentNodeError(node, str(e))
+                continue
             yield  msg.PowerState(node, newstate, oldstate)
         elif element == ['boot', 'nextdevice']:
-            await currclient.set_vm_bootdev(node, inputdata.bootdevice(node))
+            try:
+                await currclient.set_vm_bootdev(node, inputdata.bootdevice(node))
+            except exc.ConfluentException as e:
+                yield msg.ConfluentNodeError(node, str(e))
+                continue
             yield msg.BootDevice(node, await currclient.get_vm_bootdev(node))
         elif element == ['console', 'ikvm']:
+            currclient = clientsbynode[node]
+            if currclient.token:
+                # vinz forwards a cookie; a token needs a header.
+                yield msg.ConfluentNodeError(node, 'VNC needs a Proxmox user with a password; '
+                                                   'API tokens cannot be passed to the VNC proxy')
+                return
             try:
-                currclient = clientsbynode[node]
                 url = await vinzmanager.get_url(node, inputdata, nodeparmcallback=KvmConnHandler(currclient, node).connect)
             except Exception as e:
                 print(repr(e))
@@ -470,8 +692,13 @@ async def create(nodes, element, configmanager, inputdata):
             yield msg.ConfluentNodeError(node, str(e))
             continue
         if element == ['console', 'ikvm']:
+            currclient = clientsbynode[node]
+            if currclient.token:
+                # vinz forwards a cookie; a token needs a header.
+                yield msg.ConfluentNodeError(node, 'VNC needs a Proxmox user with a password; '
+                                                   'API tokens cannot be passed to the VNC proxy')
+                return
             try:
-                currclient = clientsbynode[node]
                 url = await vinzmanager.get_url(node, inputdata, nodeparmcallback=KvmConnHandler(currclient, node).connect)
             except Exception as e:
                 print(repr(e))
@@ -496,7 +723,7 @@ async def _selftest():
     elif sys.argv[3] == 'power':
         await vc.set_vm_power(vm, sys.argv[4])
     elif sys.argv[3] == 'getinfo':
-        print(repr([datum async for datum in vc.get_vm_inventory(vm)]))
+        print(repr([datum.kvpairs async for datum in vc.get_vm_inventory(vm)]))
         print("Bootdev: " + await vc.get_vm_bootdev(vm))
         print("Power: " + await vc.get_vm_power(vm))
         #print("Serial: " + repr(vc.get_vm_serial(vm)))

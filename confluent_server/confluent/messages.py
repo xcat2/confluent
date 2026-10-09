@@ -1466,7 +1466,7 @@ class InputBootDevice(BootDevice):
                             ','.join(self.valid_bootmodes))
                     self.bootmodebynode[key] = datum['bootmode']
                 if 'persistent' in datum:
-                    self.bootmodebynode[key] = datum['persistent']
+                    self.persistentbynode[key] = datum['persistent']
         else:
             datum = inputdata
             if 'nextdevice' not in datum:
