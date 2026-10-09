@@ -837,6 +837,11 @@ async def eval_detected(info):
 async def detected(info):
     global rechecker
     global rechecktime
+    if 'info_identifier' not in info:
+        infoid = info.get('hwaddr', info.get('addresses', [[None]])[0][0])
+        if not infoid:
+            return
+        info['info_identifier'] = infoid
     if not cfm.config_is_ready():
         # drop processing of discovery data while configmanager is 'down'
         return
