@@ -536,7 +536,8 @@ async def check_fish(urldata, port=443, verifycallback=None):
         url, data = urldata
         targtype = 'generic-redfish'
     try:
-        wc = webclient.WebConnection(_get_svrip(data), port, verifycallback=verifycallback, timeout=3)
+        thetimeout = 8 if url == '/DeviceDescription.json' else 3
+        wc = webclient.WebConnection(_get_svrip(data), port, verifycallback=verifycallback, timeout=thetimeout)
         peerinfo = await wc.grab_json_response(url, headers={'Accept': 'application/json', 'Host': 'credible-bmc'})
     except (socket.error, asyncio.exceptions.TimeoutError):
         return None

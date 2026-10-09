@@ -881,7 +881,7 @@ async def detected(info):
             # have the same address, but need to be reset
             # in that case, however, a user can clear pubkeys to force a check
             return
-    known_info[info['info_identifier']] = info
+    merge_info(known_info, info['info_identifier'], info)
     cfg = cfm.ConfigManager(None)
     if handler:
         handler = handler.NodeHandler(info, cfg)
@@ -973,6 +973,19 @@ async def detected(info):
         #              )})
         info['discostatus'] = 'unidentified'
         unknown_info[info['info_identifier']] = info
+
+def merge_info(thedict, key, new_info):
+    oinfo = thedict.get(key)
+    thedict[key] = new_info
+    if oinfo:
+        oldaddresses = set(oinfo.get('addresses', []))
+        newaddress = set(new_info.get('addresses', []))
+        for naddr in newaddress:
+            for oaddr in list(oldaddresses):
+                if len(naddr) == len(oaddr):
+                    oldaddresses.discard(oaddr)
+        merged_addresses = list(oldaddresses | newaddress)
+        thedict[key]['addresses'] = merged_addresses
 
 
 
