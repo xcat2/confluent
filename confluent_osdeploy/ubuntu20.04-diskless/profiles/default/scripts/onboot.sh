@@ -39,6 +39,7 @@ if [ -z "$confluent_mgr" ]; then
     exit 0
 fi
 
+run_remote setuplogging
 run_remote_python syncfileclient
 run_remote_python confignet
 
