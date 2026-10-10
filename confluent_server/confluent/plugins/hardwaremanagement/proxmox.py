@@ -589,7 +589,9 @@ class PmxApiClient:
         target = 'on' if action == 'start' else 'off'
         # Retry a task that lost the config lock race.
         for attempt in range(3):
-            upid = await self.api('POST', f'status/{action}', vm=vm)
+            # PVE's own shutdown timeout is shorter.
+            params = {'timeout': self.power_timeout['shutdown']} if action == 'shutdown' else None
+            upid = await self.api('POST', f'status/{action}', params, vm=vm)
             try:
                 return await self.wait_power(vm, target, self.power_timeout[action], upid), current
             except TaskFailed as e:
