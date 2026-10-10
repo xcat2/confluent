@@ -10,6 +10,7 @@ import confluent.tasks as tasks
 import aiohmi.util.webclient as webclient
 import aiohmi.exceptions as pygexc
 import confluent.interface.console as conapi
+import confluent.log as log
 import random
 import io
 import json
@@ -56,6 +57,25 @@ def _devkey(dev):
     bus, num = re.match(r'([a-z]+)(\d+)$', dev).groups()
     busrank = _DRIVEBUSES.index(bus) if bus in _DRIVEBUSES else len(_DRIVEBUSES)
     return busrank, bus, int(num)
+
+
+# confluent boot device -> device class moved to the front; None: disks first, network last.
+BOOTCLASS = {'network': 'net', 'net': 'net', 'hd': 'disk', 'cd': 'cdrom', 'usb': 'usb', 'default': None}
+# misc/proxmox/confluent-boot-oneshot.pl; makes a boot device one-time.
+ONESHOT_HOOK = 'confluent-boot-oneshot.pl'
+ONESHOT_MARKER = re.compile(r'^confluent-boot-restore: .*(?:\n|$)', re.M)
+
+
+def device_class(dev, cfg):
+    """net, usb, cdrom or disk, for a device named in a boot order."""
+    if re.match(r'net\d+$', dev):
+        return 'net'
+    if re.match(r'usb\d+$', dev):
+        # PVE ignores SPICE USB ports in the boot order.
+        return None if (cfg.get(dev) or '').startswith('spice') else 'usb'
+    if re.match(r'({})\d+$'.format('|'.join(_DRIVEBUSES)), dev):
+        return 'cdrom' if 'media=cdrom' in (cfg.get(dev) or '') else 'disk'
+    return None
 
 
 def boot_devices(cfg):
@@ -135,6 +155,10 @@ def parse_nic(text):
         elif sep and key not in _NICOPTIONS and model is None:
             model, mac = key, val
     return model, mac
+
+
+class TaskFailed(Exception):
+    """A PVE task ended with an error."""
 
 
 class CustomVerifier(aiohttp.Fingerprint):
@@ -393,13 +417,20 @@ class PmxApiClient:
         self.wc.set_header('CSRFPreventionToken', data['CSRFPreventionToken'])
         self.logged = True
 
+    # PVE waits ~10s for the config lock per attempt.
+    lock_retries = 5
+    lock_retry_delay = 2
+
     async def api(self, method, path, data=None, vm=None):
         """Call the PVE API; returns 'data'.
 
         With vm, path is relative to /nodes/<node>/qemu/<id>/. Retries once
-        after a 401 (expired ticket) and once after a migration.
+        after a 401 (expired ticket) and once after a migration; writes that
+        time out on the VM config lock are retried.
         """
         retried = set()
+        lockwaits = 0
+        lockstart = 0.0
         while True:
             if not self.logged:
                 await self.login()
@@ -412,6 +443,9 @@ class PmxApiClient:
             except Exception:
                 raise exc.TargetEndpointUnreachable("Unable to reach Proxmox server '{}'".format(self.server))
             if 200 <= status < 300:
+                if lockwaits:
+                    log.log({'info': '{}: waited {:.0f}s for the VM config lock'.format(
+                        vm or url, asyncio.get_running_loop().time() - lockstart)})
                 return body.get('data') if isinstance(body, dict) else body
             message = pve_error(body, status)
             if status == 401 and 'login' not in retried:
@@ -422,6 +456,17 @@ class PmxApiClient:
                 retried.add('map')
                 self.vmmap.pop(vm, None)
                 continue
+            if method != 'GET' and "can't lock file" in message:
+                # Another task on the VM holds its config lock.
+                if not lockwaits:
+                    lockstart = asyncio.get_running_loop().time()
+                if lockwaits < self.lock_retries:
+                    lockwaits += 1
+                    await asyncio.sleep(self.lock_retry_delay)
+                    continue
+                raise exc.TargetResourceUnavailable(
+                    'VM config locked by another Proxmox task; gave up after {} retries over {:.0f}s ({})'.format(
+                        lockwaits, asyncio.get_running_loop().time() - lockstart, message))
             if status == 401:
                 raise exc.TargetEndpointBadCredentials(message)
             raise exc.TargetResourceUnavailable(
@@ -501,11 +546,14 @@ class PmxApiClient:
         return consdata
 
     async def get_vm_bootdev(self, vm):
+        """(nextdevice, bootmode, persistent)."""
         cfg = next_config(await self.api('GET', 'pending', vm=vm))
         devices = boot_devices(cfg)
-        if devices and devices[0].startswith('net'):
-            return 'network'
-        return 'default'
+        first = device_class(devices[0], cfg) if devices else None
+        nextdev = {'net': 'network', 'cdrom': 'cd', 'usb': 'usb'}.get(first, 'default')
+        bootmode = 'uefi' if cfg.get('bios') == 'ovmf' else 'bios'
+        persistent = ONESHOT_MARKER.search(cfg.get('description') or '') is None
+        return nextdev, bootmode, persistent
 
 
     async def get_vm_power(self, vm):
@@ -548,44 +596,93 @@ class PmxApiClient:
             else:
                 await self.api('POST', 'status/reset', vm=vm)
             return 'reset', current
-        await self.api('POST', f'status/{action}', vm=vm)
         target = 'on' if action == 'start' else 'off'
-        return await self.wait_power(vm, target, self.power_timeout[action]), current
+        # Retry a task that lost the config lock race.
+        for attempt in range(3):
+            # PVE's own shutdown timeout is shorter.
+            params = {'timeout': self.power_timeout['shutdown']} if action == 'shutdown' else None
+            upid = await self.api('POST', f'status/{action}', params, vm=vm)
+            try:
+                return await self.wait_power(vm, target, self.power_timeout[action], upid), current
+            except TaskFailed as e:
+                if "can't lock file" not in str(e) or attempt == 2:
+                    raise exc.TargetResourceUnavailable(str(e))
+                await asyncio.sleep(2)
 
-    async def wait_power(self, vm, target, timeout):
-        # Actions return a task id at once; the state follows.
+    async def wait_power(self, vm, target, timeout, upid=None):
+        """Wait for the power state; fail early if the action's task fails."""
         loop = asyncio.get_running_loop()
         deadline = loop.time() + timeout
         while True:
             newstate = await self.get_vm_power(vm)
             if newstate == target:
                 return newstate
+            if upid:
+                host, _ = await self.get_vm(vm)
+                task = await self.api('GET', '/api2/json/nodes/{}/tasks/{}/status'.format(
+                    host, urlparse.quote(upid, safe='')))
+                if task.get('status') == 'stopped' and task.get('exitstatus') != 'OK':
+                    raise TaskFailed('{}: PVE task {} failed: {}'.format(
+                        vm, upid.split(':')[5] if upid.count(':') > 5 else 'action', task.get('exitstatus')))
             if loop.time() >= deadline:
                 raise exc.TargetResourceUnavailable(
                     '{} did not reach power state {} within {} seconds'.format(vm, target, timeout))
             await asyncio.sleep(0.5)
 
-    async def set_vm_bootdev(self, vm, bootdev):
-        if bootdev not in ('net', 'network', 'default'):
-            raise exc.InvalidArgumentException('Requested boot device not supported')
+    async def set_vm_bootdev(self, vm, bootdev, persistent=True, bootmode='unspecified'):
+        """Set the next boot device; returns True if applied persistently.
+
+        One-time is opt-in per VM through the confluent-boot-oneshot
+        hookscript: the order to restore goes in the description and the
+        hookscript restores it after the next start. It holds until a cold
+        start. Without the hookscript the order is applied persistently, quietly.
+        """
+        if bootdev in ('setup', 'floppy', 'http'):
+            raise exc.InvalidArgumentException(
+                'Proxmox VMs have no {} boot target; use network, hd, cd, usb or default'.format(bootdev))
+        if bootdev not in BOOTCLASS:
+            raise exc.InvalidArgumentException('Requested boot device {} not supported'.format(bootdev))
         cfg = next_config(await self.api('GET', 'pending', vm=vm))
+        current = await self.api('GET', 'config', vm=vm)
+        # bootmode is advisory: never change firmware under an installed OS.
+        # nodesetboot sends uefi unless -b; the reply reports the actual mode.
         devices = boot_devices(cfg)
-        # Only the NICs move; disks stay in the order.
-        netdevs = [dev for dev in devices if dev.startswith('net')]
-        if not netdevs:
-            netdevs = sorted((key for key in cfg if re.match(r'net\d+$', key)), key=_devkey)
-        others = [dev for dev in devices if not dev.startswith('net')]
-        if bootdev in ('net', 'network'):
-            if not netdevs:
-                raise exc.InvalidArgumentException('{} has no network device to boot from'.format(vm))
-            newbootdevs = netdevs + others
+        want = BOOTCLASS[bootdev]
+        if want is None:
+            # Disks first, network last (undoes cd and usb too); unlisted NICs appended.
+            disks = [d for d in devices if device_class(d, cfg) == 'disk']
+            middle = [d for d in devices if device_class(d, cfg) not in ('disk', 'net')]
+            nets = [d for d in devices if device_class(d, cfg) == 'net'] or \
+                sorted((k for k in cfg if device_class(k, cfg) == 'net'), key=_devkey)
+            front, rest = disks + middle, nets
         else:
-            newbootdevs = others + netdevs
-        neworder = 'order=' + ';'.join(newbootdevs)
-        if neworder == cfg.get('boot'):
-            return
-        # Dict body goes as JSON; shared headers stay untouched.
-        await self.api('PUT', 'config', {'boot': neworder}, vm=vm)
+            front = [d for d in devices if device_class(d, cfg) == want]
+            if not front:
+                # Not yet in the order.
+                front = sorted((k for k in cfg if device_class(k, cfg) == want), key=_devkey)
+            if not front:
+                raise exc.InvalidArgumentException('{} has no {} device to boot from'.format(vm, bootdev))
+            rest = [d for d in devices if d not in front]
+        # Only the chosen class moves.
+        neworder = 'order=' + ';'.join(front + rest)
+        description = current.get('description') or ''
+        marker = ONESHOT_MARKER.search(description)
+        oneshot = not persistent and ONESHOT_HOOK in (current.get('hookscript') or '')
+        update = {}
+        if oneshot:
+            if not marker:
+                # Keep the original order across repeated one-time requests.
+                restore = cfg.get('boot') or 'none'
+                update['description'] = (description.rstrip('\n') + '\n' if description else '') + \
+                    'confluent-boot-restore: {}\n'.format(restore)
+        elif marker:
+            # Persistent supersedes a pending restore.
+            update['description'] = ONESHOT_MARKER.sub('', description)
+        if neworder != cfg.get('boot'):
+            update['boot'] = neworder
+        if update:
+            await self.api('PUT', 'config', update, vm=vm)
+        return not oneshot
 
 
 async def prep_proxmox_clients(nodes, configmanager):
@@ -623,7 +720,8 @@ async def retrieve(nodes, element, configmanager, inputdata):
         if element == ['power', 'state']:
             yield msg.PowerState(node, await currclient.get_vm_power(node))
         elif element == ['boot', 'nextdevice']:
-            yield msg.BootDevice(node, await currclient.get_vm_bootdev(node))
+            nextdev, bootmode, persistent = await currclient.get_vm_bootdev(node)
+            yield msg.BootDevice(node, nextdev, bootmode=bootmode, persistent=persistent)
         elif element[:2] == ['inventory', 'hardware'] and len(element) == 4:
             async for rsp in currclient.get_vm_inventory(node):
                 yield rsp
@@ -659,11 +757,15 @@ async def update(nodes, element, configmanager, inputdata):
             yield  msg.PowerState(node, newstate, oldstate)
         elif element == ['boot', 'nextdevice']:
             try:
-                await currclient.set_vm_bootdev(node, inputdata.bootdevice(node))
+                applied_persistent = await currclient.set_vm_bootdev(
+                    node, inputdata.bootdevice(node), persistent=inputdata.persistent(node),
+                    bootmode=inputdata.bootmode(node))
             except exc.ConfluentException as e:
                 yield msg.ConfluentNodeError(node, str(e))
                 continue
-            yield msg.BootDevice(node, await currclient.get_vm_bootdev(node))
+            nextdev, bootmode, _ = await currclient.get_vm_bootdev(node)
+            # Persistent if one-time was requested without the hookscript.
+            yield msg.BootDevice(node, nextdev, bootmode=bootmode, persistent=applied_persistent)
         elif element == ['console', 'ikvm']:
             currclient = clientsbynode[node]
             if currclient.token:
@@ -724,7 +826,7 @@ async def _selftest():
         await vc.set_vm_power(vm, sys.argv[4])
     elif sys.argv[3] == 'getinfo':
         print(repr([datum.kvpairs async for datum in vc.get_vm_inventory(vm)]))
-        print("Bootdev: " + await vc.get_vm_bootdev(vm))
+        print("Bootdev: " + (await vc.get_vm_bootdev(vm))[0])
         print("Power: " + await vc.get_vm_power(vm))
         #print("Serial: " + repr(vc.get_vm_serial(vm)))
 
