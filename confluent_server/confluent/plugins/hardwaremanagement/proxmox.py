@@ -632,10 +632,10 @@ class PmxApiClient:
     async def set_vm_bootdev(self, vm, bootdev, persistent=True, bootmode='unspecified'):
         """Set the next boot device; returns True if applied persistently.
 
-        One-time needs the confluent-boot-oneshot hookscript: the order to
-        restore goes in the description and the hookscript restores it after
-        the next start. It holds until a cold start. Without the hookscript
-        the order is applied persistently.
+        One-time is opt-in per VM through the confluent-boot-oneshot
+        hookscript: the order to restore goes in the description and the
+        hookscript restores it after the next start. It holds until a cold
+        start. Without the hookscript the order is applied persistently, quietly.
         """
         if bootdev in ('setup', 'floppy', 'http'):
             raise exc.InvalidArgumentException(
@@ -682,9 +682,6 @@ class PmxApiClient:
             update['boot'] = neworder
         if update:
             await self.api('PUT', 'config', update, vm=vm)
-        if not persistent and not oneshot:
-            log.log({'warning': '{}: one-time boot requested, applied persistently: attach the '
-                                '{} hookscript to the VM for one-time boot'.format(vm, ONESHOT_HOOK)})
         return not oneshot
 
 
