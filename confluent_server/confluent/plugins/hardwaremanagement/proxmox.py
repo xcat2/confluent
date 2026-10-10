@@ -417,13 +417,19 @@ class PmxApiClient:
         self.wc.set_header('CSRFPreventionToken', data['CSRFPreventionToken'])
         self.logged = True
 
+    # PVE waits ~10s for the config lock per attempt.
+    lock_retries = 5
+    lock_retry_delay = 2
+
     async def api(self, method, path, data=None, vm=None):
         """Call the PVE API; returns 'data'.
 
         With vm, path is relative to /nodes/<node>/qemu/<id>/. Retries once
-        after a 401 (expired ticket) and once after a migration.
+        after a 401 (expired ticket) and once after a migration; writes that
+        time out on the VM config lock are retried.
         """
         retried = set()
+        lockwaits = 0
         while True:
             if not self.logged:
                 await self.login()
@@ -445,6 +451,11 @@ class PmxApiClient:
             if vm is not None and 'does not exist' in message and 'map' not in retried:
                 retried.add('map')
                 self.vmmap.pop(vm, None)
+                continue
+            if method != 'GET' and "can't lock file" in message and lockwaits < self.lock_retries:
+                # Another task on the VM holds its config lock.
+                lockwaits += 1
+                await asyncio.sleep(self.lock_retry_delay)
                 continue
             if status == 401:
                 raise exc.TargetEndpointBadCredentials(message)
