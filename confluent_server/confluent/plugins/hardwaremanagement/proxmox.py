@@ -430,6 +430,7 @@ class PmxApiClient:
         """
         retried = set()
         lockwaits = 0
+        lockstart = 0.0
         while True:
             if not self.logged:
                 await self.login()
@@ -442,6 +443,9 @@ class PmxApiClient:
             except Exception:
                 raise exc.TargetEndpointUnreachable("Unable to reach Proxmox server '{}'".format(self.server))
             if 200 <= status < 300:
+                if lockwaits:
+                    log.log({'info': '{}: waited {:.0f}s for the VM config lock'.format(
+                        vm or url, asyncio.get_running_loop().time() - lockstart)})
                 return body.get('data') if isinstance(body, dict) else body
             message = pve_error(body, status)
             if status == 401 and 'login' not in retried:
@@ -452,11 +456,17 @@ class PmxApiClient:
                 retried.add('map')
                 self.vmmap.pop(vm, None)
                 continue
-            if method != 'GET' and "can't lock file" in message and lockwaits < self.lock_retries:
+            if method != 'GET' and "can't lock file" in message:
                 # Another task on the VM holds its config lock.
-                lockwaits += 1
-                await asyncio.sleep(self.lock_retry_delay)
-                continue
+                if not lockwaits:
+                    lockstart = asyncio.get_running_loop().time()
+                if lockwaits < self.lock_retries:
+                    lockwaits += 1
+                    await asyncio.sleep(self.lock_retry_delay)
+                    continue
+                raise exc.TargetResourceUnavailable(
+                    'VM config locked by another Proxmox task; gave up after {} retries over {:.0f}s ({})'.format(
+                        lockwaits, asyncio.get_running_loop().time() - lockstart, message))
             if status == 401:
                 raise exc.TargetEndpointBadCredentials(message)
             raise exc.TargetResourceUnavailable(
