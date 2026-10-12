@@ -67,7 +67,12 @@ async def close_session(sessionid):
         return
     del _usersessions[sessionid]
     nodename = sessioninfo['nodename']
-    wc = sessioninfo['webclient']
+    if 'cxnmgr' in sessioninfo:
+        await sessioninfo['cxnmgr'].close()
+        return
+    wc = sessioninfo.get('webclient')
+    if not wc:
+        return
     cfg = configmanager.ConfigManager(None)
     c = cfg.get_node_attributes(
         nodename,
@@ -83,12 +88,17 @@ async def close_session(sessionid):
     if not isinstance(bmcpass, str):
         bmcpass = bmcpass.decode()
     if bmcuser and bmcpass:
+        token = None
+        for cookie in wc.cookies:
+            if cookie.key.lower() == 'xsrf-token':
+                token = cookie.value
+                break
         await wc.grab_json_response_with_status(
             '/logout', {'data': [bmcuser, bmcpass]},
             headers={
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
-                'X-XSRF-TOKEN': wc.cookies['XSRF-TOKEN']})
+                'X-XSRF-TOKEN': token})
 
 
 async def send_grant(conn, nodename, rqtype):

@@ -185,6 +185,9 @@ class KvmConnection:
         self.portnum = 8006
         self.password = consdata['ticket']
 
+    def close(self):
+        pass
+
 
 class KvmConnHandler:
     def __init__(self, pmxclient, node):
