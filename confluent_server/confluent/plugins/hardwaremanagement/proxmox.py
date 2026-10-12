@@ -185,7 +185,7 @@ class KvmConnection:
         self.portnum = 8006
         self.password = consdata['ticket']
 
-    def close(self):
+    async def close(self):
         pass
 
 
