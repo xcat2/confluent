@@ -1030,7 +1030,7 @@ async def relay_keypresses(keys, modifiers=None):
     for node in focused_nodes:
         vnclient = vncclientsbynode.get(node)
         if not vnclient:
-            sys.stderr.write(f"No VNC client for node {node}, unable to relay keypress\n")
+            #sys.stderr.write(f"No VNC client for node {node}, unable to relay keypress\n")
             continue
         try:
             await vnclient.send_keypresses(keys, modifiers)
@@ -1108,6 +1108,9 @@ async def do_vnc(node, url, outputfile=None):
                         # without the timeout, we lose track of proxmox reset
                         # with the timeout, we falsely assume dead on stale
                         break
+                    except vnc.VNCReceiverTerminated:
+                        # The VNC receiver task has terminated unexpectedly
+                        break
                     retries = 5
                     # Save as PNG using PIL/pillow
                     outfile = io.BytesIO()
@@ -1116,6 +1119,9 @@ async def do_vnc(node, url, outputfile=None):
                     if imgdata:
                         draw_node(node, imgdata, '', '', cwidth, cheight)
                     else:
+                        keeprunning = False
+                        break
+                    if not streaming:
                         keeprunning = False
                         break
         except ValueError as e:

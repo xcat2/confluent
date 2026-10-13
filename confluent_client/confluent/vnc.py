@@ -7,6 +7,8 @@ import threading
 import time
 import zlib
 
+class VNCReceiverTerminated(Exception):
+    pass
 # This results in an RGBA organization of pixels
 MYPIXFORMAT = bytearray([
     32,  # bits per pixel
@@ -141,9 +143,17 @@ class VNCClient:
         self.writer.write(data)
         return data
 
-    async def get_screenshot(self):
-        while self._updating:
-            await asyncio.sleep(0.1)
+    async def get_screenshot(self, oneshot=False):
+        # Oneshot is wanting a full screenshot, right now
+        # this means we wait up to half a second getting screenshots,
+        # then return whatever the result is after the accumulated updates over the half second
+        if oneshot:
+            await asyncio.sleep(0.5)  # Wait up to half a second for updates
+        else:
+            while self._updating and not self.receiver.done():
+                await asyncio.sleep(0.1)
+        if self.receiver.done():
+            raise VNCReceiverTerminated('VNC receiver task has terminated unexpectedly')
         await asyncio.sleep(0)
         if self.framebuffer is None:
             raise Exception('No framebuffer data available')
@@ -152,6 +162,8 @@ class VNCClient:
 
     async def _do_vnc_handshake(self):
         rfbver = await self.reader.readline()
+        if not rfbver:
+            raise Exception('Connection failed to VNC')
         if not rfbver.startswith(b'RFB 003.008'):
             self.writer.close()
             await self.writer.wait_closed()
@@ -224,7 +236,7 @@ class VNCClient:
                 else:
                     raise Exception(f'Unknown message type: {message_type}')
             except Exception as e:
-                print(f"Error in receive loop: {e}")
+                #print(f"Error in receive loop: {e}")
                 break        
 
     async def _handle_framebuffer_update(self):
