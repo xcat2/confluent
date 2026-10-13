@@ -35,9 +35,9 @@ python3 /opt/confluent/lib/python/confluent/certutil.py -s "$SWITCHNAME"
 setsid ssh $SWITCHUSER@"$SWITCHNAME" <<EOC
 enter candidate exclusive
 / system json-rpc-server admin-state enable
-/ system tls server-profile fullcert key "$(<$CERTDIR/key.pem)"
-/ system tls server-profile fullcert certificate "$(<$CERTDIR/cert.pem)"
-/ system tls server-profile fullcert cipher-list [ ecdhe-ecdsa-aes256-gcm-sha384 ]
+/ system tls profile fullcert key "$(<$CERTDIR/key.pem)"
+/ system tls profile fullcert certificate "$(<$CERTDIR/cert.pem)"
+/ system tls profile fullcert cipher-list [ ecdhe-ecdsa-aes256-gcm-sha384 ]
 / system json-rpc-server network-instance mgmt https admin-state enable
 / system json-rpc-server network-instance mgmt https tls-profile fullcert
 commit save
