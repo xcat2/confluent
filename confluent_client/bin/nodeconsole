@@ -681,6 +681,8 @@ def draw_text(text, width, height):
         cursor_left(len(text))
 
 def draw_image(bindata, width, height, doscale=True):
+    if not bindata:
+        return
     imageformat = os.environ.get('CONFLUENT_IMAGE_PROTOCOL', 'kitty')
     if doscale and Image and width:
         binfile = io.BytesIO()
@@ -1110,6 +1112,7 @@ async def do_vnc(node, url, outputfile=None):
                         break
                     except vnc.VNCReceiverTerminated:
                         # The VNC receiver task has terminated unexpectedly
+                        draw_node(node, None, 'Video not connected', '', cwidth, cheight)
                         break
                     retries = 5
                     # Save as PNG using PIL/pillow
@@ -1124,12 +1127,13 @@ async def do_vnc(node, url, outputfile=None):
                     if not streaming:
                         keeprunning = False
                         break
-        except ValueError as e:
+        except Exception as e:
             draw_node(node, None, str(e), '', cwidth, cheight)
-            retries -= 1
-            if retries <= 0:
-                keeprunning = False
-                sys.stderr.write(f'VNC connection for node {node} failed with error: {e}\n')
+            if not streaming:
+                retries -= 1
+                if retries <= 0:
+                    keeprunning = False
+                    #sys.stderr.write(f'VNC connection for node {node} failed with error: {e}\n')
             await asyncio.sleep(1)
 
 

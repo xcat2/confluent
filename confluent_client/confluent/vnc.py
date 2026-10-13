@@ -92,13 +92,15 @@ class VNCClient:
         self.copytext = None
         self._updating = True
         self.decompressor = zlib.decompressobj()
+        await self._do_vnc_handshake()
         self._input_queue = asyncio.Queue()
         self._input_task = asyncio.create_task(self._input_worker())
-        await self._do_vnc_handshake()
         return self
     
     async def _input_worker(self):
         while True:
+            if self.receiver is not None and self.receiver.done():
+                break
             keys, modifierkeys = await self._input_queue.get()
             payload = ByteStream()
             for modkey in (modifierkeys or []):
@@ -163,7 +165,7 @@ class VNCClient:
     async def _do_vnc_handshake(self):
         rfbver = await self.reader.readline()
         if not rfbver:
-            raise Exception('Connection failed to VNC')
+            raise Exception('Video not connected')
         if not rfbver.startswith(b'RFB 003.008'):
             self.writer.close()
             await self.writer.wait_closed()
