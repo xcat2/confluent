@@ -691,7 +691,8 @@ node = {
                         'expressed in noderange syntax.  This is used during '
                         'deployment if the confluent SSH certificate '
                         'authority is configured.  Default behavior is for '
-                        'all nodes to trust each other.'),
+                        'all nodes to trust each other.  Use an empty nodegroup '
+                        'to prevent the node from trusting any other node.'),
     },
     'pubkeys.addpolicy': {
         'description': ('Policy to use when encountering unknown public '
