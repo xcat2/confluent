@@ -25,6 +25,13 @@ import asyncio
 import confluent.exceptions as exc
 import inspect
 import socket
+try:
+    # Some pysnmp installs expect util to be an attribute of importlib, but that doesn't naturally happen reliably
+    # So we prime the pump by importing it the proper way, then pysnmp can succesfully do it the wrong way
+    import importlib.util # noqa: F401
+except ImportError:
+    importlib = None
+
 import pysnmp.hlapi.asyncio as snmp
 
 async def _get_transport(name):
