@@ -28,7 +28,7 @@ import socket
 try:
     # Some pysnmp installs expect util to be an attribute of importlib, but that doesn't naturally happen reliably
     # So we prime the pump by importing it the proper way, then pysnmp can succesfully do it the wrong way
-    import importlib.util # noqa: F401
+    import importlib.util
 except ImportError:
     importlib = None
 
