@@ -32,8 +32,8 @@ Want to help? Submit a [Pull Request](https://github.com/xcat2/confluent/pulls).
 
 The top-level `VERSION` file names the release the current branch is working toward. Build scripts
 call `./mkversion`, which turns it into the version stamped on packages: the tag itself on a release
-tag (`4.0.1`), otherwise a development version (`4.0.1.dev5+gdeadbee`, or `4.0.1~dev5+gdeadbee` for
-the packages that have no `setup.py`).
+tag (`4.0.1`), otherwise a development version (`4.0.1~dev5+gdeadbee`). Packages sort it before the
+release it leads up to. Only `setup.py` gets the PEP 440 spelling, `4.0.1.dev5+gdeadbee`.
 
 `mkversion` also derives a version from the newest tag reachable from HEAD and uses whichever is
 higher, so forgetting to bump `VERSION` after tagging the current branch cannot walk the version

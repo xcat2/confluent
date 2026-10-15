@@ -1,8 +1,9 @@
 #!/bin/sh
 # Print the version to stamp on packages built from this checkout.
 #
-#   --tilde   use "~dev" rather than ".dev" (packages with no setup.py; "~" sorts
-#             before the release, ".dev" after, but PEP 440 requires ".dev")
+#   --tilde   use "~dev" rather than ".dev": the package version, as "~" sorts
+#             before the release and ".dev" after it. Only setup.py takes ".dev",
+#             which PEP 440 requires.
 #
 # The root VERSION file names the release this branch is working toward. Release
 # tags do not always live on master (3.15.2 through 3.15.6 are on branch 3.15), so
