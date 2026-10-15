@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - '*'
+      # the rolling pre-release nightly.yml maintains
+      - '!nightly'
 
 permissions:
   contents: write

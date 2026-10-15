@@ -48,3 +48,11 @@ Cutting a new series:
    wrong series.
 
 Patch releases land on branch `X.Y` and are tagged `X.Y.Z` there; no `VERSION` edit is needed.
+
+## Nightly builds
+
+`.github/workflows/nightly.yml` builds the rpms (EL9, EL10, SUSE 16) and debs (Ubuntu 24.04, 26.04)
+for x86_64 and aarch64 every night that something changed, installs each set on a clean container,
+and publishes them as the `nightly` pre-release. Every bundle there holds all packages for one
+target and an `INSTALL.txt`. Pull requests that touch the packaging run the same build and tests
+without publishing. Genesis is not built there yet.
