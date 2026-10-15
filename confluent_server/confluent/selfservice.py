@@ -15,15 +15,7 @@ import confluent.discovery.core as disco
 import base64
 import hmac
 import hashlib
-try:
-    import crypt
-except ImportError:
-    # crypt left the stdlib in 3.13. Both of these reach the same libcrypt
-    # call and give the same hash; distros package one, the other, or neither.
-    try:
-        import legacycrypt as crypt
-    except ImportError:
-        import crypt_r as crypt
+import confluent.pwcrypt as crypt
 import json
 import os
 import tempfile
