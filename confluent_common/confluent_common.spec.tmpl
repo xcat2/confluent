@@ -1,12 +1,17 @@
 %define name confluent_common
 %define version #VERSION#
+# the sdist carries the PEP 440 spelling of the version (.dev, not ~dev)
+%define fversion %{lua:
+sv, _ = string.gsub("#VERSION#", "[~]", ".")
+print(sv)
+}
 %define release 1
 
 Summary: common content for confluent client and server
 Name: %{name}
 Version: %{version}
 Release: %{release}
-Source0: %{name}-%{version}.tar.gz
+Source0: %{name}-%{fversion}.tar.gz
 License: UNKNOWN
 Group: Development/Libraries
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-buildroot
@@ -19,7 +24,7 @@ Url: http://xcat.sf.net/
 This provides the modules common for both client and server
 
 %prep
-%setup -n %{name}-%{version} -n %{name}-%{version}
+%setup -n %{name}-%{fversion}
 
 %build
 python2 setup.py build

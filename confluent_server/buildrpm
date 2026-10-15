@@ -3,7 +3,10 @@ cd `dirname $0`
 if [ -x ./makeman ]; then
     ./makeman
 fi
-VERSION=`./makesetup` || exit 1
+./makesetup > /dev/null || exit 1
+# setup.py needs the PEP 440 .dev form, the rpm the ~dev one, which sorts
+# before the release it leads up to
+VERSION=`../mkversion --tilde` || exit 1
 PKGNAME=$(basename $(pwd))
 python3 setup.py sdist > /dev/null 2>&1
 cp dist/*.tar.gz ~/rpmbuild/SOURCES
