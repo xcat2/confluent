@@ -45,6 +45,7 @@ logshowpid=$!
 rpm --import /etc/pki/rpm-gpg/*
 
 run_remote_python add_local_repositories
+run_remote setuplogging
 run_remote_python syncfileclient
 run_remote_python confignet -c $confluent_mgr
 

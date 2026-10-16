@@ -88,6 +88,7 @@ chroot /target update-ca-certificates
 # Ubuntu mangles grub function for serial users, undo that mangling
 chroot /target bash -c "source /etc/confluent/functions; run_remote_python autoconsole"
 
+chroot /target bash -c "source /etc/confluent/functions; run_remote setuplogging"
 chroot /target bash -c "source /etc/confluent/functions; run_remote_python syncfileclient"
 chroot /target bash -c "source /etc/confluent/functions; run_remote_parts post.d"
 source /target/etc/confluent/functions
