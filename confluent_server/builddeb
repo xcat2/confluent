@@ -39,6 +39,7 @@ if [ "$OPKGNAME" = "confluent-server" ]; then
     else
         sed -i 's/^\(Depends:.*\)/\1, confluent-client, python3-lxml, python3-eficompressor, python3-cryptography, python3-websocket, python3-msgpack, python3-aiohttp, python3-pyparsing, python3-asyncssh, python3-pysnmp4, python3-libarchive-c, confluent-vtbufferd, python3-netifaces, python3-yaml, python3-dateutil, python3-crypt-r, python3-numpy, python3-pillow/' debian/control
     fi
+    sed -i '/^Depends:/a Recommends: rsync' debian/control
     echo 'confluent_client confluent-client' >> debian/pydist-overrides
 
 fi
