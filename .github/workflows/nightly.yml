@@ -1,0 +1,458 @@
+name: Nightly
+
+# Builds the confluent rpms (EL9, EL10, SUSE 16) and debs (Ubuntu noble,
+# resolute) for x86_64 and aarch64, installs each bundle on a clean container,
+# and publishes the bundles as the rolling "nightly" pre-release. Pull
+# requests that touch the packaging build and test, but publish nothing.
+
+on:
+  schedule:
+    - cron: '23 2 * * *'
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish the result as the nightly pre-release
+        type: boolean
+        default: true
+      force:
+        description: Build even if nothing changed since the last nightly
+        type: boolean
+        default: false
+  pull_request:
+    paths:
+      - .github/workflows/nightly.yml
+      - .github/scripts/**
+      - '**/buildrpm'
+      - '**/buildrpm-aarch64'
+      - '**/builddeb'
+      - '**/makesetup'
+      - '**/setup.py.tmpl'
+      - '**/*.spec'
+      - '**/*.spec.tmpl'
+      - confluent_osdeploy/utils/**
+      - build/arm/**
+      - mkversion
+      - VERSION
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  BROWSERFS_REPO: https://github.com/xcat2/browserfs
+  VINZ_REPO: https://github.com/xcat2/vinz
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  prepare:
+    name: prepare
+    runs-on: ubuntu-26.04
+    outputs:
+      build: ${{ steps.check.outputs.build }}
+      version: ${{ steps.check.outputs.version }}
+      key: ${{ steps.check.outputs.key }}
+      browserfs: ${{ steps.check.outputs.browserfs }}
+      vinz: ${{ steps.check.outputs.vinz }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Version and change check
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FORCE: ${{ inputs.force }}
+        # The release notes carry the commits of the last published build, so
+        # a scheduled run with nothing new to build stops here.
+        run: |
+          version=$(./mkversion --tilde)
+          browserfs=$(git ls-remote "$BROWSERFS_REPO" HEAD | cut -f1)
+          vinz=$(git ls-remote "$VINZ_REPO" HEAD | cut -f1)
+          key="confluent@$GITHUB_SHA browserfs@$browserfs vinz@$vinz"
+          # no release yet on the first run, and bash runs with pipefail here
+          last=$({ gh release view nightly --repo "$GITHUB_REPOSITORY" --json body -q .body 2>/dev/null || true; } |
+              sed -n 's/^<!-- build: \(.*\) -->$/\1/p')
+          build=true
+          if [ "$GITHUB_EVENT_NAME" != pull_request ] && [ "$FORCE" != true ] && [ "$key" = "$last" ]; then
+              echo "::notice::Nothing changed since the last nightly ($last)"
+              build=false
+          fi
+          {
+              echo "build=$build"
+              echo "version=$version"
+              echo "key=$key"
+              echo "browserfs=$browserfs"
+              echo "vinz=$vinz"
+          } | tee -a "$GITHUB_OUTPUT"
+
+  utils:
+    name: osdeploy utils (${{ matrix.set }}-${{ matrix.arch }})
+    needs: prepare
+    if: needs.prepare.outputs.build == 'true'
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # The el8bin set must run on the oldest target userspace, so it is
+        # built where confluent_osdeploy/buildrpm builds it: el7 for x86_64,
+        # el8 for aarch64. CentOS 7 is too old for the node-based actions,
+        # so these run the image by hand instead of as a job container.
+        include:
+          - { set: el8, arch: x86_64,  image: "centos:7",     runner: ubuntu-26.04 }
+          - { set: el9, arch: x86_64,  image: "almalinux:9",  runner: ubuntu-26.04 }
+          - { set: el8, arch: aarch64, image: "almalinux:8",  runner: ubuntu-26.04-arm }
+          - { set: el9, arch: aarch64, image: "almalinux:9",  runner: ubuntu-26.04-arm }
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build utils
+        run: docker run --rm -v "$PWD:/src" -w /src ${{ matrix.image }} bash .github/scripts/build-utils.sh /src/utilsbin
+      - uses: actions/upload-artifact@v7
+        with:
+          name: utils-${{ matrix.set }}-${{ matrix.arch }}
+          path: utilsbin/
+          retention-days: 3
+
+  rpms:
+    name: RPMs (${{ matrix.dist }}-${{ matrix.arch }})
+    needs: prepare
+    if: needs.prepare.outputs.build == 'true'
+    runs-on: ${{ matrix.runner }}
+    container: ${{ matrix.image }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # noarch rpms are built in the x86_64 leg only, and shared by both
+        include:
+          - { dist: el9,    arch: x86_64,  image: "almalinux:9",                             runner: ubuntu-26.04 }
+          - { dist: el9,    arch: aarch64, image: "almalinux:9",                             runner: ubuntu-26.04-arm }
+          - { dist: el10,   arch: x86_64,  image: "almalinux:10",                            runner: ubuntu-26.04 }
+          - { dist: el10,   arch: aarch64, image: "almalinux:10",                            runner: ubuntu-26.04-arm }
+          - { dist: suse16, arch: x86_64,  image: "registry.opensuse.org/opensuse/leap:16.0", runner: ubuntu-26.04 }
+          - { dist: suse16, arch: aarch64, image: "registry.opensuse.org/opensuse/leap:16.0", runner: ubuntu-26.04-arm }
+    steps:
+      - name: Install git
+        # without git in the container, checkout downloads a tarball and
+        # mkversion has no history to describe
+        run: |
+          if command -v zypper > /dev/null; then
+              zypper -n install --no-recommends git-core tar gzip
+          else
+              dnf -y --setopt=install_weak_deps=False install git-core
+          fi
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Build RPMs
+        run: bash .github/scripts/build-rpms.sh ${{ matrix.arch == 'aarch64' && '--arch-only' || '' }}
+      - uses: actions/upload-artifact@v7
+        with:
+          name: rpms-${{ matrix.dist }}-${{ matrix.arch }}
+          path: ~/rpmbuild/RPMS/
+          retention-days: 3
+
+  osdeploy:
+    name: osdeploy RPM (${{ matrix.arch }})
+    needs: utils
+    runs-on: ubuntu-26.04
+    container: almalinux:9
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x86_64, aarch64]
+    steps:
+      - name: Install build dependencies
+        run: dnf -y --setopt=install_weak_deps=False install rpm-build git-core tar xz cpio
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v8
+        with:
+          name: utils-el8-${{ matrix.arch }}
+          path: el8utils
+      - uses: actions/download-artifact@v8
+        with:
+          name: utils-el9-${{ matrix.arch }}
+          path: el9utils
+      - name: Build osdeploy RPM
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          bash .github/scripts/build-osdeploy.sh ${{ matrix.arch }} el8utils el9utils
+      - uses: actions/upload-artifact@v7
+        with:
+          name: rpms-osdeploy-${{ matrix.arch }}
+          path: ~/rpmbuild/RPMS/
+          retention-days: 3
+
+  ipxe:
+    name: iPXE RPM
+    needs: prepare
+    if: needs.prepare.outputs.build == 'true'
+    runs-on: ubuntu-26.04
+    container: almalinux:9
+    steps:
+      - name: Install build dependencies
+        run: dnf -y --setopt=install_weak_deps=False install rpm-build tar gzip
+      - uses: actions/checkout@v7
+      - name: Build iPXE RPM
+        run: bash .github/scripts/build-ipxe.sh
+      - uses: actions/upload-artifact@v7
+        with:
+          name: rpms-ipxe
+          path: ~/rpmbuild/RPMS/
+          retention-days: 3
+
+  go:
+    name: browserfs and vinz RPMs (${{ matrix.arch }})
+    needs: prepare
+    if: needs.prepare.outputs.build == 'true'
+    runs-on: ${{ matrix.runner }}
+    container: almalinux:10
+    strategy:
+      fail-fast: false
+      matrix:
+        # static (CGO_ENABLED=0) binaries, so one build serves every distro
+        include:
+          - { arch: x86_64,  runner: ubuntu-26.04 }
+          - { arch: aarch64, runner: ubuntu-26.04-arm }
+    steps:
+      - name: Install build dependencies
+        run: dnf -y --setopt=install_weak_deps=False install rpm-build git-core golang tar
+      - uses: actions/checkout@v7
+      - name: Build RPMs
+        run: |
+          bash .github/scripts/build-go-rpm.sh browserfs "$BROWSERFS_REPO" ${{ needs.prepare.outputs.browserfs }}
+          bash .github/scripts/build-go-rpm.sh vinz "$VINZ_REPO" ${{ needs.prepare.outputs.vinz }}
+      - uses: actions/upload-artifact@v7
+        with:
+          name: rpms-go-${{ matrix.arch }}
+          path: ~/rpmbuild/RPMS/
+          retention-days: 3
+
+  debs:
+    name: debs (${{ matrix.release }}-${{ matrix.arch }})
+    needs: [osdeploy, ipxe, go]
+    runs-on: ${{ matrix.runner }}
+    container: ubuntu:${{ matrix.release }}
+    strategy:
+      fail-fast: false
+      matrix:
+        release: [noble, resolute]
+        arch: [amd64, arm64]
+        include:
+          # alien only converts rpms for the architecture it runs on
+          - { arch: amd64, rpmarch: x86_64,  runner: ubuntu-26.04 }
+          - { arch: arm64, rpmarch: aarch64, runner: ubuntu-26.04-arm }
+    steps:
+      - name: Install git
+        # ca-certificates is only a Recommends of git, and checkout clones over https
+        run: apt-get update && apt-get -y --no-install-recommends install git ca-certificates
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      # noarch, so converted in the amd64 leg only, like the noarch rpms
+      - uses: actions/download-artifact@v8
+        if: matrix.arch == 'amd64'
+        with:
+          pattern: rpms-osdeploy-*
+          path: alien
+          merge-multiple: true
+      - uses: actions/download-artifact@v8
+        if: matrix.arch == 'amd64'
+        with:
+          name: rpms-ipxe
+          path: alien
+      - uses: actions/download-artifact@v8
+        with:
+          name: rpms-go-${{ matrix.rpmarch }}
+          path: alien
+      - name: Build debs
+        run: bash .github/scripts/build-debs.sh ${{ matrix.arch == 'arm64' && '--arch-only' || '' }} debout alien
+      - uses: actions/upload-artifact@v7
+        with:
+          name: debs-${{ matrix.release }}-${{ matrix.arch }}
+          path: debout/*.deb
+          retention-days: 3
+          if-no-files-found: error
+
+  bundle:
+    name: assemble bundles
+    needs: [prepare, rpms, osdeploy, ipxe, go, debs]
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install tools
+        run: sudo apt-get update && sudo apt-get -y --no-install-recommends install createrepo-c dpkg-dev
+      - uses: actions/download-artifact@v8
+        with:
+          path: art
+      - name: Compose bundles
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          set -e
+          pick() { find "$@" -name '*.rpm' ! -name '*.src.rpm'; }
+          for dist in el9 el10 suse16; do
+              for arch in x86_64 aarch64; do
+                  mapfile -t files < <(
+                      pick "art/rpms-$dist-x86_64" -name '*.noarch.rpm'
+                      pick "art/rpms-$dist-$arch" -name "*.$arch.rpm"
+                      pick art/rpms-osdeploy-* art/rpms-ipxe "art/rpms-go-$arch")
+                  bash .github/scripts/mkbundle.sh "$dist-$arch" "$VERSION" bundles "${files[@]}"
+              done
+          done
+          # Architecture: all debs come from the amd64 leg only
+          pickdeb() {  # <dir> <all|arch>
+              for f in "$1"/*.deb; do
+                  [ "$(dpkg-deb -f "$f" Architecture)" = "$2" ] && echo "$f"
+              done
+              return 0
+          }
+          for release in noble resolute; do
+              for arch in amd64 arm64; do
+                  mapfile -t files < <(
+                      pickdeb "art/debs-$release-amd64" all
+                      pickdeb "art/debs-$release-$arch" "$arch")
+                  bash .github/scripts/mkbundle.sh "$release-$arch" "$VERSION" bundles "${files[@]}"
+              done
+          done
+      - name: Write run summary
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          {
+              echo "## confluent nightly $VERSION"
+              echo
+              for b in bundles/*.tar.gz; do
+                  echo "<details><summary>$(basename "$b")</summary>"
+                  echo
+                  tar tzf "$b" | sed -n 's|^[^/]*/\([^/]*\.\(rpm\|deb\)\)$|- \1|p' | sort
+                  echo
+                  echo "</details>"
+              done
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: bundles
+          path: bundles/*.tar.gz
+          retention-days: 7
+          if-no-files-found: error
+
+  smoketest:
+    name: smoketest (${{ matrix.target }})
+    needs: bundle
+    runs-on: ${{ matrix.runner }}
+    container: ${{ matrix.image }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: el9-x86_64,      image: "almalinux:9",                             runner: ubuntu-26.04 }
+          - { target: el9-aarch64,     image: "almalinux:9",                             runner: ubuntu-26.04-arm }
+          - { target: el10-x86_64,     image: "almalinux:10",                            runner: ubuntu-26.04 }
+          - { target: el10-aarch64,    image: "almalinux:10",                            runner: ubuntu-26.04-arm }
+          - { target: suse16-x86_64,   image: "registry.opensuse.org/opensuse/leap:16.0", runner: ubuntu-26.04 }
+          - { target: suse16-aarch64,  image: "registry.opensuse.org/opensuse/leap:16.0", runner: ubuntu-26.04-arm }
+          - { target: noble-amd64,     image: "ubuntu:noble",                            runner: ubuntu-26.04 }
+          - { target: noble-arm64,     image: "ubuntu:noble",                            runner: ubuntu-26.04-arm }
+          - { target: resolute-amd64,  image: "ubuntu:resolute",                         runner: ubuntu-26.04 }
+          - { target: resolute-arm64,  image: "ubuntu:resolute",                         runner: ubuntu-26.04-arm }
+    steps:
+      - name: Install tar
+        run: |
+          if command -v zypper > /dev/null; then
+              zypper -n install --no-recommends tar gzip
+          elif command -v dnf > /dev/null; then
+              dnf -y --setopt=install_weak_deps=False install tar gzip
+          fi
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: bundles
+          path: bundles
+      - name: Install and smoke test
+        run: |
+          tar xzf bundles/confluent-nightly-${{ matrix.target }}.tar.gz
+          bash .github/scripts/smoketest.sh confluent-nightly-${{ matrix.target }}
+
+  publish:
+    name: publish nightly release
+    needs: [prepare, smoketest]
+    if: >-
+      needs.prepare.outputs.build == 'true' &&
+      (github.event_name == 'schedule' ||
+       (github.event_name == 'workflow_dispatch' && inputs.publish))
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      VERSION: ${{ needs.prepare.outputs.version }}
+      KEY: ${{ needs.prepare.outputs.key }}
+      BROWSERFS: ${{ needs.prepare.outputs.browserfs }}
+      VINZ: ${{ needs.prepare.outputs.vinz }}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: bundles
+          path: bundles
+      - name: Write release notes
+        run: |
+          url=https://github.com/$GITHUB_REPOSITORY
+          cat > notes.md <<EOF
+          Unofficial development build of $url/commit/$GITHUB_SHA, rebuilt every night when something changed. Packages are unsigned and not meant for production.
+
+          | Bundle | Target |
+          |---|---|
+          EOF
+          for b in bundles/*.tar.gz; do
+              n=$(basename "$b")
+              t=${n#confluent-nightly-}
+              echo "| [$n]($url/releases/download/nightly/$n) | ${t%.tar.gz} |" >> notes.md
+          done
+          cat >> notes.md <<EOF
+
+          Each bundle holds every package for its target plus repository metadata, so the directory also works as a dnf, zypper or apt repository. EL example:
+
+          \`\`\`
+          curl -LO $url/releases/download/nightly/confluent-nightly-el9-x86_64.tar.gz
+          tar xf confluent-nightly-el9-x86_64.tar.gz
+          dnf install epel-release && crb enable
+          dnf install ./confluent-nightly-el9-x86_64/*.rpm
+          \`\`\`
+
+          See INSTALL.txt in each bundle for the other distributions.
+
+          Built from:
+          - confluent $GITHUB_SHA
+          - browserfs $BROWSERFS_REPO/commit/$BROWSERFS
+          - vinz $VINZ_REPO/commit/$VINZ
+          - iPXE prebuilt release roms (see ipxe/confluent_ipxe.spec)
+
+          <!-- build: $KEY -->
+          EOF
+          cat notes.md
+      - name: Publish
+        # Move the tag and replace the assets in place, so the release and its
+        # download URLs never disappear between nights.
+        run: |
+          set -e
+          if gh release view nightly > /dev/null 2>&1; then
+              gh api -X PATCH "repos/$GH_REPO/git/refs/tags/nightly" -f sha="$GITHUB_SHA" -F force=true > /dev/null
+              gh release edit nightly --title "Nightly $VERSION" --notes-file notes.md --prerelease --latest=false
+              for old in $(gh release view nightly --json assets -q '.assets[].name'); do
+                  [ -f "bundles/$old" ] || gh release delete-asset nightly "$old" -y
+              done
+              gh release upload nightly bundles/*.tar.gz --clobber
+          else
+              # a stale tag without a release would keep pointing at its old commit
+              gh api -X DELETE "repos/$GH_REPO/git/refs/tags/nightly" > /dev/null 2>&1 || true
+              gh release create nightly bundles/*.tar.gz --target "$GITHUB_SHA" \
+                  --title "Nightly $VERSION" --notes-file notes.md --prerelease --latest=false
+          fi
