@@ -17,6 +17,7 @@ BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-buildroot
 Prefix: %{_prefix}
 BuildArch: noarch
 Requires: confluent_vtbufferd
+Recommends: rsync
 %if 0%{?python3_version_nodots} >= 313
 # 3.13 removed crypt from the stdlib, and stored credentials are hashed with
 # it. Recommends rather than Requires: some 3.13 distros package no candidate
