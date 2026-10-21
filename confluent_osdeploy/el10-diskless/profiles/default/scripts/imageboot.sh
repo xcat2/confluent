@@ -7,7 +7,10 @@ mkdir -p /mnt/remoteimg /mnt/remote /mnt/overlay /sysroot
 set_selinux_context system_u:object_r:bin_t:s0 /opt/confluent/bin/urlmount
 if [ "untethered" = "$(getarg confluent_imagemethod)" -o "uncompressed" = "$(getarg confluent_imagemethod)" ]; then
     mount -t tmpfs untethered /mnt/remoteimg
-    curl https://$confluent_whost/confluent-public/os/$confluent_profile/rootimg.sfs -o /mnt/remoteimg/rootimg.sfs
+    while ! curl -f https://$confluent_whost/confluent-public/os/$confluent_profile/rootimg.sfs -o /mnt/remoteimg/rootimg.sfs; do
+        echo "Failed downloading image, retrying..."
+	sleep $((RANDOM%3)).$((RANDOM))
+    done
 else
     confluent_urls="$confluent_urls https://$confluent_whost/confluent-public/os/$confluent_profile/rootimg.sfs"
     /opt/confluent/bin/urlmount $confluent_urls /mnt/remoteimg

@@ -23,7 +23,10 @@ TETHERED=1
 if grep -q confluent_imagemethod=untethered /proc/cmdline || grep -q confluent_imagemethod=uncompressed /proc/cmdline; then
     TETHERED=0
     mount -t tmpfs untethered /mnt/remoteimg
-    curl https://$confluent_mgr/confluent-public/os/$confluent_profile/rootimg.sfs -o /mnt/remoteimg/rootimg.sfs
+    while ! curl -f https://$confluent_mgr/confluent-public/os/$confluent_profile/rootimg.sfs -o /mnt/remoteimg/rootimg.sfs; do
+        echo "Failed downloading image, retrying..."
+	sleep $((RANDOM%3)).$((RANDOM))
+    done
 elif [ -n "$rootimg" ]; then
     ln -s "$rootimg" /mnt/remoteimg/rootimg.sfs
 else
