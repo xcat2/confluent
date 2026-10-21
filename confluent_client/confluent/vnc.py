@@ -202,9 +202,10 @@ class VNCClient:
         self.receiver = asyncio.create_task(self._receive_loop())
         payload.add_number(2, 1)  # Set encodings
         payload.add_number(0, 1)  # Padding
-        payload.add_number(4, 2)  # Number of encodings
+        payload.add_number(5, 2)  # Number of encodings
         payload.add_number(6, 4)  # zlib
         payload.add_number(7, 4)  # tight
+        payload.add_number(-239, 4) # cursor
         payload.add_number(-223, 4) # desktopsize
         payload.add_number(-308, 4) # extended desktopsize
         payload.flush(self.writer)
@@ -339,8 +340,22 @@ class VNCClient:
                 img = Image.open(jpgimg)
                 img.load()
                 self.framebuffer.paste(img, (x, y))
+        elif encoding_type == -239:  # cursor
+            cursor_pixels = await self.reader.readexactly(width * height * 4)
+            mask_row_bytes = (width + 7) // 8
+            cursor_mask = await self.reader.readexactly(mask_row_bytes * height)
+            pixels = np.frombuffer(cursor_pixels, dtype=np.uint8).reshape(
+                (height, width, 4)).copy()
+            if width and height:
+                mask = np.unpackbits(
+                    np.frombuffer(cursor_mask, dtype=np.uint8).reshape(
+                        (height, mask_row_bytes)),
+                    axis=1, bitorder='big')[:, :width]
+                pixels[:, :, 3] = mask * 0xff
+            self.cursor = Image.fromarray(pixels, 'RGBA')
+            self.cursor_hotspot = (x, y)
         else:
-            raise Exception(f'Unsupported encoding type: {encoding_type}')
+            raise Exception(f'Unsupported encoding type: {encoding_type}, x: {x}, y: {y}, width: {width}, height: {height}')
     
     async def _read_tight_length(self):
         length = 0

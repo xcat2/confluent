@@ -708,6 +708,10 @@ async def create(nodes, element, configmanager, inputdata):
                 return
             yield msg.ChildCollection(url)
             return
+        elif '_console' not in element:
+            async for rsp in update([node], element, configmanager, inputdata):
+                yield rsp
+            return
         serialdata = await clientsbynode[node].get_vm_serial(node)
         yield PmxConsole(serialdata, node, configmanager, clientsbynode[node])
         return

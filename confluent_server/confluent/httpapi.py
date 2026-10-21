@@ -855,7 +855,9 @@ async def resourcehandler_backend(req, make_response):
         if default:
             try:
                 loop = asyncio.get_running_loop()
-                ip_info = await loop.getaddrinfo(targip, 0, 0, socket.SOCK_STREAM)
+                ip_info = await loop.getaddrinfo(
+                    targip, 0, family=socket.AF_UNSPEC,
+                    type=socket.SOCK_STREAM)
             except socket.gaierror:
                 rsp = await make_response('text/plain', 404)
                 await rsp.write(b'hardwaremanagement.manager definition could not be resolved')
