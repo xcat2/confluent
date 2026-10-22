@@ -30,6 +30,7 @@ import confluent.util as util
 COPY = 1
 EXTRACT = 2
 EXTRACTUDF = 4
+UTAR = 8
 READFILES = set([
     '.disk/info',
     'media.1/products',
@@ -927,6 +928,52 @@ def parse_bfb(archive):
             archive.seek(currsize, os.SEEK_CUR)
     return None
 
+def get_first_name_from_tar(archive):
+    archive.seek(0, 2)
+    lng = archive.tell()
+    if lng < 512:
+        return None
+    archive.seek(257)
+    ustar = archive.read(5)
+    if ustar != b'ustar':
+        return None
+    archive.seek(156)
+    ftype = archive.read(1)
+    if ftype == b'L':  # long name, need to go to the end
+        archive.seek(128)
+        size = int(archive.read(12).split(b'\x00', 1)[0], 8)
+        blocks = size // 512
+        if size % 512 > 0:
+            blocks += 1
+        if lng < 1024 + (blocks * 512):
+            return None
+        archive.seek(512)
+        filename = archive.read(size).split(b'\x00', 1)[0]
+        archive.seek(512 + (blocks * 512) + 156)
+        ftype = archive.read(1)
+    else:
+        archive.seek(0)
+        filename = archive.read(100).split(b'\x00', 1)[0]
+    if ftype == b'5':
+        ftype = 'directory'
+    return filename.decode(), ftype
+
+def scan_tar(archive):
+    first_name = get_first_name_from_tar(archive)
+    if not first_name:
+        return None
+    filename, ftype = first_name
+    if ftype != 'directory':
+        return None
+    if not filename.startswith('public/os/'):
+        return None
+    profilename = filename.split('/', 3)[2]
+    return {
+        'name': profilename,
+        'distribution': False,
+        'method': UTAR
+    }
+
 def fingerprint(archive):
     archive.seek(0)
     header = archive.read(32768)
@@ -941,12 +988,14 @@ def fingerprint(archive):
                 if name:
                     return name, isoinfo[0], fun.replace('check_', '')
         return None
-    elif header[:4] == b'Bf\x02\x13':
+    elif len(header) >= 4 and header[:4] == b'Bf\x02\x13':
         # BFB payload for Bluefield
         archive.seek(0)
         imginfo = parse_bfb(archive)
         if imginfo:
             return imginfo, None, 'bluefield'
+    elif len(header) >= 512 and header[257:262] == b'ustar':
+        return scan_tar(archive), None, None
     else:
         sum = hashlib.sha256(header)
         if sum.digest() in HEADERSUMS:
@@ -959,6 +1008,68 @@ def fingerprint(archive):
             if imginfo:
                 return imginfo, None, None
 
+async def extract_tar(archive, profilename, origprofilename, callback):
+    if not origprofilename:
+        origprofilename = profilename
+    if not profilename:
+        profilename = origprofilename
+    for name in (profilename, origprofilename):
+        if (not name or name in ('.', '..') or '/' in name or '\x00' in name):
+            raise ValueError('Invalid profile name in tar archive')
+
+    archive.seek(0, os.SEEK_END)
+    totalsize = archive.tell()
+    if not totalsize:
+        raise ValueError('Empty tar archive')
+    archive.seek(0)
+
+    # we use stdin, because we might not have permission to reopen the archive we already have open
+    args = [ 'tar', '-xf', '-' ]
+    if profilename != origprofilename:
+        args.extend((
+            '--transform=s!^public/os/{0}!public/os/{1}!'.format(origprofilename, profilename),
+            '--transform=s!^private/os/{0}!private/os/{1}!'.format(origprofilename, profilename),
+        ))
+    args.extend((
+        '--', 'public/os/{0}'.format(origprofilename),
+        'private/os/{0}'.format(origprofilename),
+    ))
+    proc = await asyncio.create_subprocess_exec(
+        *args, cwd='/var/lib/confluent',
+        stdin=asyncio.subprocess.PIPE,
+        stdout=asyncio.subprocess.DEVNULL,
+        stderr=asyncio.subprocess.PIPE)
+
+    async def feed_archive(callback):
+        fedsize = 0
+        try:
+            while True:
+                chunk = await asyncio.to_thread(archive.read, 1024 * 1024)
+                if not chunk:
+                    break
+                proc.stdin.write(chunk)
+                await proc.stdin.drain()
+                fedsize += len(chunk)
+                callback({'progress': min(float(fedsize) / totalsize, 0.99)})
+        except (BrokenPipeError, ConnectionResetError):
+            pass  # Report tar's exit status and stderr below.
+        finally:
+            proc.stdin.close()
+
+    feeder = asyncio.create_task(feed_archive(callback))
+    errors = []
+    while True:
+        line = await proc.stderr.readline()
+        if not line:
+            break
+        errors.append(line.decode('utf-8', 'replace').strip())
+    await feeder
+    result = await proc.wait()
+    if result:
+        detail = ': ' + '; '.join(errors) if errors else ''
+        raise RuntimeError('tar extraction failed with status {0}{1}'.format(
+            result, detail))
+    callback({'progress': 1.0})
 
 async def import_image(filename, callback, backend=False, mfd=None, custtargpath=None, custdistpath=None, custname=''):
     if mfd:
@@ -970,29 +1081,37 @@ async def import_image(filename, callback, backend=False, mfd=None, custtargpath
         return -1
     identity, imginfo, funname = identity
     distpath = custdistpath
-    if not distpath:
+    if distpath is None:
         targpath = identity['name']
         distpath = '/var/lib/confluent/distributions/' + targpath
-    if not custtargpath:
+    if custtargpath is None:
         if identity.get('subname', None):
             targpath += '/' + identity['subname']
         targpath = '/var/lib/confluent/distributions/' + targpath
     else:
         targpath = custtargpath
-    try:
-        os.makedirs(targpath, 0o755)
-    except Exception as e:
-        sys.stdout.write('ERROR:{0}\r'.format(str(e)))
+    if targpath:
+        try:
+            os.makedirs(targpath, 0o755)
+        except Exception as e:
+            sys.stdout.write('ERROR:{0}\r'.format(str(e)))
     filename = os.path.abspath(filename)
     identity['importedfile'] = filename
-    os.chdir(targpath)
-    if not backend:
-        print('Importing OS to ' + targpath + ':')
+    if targpath:
+        os.chdir(targpath)
+        if not backend:
+            print('Importing OS to ' + targpath + ':')
+    elif identity['method'] != UTAR:
+        return -1
     callback({'progress': 0.0})
     pct = 0.0
     if EXTRACT & identity['method'] or EXTRACTUDF & identity['method']:
         pct = extract_file(archive, callback=callback, imginfo=imginfo,
                            extractlist=identity.get('extractlist', None), method=identity['method'])
+    if UTAR & identity['method']:
+        await extract_tar(archive, custname or identity['name'],
+                          identity['name'], callback)
+        pct = 1.0
     if COPY & identity['method']:
         basename = identity.get('copyto', os.path.basename(filename))
         targiso = os.path.join(targpath, basename)
@@ -1012,12 +1131,13 @@ async def import_image(filename, callback, backend=False, mfd=None, custtargpath
                     printat = time.time() + 0.5
                 targ.write(buf)
                 buf = archive.read(32768)
-    with open(targpath + '/distinfo.yaml', 'w') as distinfo:
-        distinfo.write(yaml.dump(identity, default_flow_style=False))
-    if 'subname' in identity:
-        del identity['subname']
-    with open(distpath + '/distinfo.yaml', 'w') as distinfo:
-        distinfo.write(yaml.dump(identity, default_flow_style=False))
+    if targpath:
+        with open(targpath + '/distinfo.yaml', 'w') as distinfo:
+            distinfo.write(yaml.dump(identity, default_flow_style=False))
+        if 'subname' in identity:
+            del identity['subname']
+        with open(distpath + '/distinfo.yaml', 'w') as distinfo:
+            distinfo.write(yaml.dump(identity, default_flow_style=False))
     if 'fixup_{0}'.format(funname) in globals():
         globals()['fixup_{0}'.format(funname)](targpath)
     callback({'progress': 1.0})
@@ -1252,16 +1372,27 @@ class MediaImporter(object):
             targpath = customname
         else:
             targpath = identity['name']
-        self.distpath = '/var/lib/confluent/distributions/' + targpath
-        if identity.get('subname', None):  # subname is to indicate disk number in a media set
-            targpath += '/' + identity['subname']
-        self.targpath = '/var/lib/confluent/distributions/' + targpath
-        if os.path.exists(self.targpath):
-            errstr = '{0} already exists'.format(self.targpath)
-            if checkonly:
-                self.errors = [errstr]
-            else:
-                raise Exception(errstr)
+        self.distpath = ''
+        self.targpath = ''
+        self.targets = []
+        targpaths = []
+        if identity.get('distribution', True):
+            self.distpath = '/var/lib/confluent/distributions/' + targpath
+            if identity.get('subname', None):  # subname is to indicate disk number in a media set
+                targpath += '/' + identity['subname']
+            self.targpath = '/var/lib/confluent/distributions/' + targpath
+            targpaths = [self.targpath]
+            self.targets = targpaths
+        else:
+            targpaths = [f'/var/lib/confluent/public/os/{targpath}', f'/var/lib/confluent/private/os/{targpath}']
+            self.targets = targpaths
+        for targ in targpaths:
+            if os.path.exists(targ):
+                errstr = '{0} already exists'.format(targ)
+                if checkonly:
+                    self.errors = [errstr]
+                else:
+                    raise Exception(errstr)
         if checkonly:
             return
         importing[importkey] = self

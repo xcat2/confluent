@@ -250,6 +250,7 @@ async def handle_deployment(configmanager, inputdata, pathcomponents,
             await importer.init(inputdata['filename'], configmanager, checkonly=True)
             medinfo = {
                 'targetpath': importer.targpath,
+                'targets': importer.targets,
                 'name': importer.osname,
                 'oscategory': importer.oscategory,
                 'errors': importer.errors,
@@ -272,6 +273,7 @@ async def handle_deployment(configmanager, inputdata, pathcomponents,
                     await importer.init(inputdata['filename'],
                                                     configmanager)
                 yield msg.KeyValueData({'target': importer.targpath,
+                                        'targets': importer.targets,
                                         'name': importer.importkey})
                 return
         elif len(pathcomponents) == 3:

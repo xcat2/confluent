@@ -641,15 +641,26 @@ async def osimport(imagefile, checkonly=False, custname=None):
         if 'target' in rsp:
             importing = True
             shortname = rsp['name']
-            print('Importing from {0} to {1}'.format(imagefile, rsp['target']))
+            if 'targets' in rsp:
+                target = ','.join(rsp.get('targets', []))
+            else:
+                target = rsp['target']
+            if target:
+                print('Importing from {0} to {1}'.format(imagefile, target))
+            else:
+                print('Importing from {0}'.format(imagefile))
         elif 'targetpath' in rsp:
             tpath = rsp.get('targetpath', None)
             tname = rsp.get('name', None)
             oscat = rsp.get('oscategory', None)
+            targets = rsp.get('targets', [])
             if tpath:
                 print('Detected target directory: ' + tpath)
             if tname:
-                print('Detected distribution name: ' + tname)
+                if len(targets) > 1:
+                    print('Detected profile name:' + tname)
+                else:
+                    print('Detected distribution name: ' + tname)
             if oscat:
                 print('Detected OS category: ' + oscat)
             for err in rsp.get('errors', []):
