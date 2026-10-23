@@ -57,9 +57,13 @@ async def main(args):
     osip = sp.add_parser('import', help='Import an OS image from an ISO image')
     osip.add_argument('imagefile', help='File to use for source of importing')
     osip.add_argument('-n', help='Specific a custom distribution name')
+    
     fetchargs = sp.add_parser('fetch', help='Fetch an OS image from a remote source')
     fetchargs.add_argument('distname', help='Distribution name to fetch')
     fetchargs.add_argument('destdir', help='Directory to save the fetched image in')
+    exportargs = sp.add_parser('export', help='Export a deployment profile')
+    exportargs.add_argument('profile', help='Profile name to export')
+    exportargs.add_argument('filename', help='Output filename')
     upb = sp.add_parser(
         'updateboot',
         help='Push profile.yaml of the named profile data into boot assets as appropriate')
@@ -77,6 +81,8 @@ async def main(args):
         return await oslist()
     if cmdset.command == 'fetch':
         return await download_image(cmdset.distname, cmdset.destdir)
+    if cmdset.command == 'export':
+        return await export_profile(cmdset.profile, cmdset.filename)
     if cmdset.command == 'import':
         return await osimport(cmdset.imagefile, custname=cmdset.n)
     if cmdset.command == 'importcheck':
@@ -527,6 +533,28 @@ async def updateboot(profilename):
             print('Updated: {0}'.format(rsp['updated']))
         else:
             print(repr(rsp))
+
+
+async def export_profile(profilename, filename):
+    c = client.Command()
+    profiles = []
+    async for rsp in c.read('/deployment/profiles'):
+            if 'error' in rsp:
+                sys.stderr.write(rsp['error'] + '\n')
+                exitcode = 1
+            else:
+                profiles.append(rsp['item']['href'].replace('/', ''))
+    if profilename not in profiles:
+        sys.stderr.write('Profile {0} not found\n'.format(profilename))
+        return 1
+    tarpaths = ['public/os/{0}'.format(profilename)]
+    privatepath = 'private/os/{0}'.format(profilename)
+    if os.path.isdir(os.path.join('/var/lib/confluent', privatepath)):
+        tarpaths.append(privatepath)
+    result = subprocess.run(
+        ['tar', 'cf', filename] + tarpaths,
+        cwd='/var/lib/confluent')
+    return result.returncode
 
 
 async def rebase(profilename):

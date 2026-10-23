@@ -4,9 +4,10 @@ osdeploy(8) --- Configure general OS deployment facilities of confluent
 ## SYNOPSIS
 
 `osdeploy import <iso>`  
+`osdeploy export <profile> <filename>`
 `osdeploy updateboot <profile>`  
 `osdeploy rebase <profile>`  
-`osdeploy initialize [-h] [-g] [-u] [-s] [-k] [-t] [-p] [-i] [-l] [-a]`  
+`osdeploy initialize [-h] [-g] [-u] [-s] [-k] [-t] [-p] [-i] [-l] [-a] [-r]`
 
 ## DESCRIPTION
 
@@ -17,3 +18,8 @@ and ensure those needed changes are performed. `initialize` provides assistance 
 up the most commonly required facilities. `rebase` has confluent attempt to update profile
 content that came from /opt/confluent in an rpm update, if profile supports it. 
 Run `osdeploy initialize -h` for more detail on the options offered by `osdeploy initialize`.
+
+`export` takes the profile specified and creates a file suitable for import to another confluent server.
+Note that this will not include the targets of symbolic links that go outside of the public or private profile date.
+An export will include any sensitive data embedded in the image and the requisite private keys.  This is only intended for
+diskless and captured images.

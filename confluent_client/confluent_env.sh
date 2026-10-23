@@ -156,7 +156,7 @@ _confluent_osimage_completion()
 {
     _confluent_get_args
     if [ $NUMARGS == 2 ]; then
-        COMPREPLY=($(compgen -W "initialize import importcheck updateboot rebase fetch" -- ${COMP_WORDS[COMP_CWORD]}))
+        COMPREPLY=($(compgen -W "initialize export import importcheck updateboot rebase fetch" -- ${COMP_WORDS[COMP_CWORD]}))
         return
     elif [ ${CMPARGS[1]} == 'initialize' ]; then
         COMPREPLY=($(compgen -W "-h -a -g -u -s -k -t -p -i -l -r" -- ${COMP_WORDS[COMP_CWORD]}))
@@ -175,7 +175,16 @@ _confluent_osimage_completion()
     elif [ ${CMPARGS[1]} == 'updateboot' -o ${CMPARGS[1]} == 'rebase' ]; then
         COMPREPLY=($(compgen -W "-n $(confetty show /deployment/profiles|sed -e 's/\///')" -- "${COMP_WORDS[COMP_CWORD]}"))
         return
+    elif [ ${CMPARGS[1]} == 'export' ]; then
+        if [ $NUMARGS == 3 ]; then
+            COMPREPLY=($(compgen -W "-n $(confetty show /deployment/profiles|sed -e 's/\///')" -- "${COMP_WORDS[COMP_CWORD]}"))
+            return
+        fi
+        compopt -o  dirnames
+        COMPREPLY=()
+        return
     fi
+    
 }
 
 _confluent_imgutil_completion()
