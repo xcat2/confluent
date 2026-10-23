@@ -480,6 +480,10 @@ class InputHandler:
                 await relay_keypresses(self.csikeys[self.buffer[1:]], modifiers=self.modkeys)
                 self.reset_input_context(escmode=True)
                 return
+            if self.buffer[1:] == '[Z':
+                await relay_keypresses(SpecialKeys.TAB, modifiers=[SpecialKeys.SHIFT])
+                self.reset_input_context(escmode=True)
+                return
             for cand in self.csikeys:
                 if cand.startswith(self.buffer[1:]):
                     # continue to wait for more input to disambiguate
