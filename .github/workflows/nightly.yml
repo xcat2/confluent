@@ -408,6 +408,8 @@ jobs:
           cat > notes.md <<EOF
           Unofficial development build of $url/commit/$GITHUB_SHA, rebuilt every night when something changed. Packages are unsigned and not meant for production.
 
+          Built on $(date -u '+%Y-%m-%d at %H:%M UTC').
+
           | Bundle | Target |
           |---|---|
           EOF
