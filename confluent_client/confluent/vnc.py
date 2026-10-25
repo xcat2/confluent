@@ -98,10 +98,11 @@ class VNCClient:
         return self
     
     async def _input_worker(self):
+        self.mouse_buttons = 0
         while True:
             if self.receiver is not None and self.receiver.done():
                 break
-            keys, modifierkeys = await self._input_queue.get()
+            keys, modifierkeys, mouse_event = await self._input_queue.get()
             payload = ByteStream()
             for modkey in (modifierkeys or []):
                 payload.add_number(4, 1)  # Key event
@@ -122,6 +123,21 @@ class VNCClient:
                 payload.add_number(keynumber, 4)
                 payload.flush(self.writer)
                 await self.writer.drain()
+            if mouse_event:
+                button, x, y, direction = mouse_event
+                if button is None:
+                    self.mouse_buttons = 0
+                elif direction == 'release':
+                    self.mouse_buttons &= ~(1 << button - 1)
+                else:
+                    self.mouse_buttons |= (1 << button - 1)
+                payload.add_number(5, 1)  # Pointer event
+                payload.add_number(self.mouse_buttons, 1)
+                payload.add_number(int(x), 2)
+                payload.add_number(int(y), 2)
+                payload.flush(self.writer)
+                await self.writer.drain()
+                self.mouse_buttons &= ~24  # clear scroll wheel buttons (bits 3 and 4)
             for modkey in (modifierkeys or []):
                 payload.add_number(4, 1)  # Key event
                 payload.add_number(0, 1)  # Up
@@ -129,12 +145,20 @@ class VNCClient:
                 payload.add_number(modkey.value, 4)
                 payload.flush(self.writer)
                 await self.writer.drain()
-            await asyncio.sleep(0.01)  # Have to slow down keypresses for some servers
+            if keys:
+                await asyncio.sleep(0.01)  # Have to slow down keypresses for some servers
             # Still shouldn't be noticable interactively, but does slow down paste to a fast typist...
             self._input_queue.task_done()
     
     async def send_keypresses(self, keys, modifierkeys=None):
-        await self._input_queue.put((keys, modifierkeys))
+        await self._input_queue.put((keys, modifierkeys, []))
+
+    async def send_pointer_event(self, button, x, y, direction, modifierkeys=None):
+        if isinstance(x, float):
+            x = self.width * x
+        if isinstance(y, float):
+            y = self.height * y
+        await self._input_queue.put(([], modifierkeys, [button, x, y, direction]))
 
     async def _read_number(self, num_bytes):
         data = await self.reader.readexactly(num_bytes)

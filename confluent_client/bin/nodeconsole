@@ -205,13 +205,36 @@ async def do_power_action(action, setboot=None):
 
 def set_extra_text(text):
     global focustext
+    if focustext == text:
+        return # noop
     focustext = text
     redraw()
+
+inhandler = None
+def clean_exit():
+    sys.stdout.write('\x1b[?1006l')  # Disable SGR extended mode for mouse
+    sys.stdout.write('\x1b[?1003l')  # Disable mouse movement tracking
+    sys.stdout.write('\x1b[?1000l')  # Disable mouse click tracking
+    sys.stdout.flush()
+    if inhandler:
+        # consume pending mouse actions rather than inflicting them on the prompt
+        inhandler.drain_input()
+    sys.exit(0)
 
 async def watch_input():
     global focustext
     focustext = 'Hit Ctrl-E for command mode'
-    handler = await InputHandler.create()
+    global inhandler
+    inhandler = await InputHandler.create()
+    while not console_direct_mode:
+        # wait for direct mode to activate before triggering mouse notifications
+        await asyncio.sleep(0.1)
+    sys.stdout.write('\x1b[?1000h')  # Enable mouse click tracking
+    sys.stdout.write('\x1b[?1003h')  # Enable mouse movement tracking
+    sys.stdout.write('\x1b[?1006h')  # Enable SGR extended mode for mouse
+    # 1016 isn't as ubiquitous as the other mouse tracking modes, see if 1006 is good enough for now
+    # Notably, Konsole seems to bug out and revert to ambiguous mouse release with 1016
+    sys.stdout.flush()
     while True:
         await asyncio.sleep(5)
         if focustext == 'Hit Ctrl-E for command mode':
@@ -274,12 +297,20 @@ class InputHandler:
             return
         self.pendinginput.put_nowait(data)
 
+    def drain_input(self):
+        asyncio.get_running_loop().remove_reader(self.fd)
+        while select.select([self.fd], [], [], 0.3)[0]:
+            os.read(self.fd, 1)
+
     async def consume_input(self):
         # One consumer, so a keystroke that blocks relaying cannot be overtaken
         # by the next one, and the sequence buffer is only touched by one task
         while True:
             data = await self.pendinginput.get()
-            await self.process_input(data)
+            try:
+                await self.process_input(data)
+            except Exception as e:
+                sys.stderr.write("Error processing input: " + str(e) + "\n")
 
     async def timeout_sequence(self, timeout=3, flushbuffer=False):
         await asyncio.sleep(timeout)
@@ -301,7 +332,6 @@ class InputHandler:
         global focus_pending
         if focus_pending:
             focus_pending = False
-        if focus_pending or escmode:
             redraw()
 
     async def process_input(self, data):
@@ -416,7 +446,7 @@ class InputHandler:
             self.reset_input_context()
         elif self.buffer == '\x05c.' or self.buffer == '\x05cq':  # Ctrl-E, then . or q
             set_extra_text('Exiting...') 
-            asyncio.get_running_loop().call_soon(sys.exit, 0)
+            asyncio.get_running_loop().call_soon(clean_exit)
             return
         elif self.buffer == '\x05cf':  # Ctrl-E, then c, then f
             set_extra_text('Focus commands: ⇅⇄:move focus, a:toggle focus all')
@@ -480,17 +510,79 @@ class InputHandler:
                 await relay_keypresses(self.csikeys[self.buffer[1:]], modifiers=self.modkeys)
                 self.reset_input_context(escmode=True)
                 return
-            if self.buffer[1:] == '[Z':
+            if self.buffer[1:] == '[Z':  # Backtab (Shift+Tab)
                 await relay_keypresses(SpecialKeys.TAB, modifiers=[SpecialKeys.SHIFT])
                 self.reset_input_context(escmode=True)
                 return
-            for cand in self.csikeys:
-                if cand.startswith(self.buffer[1:]):
-                    # continue to wait for more input to disambiguate
-                    self.seqtimeout = asyncio.create_task(self.timeout_sequence(0.2))
-                    break
+            if self.buffer.startswith('\x1b[<'):
+                # Mouse event sequence
+                if self.buffer.endswith('M') or self.buffer.endswith('m'):
+                    if self.buffer.endswith('M'):
+                        event_type = 'press'
+                    else:
+                        event_type = 'release'
+                    seqdata = self.buffer[3:-1]  # Strip the '\x1b[<' prefix and the trailing 'M' or 'm'
+                    try:
+                        evt, col, row = seqdata.split(';')
+                    except ValueError:
+                        self.reset_input_context(escmode=True)
+                        # ignore malformed sequence, konsole sometimes tosses
+                        # a weird stray with two values
+                        return
+                    evt = int(evt)
+                    col = int(col)
+                    row = int(row)
+                    button = evt & 3
+                    if evt & 64:
+                        # move button to 4, 5 for scroll up/down
+                        button += 4
+                    if button == 3:
+                        button = None # button is not pressed
+                    else:
+                        button += 1
+                    movement = evt & 32
+                    modifiers = []
+                    if evt & 16:
+                        modifiers.append(SpecialKeys.CTRL)
+                    if evt & 4:
+                        modifiers.append(SpecialKeys.SHIFT)
+                    if evt & 8:
+                        modifiers.append(SpecialKeys.ALT)
+                    # Mouse coordinates are one-based; tile positions are
+                    # zero-based, and the first tile row is its title bar.
+                    for node, (tilecol, tilerow) in nodepositions.items():
+                        x = col - tilecol - 1
+                        y = row - tilerow - 2
+                        if 0 <= x < cwidth and 0 <= y < cheight - 1:
+                            x = (x / cwidth)
+                            y = (y / (cheight - 1))
+                            if node not in focused_nodes:
+                                if button == 1:
+                                    if SpecialKeys.CTRL not in modifiers:
+                                        focused_nodes.clear()
+                                    focused_nodes[node] = True
+                                    redraw()
+                                break
+                            for node in focused_nodes:
+                                vnclient = vncclientsbynode.get(node)
+                                if vnclient:
+                                    await vnclient.send_pointer_event(button, x, y, event_type, modifierkeys=modifiers)
+                            break
+                    else:
+                        if button == 1:
+                            focused_nodes.clear()
+                            redraw()
+                    self.reset_input_context(escmode=True)
+                    return
+                self.seqtimeout = asyncio.create_task(self.timeout_sequence(0.2))
             else:
-                self.reset_input_context(escmode=True)
+                for cand in self.csikeys:
+                    if cand.startswith(self.buffer[1:]):
+                        # continue to wait for more input to disambiguate
+                        self.seqtimeout = asyncio.create_task(self.timeout_sequence(0.2))
+                        break
+                else:
+                    self.reset_input_context(escmode=True)
         elif len(self.buffer) >= 2 and self.buffer.startswith('\x1bO'): #SS3
             if len(self.buffer) == 3:
                 if self.buffer[2:] in self.ss3keys:
