@@ -554,8 +554,17 @@ class InputHandler:
                         x = col - tilecol - 1
                         y = row - tilerow - 2
                         if 0 <= x < cwidth and 0 <= y < cheight - 1:
-                            x = (x / cwidth)
-                            y = (y / (cheight - 1))
+                            geometry = imagegeometrybynode.get(node)
+                            if geometry:
+                                canvaswidth, canvasheight, imagewidth, imageheight, cellwidth, cellheight = geometry
+                                # aim for the middle of the cell with 0.5, converting for actual image
+                                x = ((x + 0.5) * canvaswidth / cellwidth - 2) / imagewidth
+                                y = ((y + 0.5) * canvasheight / cellheight - 2) / imageheight
+                                x = min(1, max(0, x))
+                                y = min(1, max(0, y))
+                            else:
+                                x = x / cwidth
+                                y = y / (cheight - 1)
                             if node not in focused_nodes:
                                 if button == 1:
                                     if SpecialKeys.CTRL not in modifiers:
@@ -776,7 +785,7 @@ def draw_text(text, width, height):
         sys.stdout.write(text)
         cursor_left(len(text))
 
-def draw_image(bindata, width, height, doscale=True):
+def draw_image(bindata, width, height, doscale=True, node=None):
     if not bindata:
         return
     imageformat = os.environ.get('CONFLUENT_IMAGE_PROTOCOL', 'kitty')
@@ -789,8 +798,9 @@ def draw_image(bindata, width, height, doscale=True):
         except Exception as e:
             errstr = 'Error rendering image:\n' + str(e)
             return draw_text(errstr, width, height)
-        imgwidth, imgheight = get_pix_dimensions(width, height)
-        nimg = Image.new(mode='RGBA', size=(imgwidth, imgheight))
+        canvaswidth, canvasheight = get_pix_dimensions(width, height)
+        imgwidth, imgheight = canvaswidth, canvasheight
+        nimg = Image.new(mode='RGBA', size=(canvaswidth, canvasheight))
         imgwidth -= 4
         imgheight -= 4
         hscalefact = imgwidth / img.width
@@ -801,6 +811,8 @@ def draw_image(bindata, width, height, doscale=True):
         else:
             rzwidth = int(img.width * vscalefact)
             rzheight = imgheight
+        if node is not None:
+            imagegeometrybynode[node] = (canvaswidth, canvasheight, rzwidth, rzheight, width, height)
         img = img.resize((rzwidth, rzheight))
         nd = ImageDraw.Draw(nimg)
         nd.rectangle((1, 1, rzwidth + 2, rzheight + 2), outline='black')
@@ -932,6 +944,7 @@ numrows = 0
 cwidth = 0
 cheight = 0
 imagedatabynode = {}
+imagegeometrybynode = {}
 firstnodename = None
 
 # Terminal drawing is offloaded to a single worker thread so slow image
@@ -955,7 +968,7 @@ def redraw():
                     sticky_cursor()
                 sys.stdout.write('{}: '.format(node))
             # one row is used by our own name, so cheight - 1 for that allowance
-            draw_image(imgdata, cwidth, cheight - 1 if cheight else cheight)
+            draw_image(imgdata, cwidth, cheight - 1 if cheight else cheight, node=node)
             if node in nodepositions:
                 cursor_restore()
                 reset_cursor(node)
@@ -1264,7 +1277,7 @@ def _draw_node(node, imgdata, errorstr, firstnodename, cwidth, cheight):
     if errorstr:
         draw_text(errorstr, cwidth, cheight -1 if cheight else cheight)
     else:
-        draw_image(imgdata, cwidth, cheight - 1 if cheight else cheight)
+        draw_image(imgdata, cwidth, cheight - 1 if cheight else cheight, node=node)
     if node in nodepositions:
         cursor_restore()
         reset_cursor(node)
