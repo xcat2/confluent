@@ -299,7 +299,7 @@ class InputHandler:
 
     def drain_input(self):
         asyncio.get_running_loop().remove_reader(self.fd)
-        while select.select([self.fd], [], [], 0.3)[0]:
+        while select.select([self.fd], [], [], 0.5)[0]:
             os.read(self.fd, 1)
 
     async def consume_input(self):
@@ -576,6 +576,22 @@ class InputHandler:
                                 vnclient = vncclientsbynode.get(node)
                                 if vnclient:
                                     await vnclient.send_pointer_event(button, x, y, event_type, modifierkeys=modifiers)
+                            break
+                        elif 0 <= x < cwidth and y == -1:
+                            if node in focused_nodes:
+                                if button == 1 and event_type == 'release':
+                                    if SpecialKeys.CTRL in modifiers:
+                                        focused_nodes.pop(node, None)
+                                    else:
+                                        focused_nodes.clear()
+                                        focused_nodes[node] = True
+                                    redraw()
+                            else:
+                                if button == 1 and event_type == 'release':
+                                    if SpecialKeys.CTRL not in modifiers:
+                                        focused_nodes.clear()
+                                    focused_nodes[node] = True
+                                    redraw()
                             break
                     else:
                         if button == 1:
