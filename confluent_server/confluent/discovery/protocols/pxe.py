@@ -823,6 +823,18 @@ async def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, 
                 log.log({'info': 'No pending profile for {0}, skipping proxyDHCP reply'.format(node)})
                 return
             bootfile = 'http://{0}/confluent-public/os/{1}/boot.ipxe'.format(myipn, profile).encode('utf8')
+            if len(bootfile) > 127:
+                if bootfile.startswith(b'http'):
+                    bootshorturl = '/confluent-public/os/{0}/boot.ipxe'.format(profile)
+                    bootfilename = '/var/lib/confluent/public/os/{0}/boot.ipxe'.format(profile)
+                    bootfile = register_shorturl(bootfile.decode('utf8'), can302, bootshorturl, bootfilename).encode('utf8')
+                else:
+                    log.log(
+                        {'info': 'Boot offer cannot be made to {0} as the '
+                        'profile name "{1}" is {2} characters longer than is supported '
+                        'for this boot method.'.format(
+                            node, profile, len(bootfile) - 127)})
+                    return
         else:
             bootfile = b'confluent/aarch64/ipxe-shim.efi'
         repview[108:108 + len(bootfile)] = bootfile
