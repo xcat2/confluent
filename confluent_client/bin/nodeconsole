@@ -1278,6 +1278,10 @@ def _draw_worker():
             _draw_node(node, imgdata, errorstr, firstnodename, cwidth, cheight)
 
 def _draw_node(node, imgdata, errorstr, firstnodename, cwidth, cheight):
+    oldimgdata = imagedatabynode.get(node)
+    if oldimgdata == imgdata:
+        # skip redundant screen update
+        return
     imagedatabynode[node] = imgdata
     if node in nodepositions:
         prep_node_tile(node)
