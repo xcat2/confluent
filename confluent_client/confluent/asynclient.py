@@ -27,6 +27,7 @@ import os
 import shlex
 import socket
 import ssl
+import subprocess
 import sys
 import confluent.asynctlvdata as tlvdata
 import confluent.sortutil as sortutil
@@ -194,14 +195,37 @@ class Command(object):
                 self.serverloc = '/var/run/confluent/api.sock'
         else:
             self.serverloc = server
+        if self.serverloc.startswith('ssh://'):
+            if '/' not in self.serverloc[6:]:
+                self.serverloc += '/var/run/confluent/api.sock'
+            userhost, apipath = self.serverloc[6:].split('/', 1)
+            if apipath[0] != '/':
+                apipath = '/' + apipath
+            serverpath = os.path.join(os.environ['XDG_RUNTIME_DIR'], 'confluent')
+            serverpath = os.path.join(serverpath, userhost)
+            localsock = os.path.join(serverpath, 'api.sock')
+            self.serverloc = localsock
+            os.makedirs(serverpath, exist_ok=True, mode=0o700)
+            if os.path.exists(localsock):
+                try:
+                    self._connect_unix()
+                    self.unixdomain = True
+                except Exception as e:
+                    os.remove(localsock)
+            if not os.path.exists(localsock):
+                subprocess.check_call([
+                    'ssh', '-fNT', '-o', 'StreamLocalBindUnlink=yes',
+                    '-L', localsock + ':' + apipath,
+                    userhost])
         self.connected = False
 
     async def ensure_connected(self):
         if self.connected:
             return True
         if os.path.isabs(self.serverloc) and os.path.exists(self.serverloc):
-            self._connect_unix()
-            self.unixdomain = True
+            if not self.unixdomain:
+                self._connect_unix()
+                self.unixdomain = True
         elif self.serverloc == '/var/run/confluent/api.sock':
             raise Exception('Confluent service is not available')
         else:

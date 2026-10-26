@@ -1213,6 +1213,27 @@ async def do_vnc(node, url, outputfile=None):
     global streaming
     keeprunning = True
     retries = 5
+    if os.path.abspath(url) and 'ssh://' in os.environ.get('CONFLUENT_HOST', ''):
+        if not os.path.exists(url):
+            localpath = os.path.join(os.environ['XDG_RUNTIME_DIR'], 'confluent', 'vinz', os.path.basename(url))
+            os.makedirs(os.path.dirname(localpath), exist_ok=True, mode=0o700)
+            if os.path.exists(localpath):
+                try:
+                    rdr, writer = await asyncio.open_unix_connection(localpath)
+                    writer.close()
+                except Exception:
+                    os.unlink(localpath)
+            if not os.path.exists(localpath):
+                sshhost = os.environ.get('CONFLUENT_HOST')[6:].split('/', 1)[0]
+                # would do '-fNT' like elsewhere, but the video tunnel exiting on close
+                # is nice, since we end up with another port forward for each node
+                sshproc = await asyncio.create_subprocess_exec(
+                    'ssh', '-fT', '-o', 'StreamLocalBindUnlink=yes',
+                    '-L', localpath + ':' + url, sshhost, 'sleep', '30',
+                    stdout=asyncio.subprocess.DEVNULL,
+                    stderr=asyncio.subprocess.DEVNULL)
+                await sshproc.wait()
+            url = localpath
     while keeprunning:
         try:
             async with await vnc.VNCClient.create(url, outputfile=outputfile) as client:
