@@ -64,6 +64,9 @@ except ImportError:
         def draw(self, imgfile):
             sys.stderr.write("PySixel not detected, Sixel format display not supported\n")
 
+expecting_cpr = False  # cursor position report
+current_cursor = (1, 1)
+
 confettypath = os.path.join(os.path.dirname(sys.argv[0]), 'confetty')
 argparser = optparse.OptionParser(
     usage="Usage: %prog [options] <noderange> [kill][-- [passthroughoptions]]",
@@ -495,6 +498,7 @@ class InputHandler:
             self.reset_input_context()
 
     async def handle_esc_sequence(self, data):
+        global current_cursor, expecting_cpr
         if self.seqtimeout:
             self.seqtimeout.cancel()
         self.buffer += data.decode('utf-8', errors='ignore')
@@ -512,6 +516,26 @@ class InputHandler:
                 return
             if self.buffer[1:] == '[Z':  # Backtab (Shift+Tab)
                 await relay_keypresses(SpecialKeys.TAB, modifiers=[SpecialKeys.SHIFT])
+                self.reset_input_context(escmode=True)
+                return
+            if expecting_cpr:
+                # dsr is '\x1b[<row>;<col>R'
+                if self.buffer.endswith('R'):
+                    expecting_cpr = False
+                    try:
+                        _, pos = self.buffer.split('[', 1)
+                        row, col = pos[:-1].split(';')
+                        current_cursor = (int(col), int(row))
+                    except ValueError:
+                        pass
+                    self.reset_input_context(escmode=True)
+                    return
+                cprdata = self.buffer[2:]
+                if (cprdata.count(';') <= 1 and
+                    all(char == ';' or '0' <= char <= '9' for char in cprdata)):
+                    # This may be a partial cursor-position response.
+                    self.seqtimeout = asyncio.create_task(self.timeout_sequence(0.2))
+                    return
                 self.reset_input_context(escmode=True)
                 return
             if self.buffer.startswith('\x1b[<'):
@@ -550,9 +574,10 @@ class InputHandler:
                         modifiers.append(SpecialKeys.ALT)
                     # Mouse coordinates are one-based; tile positions are
                     # zero-based, and the first tile row is its title bar.
+                    toprow = current_cursor[1]
                     for node, (tilecol, tilerow) in nodepositions.items():
                         x = col - tilecol - 1
-                        y = row - tilerow - 2
+                        y = row - tilerow - 1 - toprow
                         if 0 <= x < cwidth and 0 <= y < cheight - 1:
                             geometry = imagegeometrybynode.get(node)
                             if geometry:
@@ -623,15 +648,21 @@ class InputHandler:
                   
 
 vncclientsbynode = {}
+
+async def timeout_cpr():
+    global expecting_cpr
+    await asyncio.sleep(0.5)
+    expecting_cpr = False
+
 def get_coords():
+    global current_cursor
+    global expecting_cpr
+    direct_console()
+    current_cursor = (1, 1)
     sys.stdout.write('\x1b[6n') #
     sys.stdout.flush()
-    gotreply = select.select([sys.stdin,], [], [], 0.250)[0]
-    if gotreply:
-        response = ''
-        while select.select([sys.stdin,], [], [], 0.1)[0] and 'R' not in response:
-            response += sys.stdin.read()
-        coords = response.replace('R', '').split('[')[1].split(';')
+    asyncio.create_task(timeout_cpr())
+    expecting_cpr = True
     #sys.stdout.write('\x1b[{}:{}H'.format(*coords))
 
 console_direct_mode = False
@@ -867,7 +898,7 @@ def iterm_draw(bindata, width, height):
 
 def kitty_draw(bindata, width, height):
     data = base64.b64encode(bindata)
-    preamble = '\x1b_Ga=T,f=100,q=2'
+    preamble = '\x1b_Ga=T,f=100,z=-1,q=2'
     if height:
         preamble += f',r={height},c={width}'
     #sys.stdout.write(repr(preamble))
@@ -1002,6 +1033,7 @@ async def do_screenshot():
     global inputwatcher
     sess = client.Command()
     if streaming:
+        direct_console()
         inputwatcher = asyncio.create_task(watch_input())
     if options.tile:
         imageformat = os.environ.get('CONFLUENT_IMAGE_PROTOCOL', 'kitty')
@@ -1015,15 +1047,17 @@ async def do_screenshot():
             numnodes += 1
         resized = False
         def do_resize(a=None, b=None):
-            global resized
+            global resized, current_cursor
             if a:
                 resized = True
                 # on a window resize, clear the old stuff
                 sys.stdout.write('\x1bc')
+                current_cursor = (1, 1)
             global numrows
             global cwidth
             global cheight
             cols, rows, cwidth, cheight, numrows = determine_tile_size(numnodes)
+            get_coords()
             currcol = 1
             currcolcell = 0
             currrowcell = 0
@@ -1247,9 +1281,6 @@ async def do_vnc(node, url, outputfile=None):
                         # ask for a video refresh, then do reads until the video is complete
                         # stock screenshot function discards data,
                         # or we just patch the screenshot instead....
-                        # but OpenBMC sends an alpha heavy mouse overlay
-                        # that results in blackness
-                        # possibly use client side cursor to suppress the ick?
                         image = await client.get_screenshot()
                     except asyncio.TimeoutError:
                         # need a better closed connection detector, a static screen triggers timeouts too
