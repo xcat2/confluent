@@ -822,7 +822,7 @@ async def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, 
             if not profile:
                 log.log({'info': 'No pending profile for {0}, skipping proxyDHCP reply'.format(node)})
                 return
-            if disco['arch'] == 'bios-x86' or not os.path.exists('/var/lib/confluent/public/os/{0}/boot.ipxe.shim'.format(profile)):
+            if not os.path.exists('/var/lib/confluent/public/os/{0}/boot.ipxe.shim'.format(profile)):
                 bootfile = 'http://{0}/confluent-public/os/{1}/boot.ipxe'.format(myipn, profile).encode('utf8')
             else:
                 bootfile = 'http://{0}/confluent-public/os/{1}/boot.ipxe.shim'.format(myipn, profile).encode('utf8')
