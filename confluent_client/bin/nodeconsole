@@ -654,14 +654,16 @@ async def timeout_cpr():
     await asyncio.sleep(0.5)
     expecting_cpr = False
 
+coordtimeouttask = None
 def get_coords():
     global current_cursor
     global expecting_cpr
+    global coordtimeouttask
     direct_console()
     current_cursor = (1, 1)
     sys.stdout.write('\x1b[6n') #
     sys.stdout.flush()
-    asyncio.create_task(timeout_cpr())
+    coordtimeouttask = asyncio.create_task(timeout_cpr())
     expecting_cpr = True
     #sys.stdout.write('\x1b[{}:{}H'.format(*coords))
 
@@ -1046,18 +1048,22 @@ async def do_screenshot():
             allnodes.append(res['item']['href'].replace('/', ''))
             numnodes += 1
         resized = False
-        def do_resize(a=None, b=None):
+        def do_resize(signum=None, sigframe=None):
             global resized, current_cursor
-            if a:
+            if signum is not None:
                 resized = True
                 # on a window resize, clear the old stuff
                 sys.stdout.write('\x1bc')
                 current_cursor = (1, 1)
+                sys.stdout.write('\x1b[?1000h')  # Enable mouse click tracking
+                sys.stdout.write('\x1b[?1003h')  # Enable mouse movement tracking
+                sys.stdout.write('\x1b[?1006h')  # Enable SGR extended mode for mouse
             global numrows
             global cwidth
             global cheight
             cols, rows, cwidth, cheight, numrows = determine_tile_size(numnodes)
-            get_coords()
+            if not resized:
+                get_coords()
             currcol = 1
             currcolcell = 0
             currrowcell = 0
@@ -1072,8 +1078,8 @@ async def do_screenshot():
                     currcol = 1
                     currcolcell = 0
                     currrowcell += cheight
-            if a:
-                redraw()
+            if signum is not None:
+                draw_queue.put('resize')
         do_resize()
         signal.signal(signal.SIGWINCH, do_resize)
     elif options.interval is not None:
@@ -1325,6 +1331,9 @@ def _draw_worker():
             item = draw_queue.get()
         if item is None:
             break
+        if item == 'resize':
+            redraw()
+            continue
         node, imgdata, errorstr, firstnodename, cwidth, cheight = item
         with draw_lock:
             _draw_node(node, imgdata, errorstr, firstnodename, cwidth, cheight)
