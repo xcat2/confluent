@@ -260,6 +260,7 @@ async def update_boot_linux(profiledir, profile, label):
         ipxeout.write('imgload kernel\nimgexec kernel\n')
     finally:
         ipxeout.close()
+    oum = os.umask(0o22)
     ipout = os.open(profiledir + '/boot.ipxe', os.O_WRONLY|os.O_CREAT|os.O_TRUNC, 0o644)
     ipxeout = os.fdopen(ipout, 'w')
     try:

@@ -822,12 +822,13 @@ async def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, 
             if not profile:
                 log.log({'info': 'No pending profile for {0}, skipping proxyDHCP reply'.format(node)})
                 return
-            bootfile = 'http://{0}/confluent-public/os/{1}/boot.ipxe'.format(myipn, profile).encode('utf8')
+            if disco['arch'] == 'bios-x86' or not os.path.exists('/var/lib/confluent/public/os/{0}/boot.ipxe.shim'.format(profile)):
+                bootfile = 'http://{0}/confluent-public/os/{1}/boot.ipxe'.format(myipn, profile).encode('utf8')
+            else:
+                bootfile = 'http://{0}/confluent-public/os/{1}/boot.ipxe.shim'.format(myipn, profile).encode('utf8')
             if len(bootfile) > 127:
                 if bootfile.startswith(b'http'):
-                    bootshorturl = '/confluent-public/os/{0}/boot.ipxe'.format(profile)
-                    bootfilename = '/var/lib/confluent/public/os/{0}/boot.ipxe'.format(profile)
-                    bootfile = register_shorturl(bootfile.decode('utf8'), can302, bootshorturl, bootfilename).encode('utf8')
+                    bootfile = register_shorturl(bootfile.decode('utf8')).encode('utf8')
                 else:
                     log.log(
                         {'info': 'Boot offer cannot be made to {0} as the '
