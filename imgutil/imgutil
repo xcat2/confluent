@@ -776,7 +776,11 @@ class DebHandler(OsHandler):
         mydir = get_mydir(self.oscategory)
         srcdir = os.path.join(mydir, 'initramfs-tools')
         targdir = os.path.join(self.targpath, 'etc/initramfs-tools')
-        shutil.copytree(srcdir, targdir)
+        try:
+            shutil.copytree(srcdir, targdir)
+        except Exception:
+            sys.stderr.write('Target directory already exists, cannot build\n')
+            raise
         os.chmod(os.path.join(targdir, 'hooks/confluent'), 0o755)
         #cmd = ['debootstrap', '--include={0}'.format(','.join(self.includepkgs)), self.codename, self.targpath]
         if self.arch != os.uname().machine:
