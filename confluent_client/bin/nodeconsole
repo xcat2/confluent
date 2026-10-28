@@ -1024,12 +1024,41 @@ def redraw():
             else:
                 sys.stdout.write('\n')
             sys.stdout.flush()
-resized = False
 inputwatcher = None
+
+
+def do_resize(nodelist, winch=False):
+    global current_cursor
+    if winch:
+        # on a window resize, clear the old stuff
+        current_cursor = (1, 1)
+        sys.stdout.write('\x1bc')
+        sys.stdout.write('\x1b[?1000h')  # Enable mouse click tracking
+        sys.stdout.write('\x1b[?1003h')  # Enable mouse movement tracking
+        sys.stdout.write('\x1b[?1006h')  # Enable SGR extended mode for mouse
+    global numrows
+    global cwidth
+    global cheight
+    cols, rows, cwidth, cheight, numrows = determine_tile_size(len(nodelist))
+    if streaming and not winch:
+        get_coords()
+    currcol = 1
+    currcolcell = 0
+    currrowcell = 0
+    for node in nodelist:
+        nodepositions[node] = currcolcell, currrowcell
+        if streaming:
+            init_focus(node)
+        if currcol < cols:
+            currcol += 1
+            currcolcell += cwidth
+        else:
+            currcol = 1
+            currcolcell = 0
+            currrowcell += cheight
 
 async def do_screenshot():
     global streaming
-    global resized
     global numrows
     global firstnodename
     global inputwatcher
@@ -1047,41 +1076,11 @@ async def do_screenshot():
         async for res in sess.read('/noderange/{}/nodes/'.format(args[0])):
             allnodes.append(res['item']['href'].replace('/', ''))
             numnodes += 1
-        resized = False
-        def do_resize(signum=None, sigframe=None):
-            global resized, current_cursor
+        def handle_resize(signum, sigframe):
             if signum is not None:
-                resized = True
-                # on a window resize, clear the old stuff
-                sys.stdout.write('\x1bc')
-                current_cursor = (1, 1)
-                sys.stdout.write('\x1b[?1000h')  # Enable mouse click tracking
-                sys.stdout.write('\x1b[?1003h')  # Enable mouse movement tracking
-                sys.stdout.write('\x1b[?1006h')  # Enable SGR extended mode for mouse
-            global numrows
-            global cwidth
-            global cheight
-            cols, rows, cwidth, cheight, numrows = determine_tile_size(numnodes)
-            if not resized:
-                get_coords()
-            currcol = 1
-            currcolcell = 0
-            currrowcell = 0
-            for node in allnodes:
-                nodepositions[node] = currcolcell, currrowcell
-                if streaming:
-                    init_focus(node)
-                if currcol < cols:
-                    currcol += 1
-                    currcolcell += cwidth
-                else:
-                    currcol = 1
-                    currcolcell = 0
-                    currrowcell += cheight
-            if signum is not None:
-                draw_queue.put('resize')
-        do_resize()
-        signal.signal(signal.SIGWINCH, do_resize)
+                draw_queue.put_nowait(ResizeEvent(allnodes))
+        do_resize(allnodes)
+        signal.signal(signal.SIGWINCH, handle_resize)
     elif options.interval is not None:
         sys.stdout.write('\x1bc')
     firstnodename = None
@@ -1127,9 +1126,6 @@ async def do_screenshot():
                 if url:
                     urlbynode[node] = url
         await grab_vncs(urlbynode)
-        if resized:
-            do_resize(True)
-            resized = False
         if options.interval is None:
             dorefresh = False
         else:
@@ -1324,19 +1320,42 @@ def draw_node(node, imgdata, errorstr, firstnodename, cwidth, cheight):
     # Queue the frame for the drawing thread; frames arriving mid-draw wait here
     draw_queue.put((node, imgdata, errorstr, firstnodename, cwidth, cheight))
 
+class ResizeEvent:
+    def __init__(self, nodelist):
+        self.nodelist = nodelist
+
 def _draw_worker():
+    itemsbynode = {}
     while True:
+        itemsbynode.clear()
+        queuedresize = None
         item = draw_queue.get()
+        if isinstance(item, ResizeEvent):
+            queuedresize = item
+        elif item is None:
+            break
+        elif item[0] not in itemsbynode:
+            itemsbynode[item[0]] = item
         while not draw_queue.empty():
             item = draw_queue.get()
+            if isinstance(item, ResizeEvent):
+                queuedresize = item
+            elif item is None:
+                break
+            elif item[0] not in itemsbynode:
+                itemsbynode[item[0]] = item
         if item is None:
             break
-        if item == 'resize':
+        if queuedresize:
+            do_resize(queuedresize.nodelist, winch=True)
             redraw()
+            # skip rendering frames with stale geometry
             continue
-        node, imgdata, errorstr, firstnodename, cwidth, cheight = item
-        with draw_lock:
-            _draw_node(node, imgdata, errorstr, firstnodename, cwidth, cheight)
+        for item in itemsbynode.values():
+            node, imgdata, errorstr, firstnodename, cwidth, cheight = item
+            with draw_lock:
+                _draw_node(node, imgdata, errorstr, firstnodename, cwidth, cheight)
+
 
 def _draw_node(node, imgdata, errorstr, firstnodename, cwidth, cheight):
     oldimgdata = imagedatabynode.get(node)
