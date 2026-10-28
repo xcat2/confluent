@@ -17,6 +17,7 @@ echo "Initializing SSH"
 for pubkey in /etc/ssh/ssh_host_*key.pub; do
     privfile=${pubkey%.pub}
     certfile=${pubkey/.pub/-cert.pub}
+    python3 /opt/confluent/bin/apiclient /confluent-api/self/sshcertready
     python3 /opt/confluent/bin/apiclient /confluent-api/self/sshcert $pubkey > $certfile
     if [ -s $certfile ]; then
         echo HostCertificate $certfile >> /etc/ssh/sshd_config.d/20_hostkeys.conf

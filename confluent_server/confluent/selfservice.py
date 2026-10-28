@@ -20,6 +20,7 @@ import json
 import os
 import tempfile
 import time
+import random
 import datetime
 import yaml
 try:
@@ -37,6 +38,14 @@ currtz = 'UTC'
 keymap = 'us'
 currlocale = 'en_US.UTF-8'
 currtzvintage = None
+inflight_sshcerts = {}
+MAX_INFLIGHT_SSHCERTS = 24
+
+def cleanup_inflight_sshcerts():
+    now = time.monotonic()
+    expired = [nodename for nodename, ts in inflight_sshcerts.items() if now > ts]
+    for nodename in expired:
+        inflight_sshcerts.pop(nodename, None)
 
 
 def yamldump(input):
@@ -433,12 +442,29 @@ async def handle_request(req, make_response, mimetype):
                 cert = certf.read()
             os.unlink(certname)
             return await make_response('application/x-pem-file', 200, 'OK', body=cert)
+    elif reqpath == '/self/sshcertready':
+        cleanup_inflight_sshcerts()
+        if nodename not in inflight_sshcerts and len(inflight_sshcerts) >= MAX_INFLIGHT_SSHCERTS:
+            rsp = await make_response(mimetype, 429, 'Too Many Requests',
+                                      body='Too Many Requests',
+                                      headers={
+                                          'Retry-After': str(random.randint(1, 3))
+                                      })
+            return rsp
+        inflight_sshcerts[nodename] = time.monotonic() + 5
+        return await make_response(mimetype, 200, 'OK', body='Reserved')
     elif reqpath == '/self/sshcert' and reqbody:
-        if not sshutil.ca_exists():
-            return await make_response(mimetype, 500, 'Unconfigured', body='CA is not configured on this system (run ...)')
-        pals = await get_extra_names(nodename, cfg, myip)
-        cert = await sshutil.sign_host_key(reqbody, nodename, pals)
-        return await make_response('text/plain', 200, 'OK', body=cert.encode())
+        try:
+            # extend the reservation now that a real attempt is being made
+            inflight_sshcerts[nodename] = time.monotonic() + 60
+            # the inflight reservation is advisory for backwards compatibility, not enforced
+            if not sshutil.ca_exists():
+                return await make_response(mimetype, 500, 'Unconfigured', body='CA is not configured on this system (run ...)')
+            pals = await get_extra_names(nodename, cfg, myip)
+            cert = await sshutil.sign_host_key(reqbody, nodename, pals)
+            return await make_response('text/plain', 200, 'OK', body=cert.encode())
+        finally:
+            inflight_sshcerts.pop(nodename, None)
     elif reqpath == '/self/nodelist':
         nodes, _ = await get_cluster_list(nodename, cfg)
         if isgeneric:

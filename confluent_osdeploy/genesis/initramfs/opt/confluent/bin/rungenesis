@@ -243,6 +243,7 @@ rm /etc/ssh/ssh_host_dsa_key*
 for pubkey in /etc/ssh/ssh_host*key.pub; do
     certfile=${pubkey/.pub/-cert.pub}
     privfile=${pubkey%.pub}
+    /usr/libexec/platform-python /opt/confluent/bin/apiclient /confluent-api/self/sshcertready
     /usr/libexec/platform-python /opt/confluent/bin/apiclient /confluent-api/self/sshcert $pubkey > $certfile
     if [ -s $certfile ]; then
         echo HostCertificate $certfile >> /etc/ssh/sshd_config
