@@ -1,8 +1,23 @@
 from setuptools import setup
 import os
 
+completion_commands = []
+with open('confluent.fish') as completion_file:
+    completion_commands = [line.split()[2] for line in completion_file
+                           if line.startswith('complete -c ')]
+completion_dir = os.path.join('build', 'fish_completions')
+if not os.path.isdir(completion_dir):
+    os.makedirs(completion_dir)
+for command in completion_commands:
+    completion_path = os.path.join(completion_dir, command + '.fish')
+    with open(completion_path, 'w') as completion_file:
+        completion_file.write(
+            'source (path dirname (status filename))/confluent.fish\n')
+
 data_files = [('/etc/profile.d', ['confluent_env.sh', 'confluent_env.csh']),
-              ('/usr/share/fish/vendor_completions.d/', ['confluent.fish']),
+              ('/usr/share/fish/vendor_completions.d/',
+               ['confluent.fish'] + [os.path.join(completion_dir, command + '.fish')
+                                     for command in completion_commands]),
               ('/opt/confluent/share/licenses/confluent_client/', ['LICENSE', 'COPYRIGHT'])
               ]
 try:
