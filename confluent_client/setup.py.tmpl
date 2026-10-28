@@ -2,6 +2,7 @@ from setuptools import setup
 import os
 
 data_files = [('/etc/profile.d', ['confluent_env.sh', 'confluent_env.csh']),
+              ('/usr/share/fish/vendor_completions.d/', ['confluent.fish']),
               ('/opt/confluent/share/licenses/confluent_client/', ['LICENSE', 'COPYRIGHT'])
               ]
 try:
