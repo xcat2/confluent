@@ -109,7 +109,9 @@ class DiskInfo(object):
         if self.size < 2048:
             raise SilentException("Too small")
         if storagespec and storagespec == 'm2':
-            if self.model.lower() not in PRIORITY_MODELS and not devinfo.get('m2_slot', None):
+            if (self.model.lower() not in PRIORITY_MODELS
+                    and not devinfo.get('m2_slot', None)
+                    and self.driver != 'iavmd'):
                 raise SilentException("Not an M.2 disk")
                
             
@@ -121,6 +123,8 @@ class DiskInfo(object):
             return 0
         if self.model.lower() in PRIORITY_MODELS:
             return 0
+        if self.driver == 'iavmd':
+            return 1
         if self.driver == 'vmw_ahci':
             return 2
         if self.driver == 'nvme_pcie':
