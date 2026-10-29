@@ -172,10 +172,10 @@ function _confluent_osdeploy_complete
                     _confluent_directory_complete
                 end
             case updateboot rebase
-                printf '%s\n' -n (confetty show /deployment/profiles | string replace -r '^/' '')
+                printf '%s\n' -n (confetty show /deployment/profiles | string replace -r '/' '')
             case export
                 if test $count -eq 3
-                    printf '%s\n' -n (confetty show /deployment/profiles | string replace -r '^/' '')
+                    printf '%s\n' -n (confetty show /deployment/profiles | string replace -r '/' '')
                 else
                     _confluent_directory_complete
                 end
@@ -215,7 +215,7 @@ end
 
 function _confluent_nodedeploy_complete
     if test (_confluent_arg_count) -gt 2
-        printf '%s\n' -n (confetty show /deployment/profiles | string replace -r '^/' '')
+        printf '%s\n' -n (confetty show /deployment/profiles | string replace -r '/' '')
     else
         _confluent_nr_complete
     end
