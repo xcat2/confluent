@@ -1,4 +1,4 @@
 include confluent_env.sh
 include confluent_env.csh
 include confluent.fish
-include build/fish_completions/*.fish
+include fish_completions/*.fish
