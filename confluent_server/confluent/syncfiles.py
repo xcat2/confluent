@@ -349,6 +349,10 @@ def start_syncfiles(nodename, cfg, suffixes, principals=[]):
     sl = SyncList(synclist, nodename, cfg)
     if not (sl.appendmap or sl.mergemap or sl.replacemap or sl.appendoncemap):
         return 200, 'OK', 'Empty synclist'  # the synclist has no actual entries
+    if not shutil.which('rsync'):
+        return 500, 'Error', (
+            'File synchronization requires rsync. '
+            'Install rsync on the Confluent server and retry.')
     if nodename in syncrunners:
         if syncrunners[nodename].done():
             try:
