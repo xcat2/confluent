@@ -1,4 +1,4 @@
-#!/usr/libexec/platform-python
+#!/usr/bin/python3
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2015 Lenovo
@@ -1033,9 +1033,10 @@ def do_resize(nodelist, winch=False):
         # on a window resize, clear the old stuff
         current_cursor = (1, 1)
         sys.stdout.write('\x1bc')
-        sys.stdout.write('\x1b[?1000h')  # Enable mouse click tracking
-        sys.stdout.write('\x1b[?1003h')  # Enable mouse movement tracking
-        sys.stdout.write('\x1b[?1006h')  # Enable SGR extended mode for mouse
+        if console_direct_mode:
+            sys.stdout.write('\x1b[?1000h')  # Enable mouse click tracking
+            sys.stdout.write('\x1b[?1003h')  # Enable mouse movement tracking
+            sys.stdout.write('\x1b[?1006h')  # Enable SGR extended mode for mouse
     global numrows
     global cwidth
     global cheight
