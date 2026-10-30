@@ -146,36 +146,65 @@ set_selinux_context system_u:object_r:bin_t:s0 /sysroot/opt/confluent/bin/onboot
 set_selinux_context system_u:object_r:bin_t:s0 /sysroot/opt/confluent/bin/apiclient
 ln -s /etc/systemd/system/onboot.service /sysroot/etc/systemd/system/multi-user.target.wants/onboot.service
 cp /etc/confluent/functions /sysroot/etc/confluent/functions
-if [ $TETHERED -eq 1 ] && [ -x /sysroot/usr/sbin/matchpathcon ] && grep -Eq '^SELINUX=(enforcing|permissive)' /sysroot/etc/selinux/config 2> /dev/null; then
-    # Files written to the upper layer before policy load are unlabeled.
-    # Label only those, using globstar since the initramfs has no find.
+if [ -x /sysroot/usr/sbin/matchpathcon ] && grep -Eq '^SELINUX=(enforcing|permissive)' /sysroot/etc/selinux/config 2> /dev/null; then
+    # Files written to /sysroot before policy load are unlabeled.
     selinuxpolicy=$(sed -n 's/^SELINUXTYPE=//p' /sysroot/etc/selinux/config)
-    shopt -s globstar dotglob nullglob
-    relabel=()
-    if [ -f /tmp/mountparts.sh ]; then
-        overlayparts=$(awk '{print $3}' /tmp/mountparts.sh)
-    else
-        overlayparts=/mnt/remote
-    fi
-    for srcmount in $overlayparts; do
-        upperdir=/mnt/overlay/upper
+    fcontexts=/etc/selinux/$selinuxpolicy/contexts/files/file_contexts
+    if [ $TETHERED -eq 1 ]; then
+        # Label only the upper layer, using globstar since the initramfs has no find.
+        shopt -s globstar dotglob nullglob
+        relabel=()
         if [ -f /tmp/mountparts.sh ]; then
-            upperdir=/mnt/overlay${srcmount}/upper
+            overlayparts=$(awk '{print $3}' /tmp/mountparts.sh)
+        else
+            overlayparts=/mnt/remote
         fi
-        prefix=${srcmount#/mnt/remote}
-        prefix=${prefix%/}
-        relabel+=("${prefix:-/}")
-        for relpath in "$upperdir"/**; do
-            relabel+=("$prefix${relpath#$upperdir}")
+        for srcmount in $overlayparts; do
+            upperdir=/mnt/overlay/upper
+            if [ -f /tmp/mountparts.sh ]; then
+                upperdir=/mnt/overlay${srcmount}/upper
+            fi
+            prefix=${srcmount#/mnt/remote}
+            prefix=${prefix%/}
+            relabel+=("${prefix:-/}")
+            for relpath in "$upperdir"/**; do
+                relabel+=("$prefix${relpath#$upperdir}")
+            done
         done
-    done
-    shopt -u globstar dotglob nullglob
-    # Not setfiles (recurses) or restorecon (no-op before policy load).
-    chroot /sysroot /usr/sbin/matchpathcon -f /etc/selinux/$selinuxpolicy/contexts/files/file_contexts "${relabel[@]}" | while IFS=$'\t' read -r relpath context; do
-        if [ "$context" != "<<none>>" ]; then
-            chcon -h "$context" "/sysroot$relpath"
+        shopt -u globstar dotglob nullglob
+        # Not setfiles (recurses into the image) or restorecon (no-op before policy load).
+        chroot /sysroot /usr/sbin/matchpathcon -f $fcontexts "${relabel[@]}" | while IFS=$'\t' read -r relpath context; do
+            if [ "$context" != "<<none>>" ]; then
+                chcon -h "$context" "/sysroot$relpath"
+            fi
+        done
+    elif [ -x /sysroot/usr/bin/python3 ] && [ -x /sysroot/usr/sbin/setfiles ]; then
+        # The root is a local copy: label every inode without a label, which
+        # also covers sockets that unsquashfs creates without attributes.
+        # setfiles only recurses into directories that are new here.
+        chroot /sysroot /usr/bin/python3 -c '
+import errno, os, sys
+out = sys.stdout.buffer
+rootdev = os.lstat(b"/").st_dev
+def check(path):
+    try:
+        os.getxattr(path, b"security.selinux", follow_symlinks=False)
+    except OSError as e:
+        if e.errno == errno.ENODATA:
+            out.write(path + b"\0")
+check(b"/")
+for root, dirs, files in os.walk(b"/"):
+    for name in dirs + files:
+        check(os.path.join(root, name))
+    dirs[:] = [d for d in dirs if os.lstat(os.path.join(root, d)).st_dev == rootdev]
+' | chroot /sysroot /usr/sbin/setfiles -0 -F -f - $fcontexts
+        relabelstatus=("${PIPESTATUS[@]}")
+        if [ "${relabelstatus[0]}" != 0 ] || [ "${relabelstatus[1]}" != 0 ]; then
+            echo "Warning: SELinux labeling of the root filesystem failed"
         fi
-    done
+    else
+        echo "Warning: python3 or setfiles missing in the image, files written at boot stay unlabeled"
+    fi
 fi
 if grep installtodisk /proc/cmdline > /dev/null; then
     . /etc/confluent/functions
