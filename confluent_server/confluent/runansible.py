@@ -134,6 +134,9 @@ class PlayRunner(object):
                 ansiblesshargs = os.environ.get('ANSIBLE_SSH_ARGS', '')
                 if 'hostbasedkeytypes' not in ansiblesshargs.lower() and 'hostbasedacceptedalgorithms' not in ansiblesshargs.lower():
                     ansiblesshargs += ' -o HostbasedAcceptedAlgorithms=*ed25519*'
+                # notice a node that was reset mid play, else ssh waits forever
+                if 'serveraliveinterval' not in ansiblesshargs.lower():
+                    ansiblesshargs += ' -o ServerAliveInterval=15 -o ServerAliveCountMax=4'
                 localenv['ANSIBLE_SSH_ARGS'] = ansiblesshargs
                 with feedback:
                     for playfilename in self.playfiles:
