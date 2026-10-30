@@ -19,8 +19,19 @@ if [ -z "$rootimg" ]; then
     done
 fi
 mkdir -p /mnt/remoteimg /mnt/remote /mnt/overlay
+imagemethod=tethered
+if grep -q confluent_imagemethod=untethered /proc/cmdline; then
+    imagemethod=untethered
+elif grep -q confluent_imagemethod=uncompressed /proc/cmdline; then
+    imagemethod=uncompressed
+fi
+if grep installtodisk /proc/cmdline > /dev/null; then
+    # installimage copies from the mounted image, which an untethered or
+    # uncompressed boot would extract to RAM and unmount first
+    imagemethod=tethered
+fi
 TETHERED=1
-if grep -q confluent_imagemethod=untethered /proc/cmdline || grep -q confluent_imagemethod=uncompressed /proc/cmdline; then
+if [ "$imagemethod" != tethered ]; then
     TETHERED=0
     mount -t tmpfs untethered /mnt/remoteimg
     while ! curl -f https://$confluent_mgr/confluent-public/os/$confluent_profile/rootimg.sfs -o /mnt/remoteimg/rootimg.sfs; do
@@ -71,7 +82,7 @@ fi
 
 #mount -t tmpfs overlay /mnt/overlay
 mkdir /sysroot
-if ! grep -q confluent_imagemethod=uncompressed /proc/cmdline; then
+if [ "$imagemethod" != uncompressed ]; then
     modprobe zram
     memtot=$(grep ^MemTotal: /proc/meminfo|awk '{print $2}')
     memtot=$((memtot/2))$(grep ^MemTotal: /proc/meminfo | awk '{print $3'})
@@ -83,7 +94,7 @@ if ! grep -q confluent_imagemethod=uncompressed /proc/cmdline; then
     else
          mount -o discard /dev/zram0 /sysroot
     fi
-elif grep -q confluent_imagemethod=uncompressed /proc/cmdline; then
+elif [ "$imagemethod" = uncompressed ]; then
     mount -t tmpfs disklessroot /sysroot
 fi
 if [ "$TETHERED" = 0 ]; then
