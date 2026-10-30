@@ -25,6 +25,9 @@
 
 * `pack`:
   Pack a scratch directory into a diskless profile that can be deployed.
+  If the image enables SELinux in `/etc/selinux/config`, the scratch
+  directory is first labeled with the policy of the image. If labeling
+  fails, pack fails.
 
 * `capture`:
   Capture an image for cloning from a running system.
@@ -55,6 +58,12 @@
 
 * `-y`, `--non-interactive`:
   Avoid prompting for confirmation.
+
+* `--selinux`:
+  Install the targeted SELinux policy and leave SELinux enforcing in the
+  image instead of disabling it. EL8 and newer only. Labels come from the policy
+  of the image. If labeling fails, for example because the build host
+  enforces an older policy, the build fails.
 
 * `-v`, `--volume` <mount>:
   Directory to make available in the build environment. `-v /` will cause it to be mounted in image as `/run/external/`. `-v /:/run/root` will override the target to be `/run/root`. Something like `/var/lib/repository:-` will cause it to mount to the identical path inside the image. May be specified multiple times.
