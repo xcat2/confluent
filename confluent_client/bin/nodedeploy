@@ -187,7 +187,11 @@ def main(args):
                     profile = 'staged: {}'.format(profile)
                 else:
                     profile = databynode[node].get('deployment.profile', '')
-                    if profile:
+                    if profile and databynode[node].get('deployment.state', '') == 'booted':
+                        # a diskless node runs this profile until its next
+                        # reboot, but it is not pending anymore
+                        profile = 'booted, not pending: {}'.format(profile)
+                    elif profile:
                         profile = 'completed: {}'.format(profile)
                     elif args.clear:
                         profile = 'No profile applied, any pending profile has been cleared'
