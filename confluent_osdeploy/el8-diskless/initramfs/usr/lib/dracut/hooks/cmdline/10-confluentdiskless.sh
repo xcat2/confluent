@@ -134,32 +134,43 @@ if [ ! -z "$confluentsrv" ]; then
     for i in *; do
         ip link set $i up
     done
-    if [[ "$confluentsrv" = *":"* ]]; then
-        confluenthttpsrv=[$confluentsrv]
-        /usr/libexec/nm-initrd-generator ip=:dhcp6
-    else
-        confluenthttpsrv=$confluentsrv
-        ifname=""
-        while [ -z "$ifname" ]; do
-            ifname=$(ip -br link|grep LOWER_UP|grep -v ib|grep -v UNKNOWN|head -n 1|awk '{print $1}')
-            sleep 0.5
-        done
-        echo -n "Attempting to use dhcp to bring up $ifname..."
-        dhclient $ifname
-        while ! ip -br addr show dev $ifname | grep \\. > /dev/null; do
-            echo -n "Still waiting for IPv4 address on: "
-            ip -br link show dev $ifname 
-            sleep 1
-        done
-        echo -n "Complete: "
-        ip -br addr show dev $ifname
-        DIDDHCP=1
-    fi
     myids=uuid=$(cat /sys/devices/virtual/dmi/id/product_uuid)
     for mac in $(ip -br link|grep -v LOOPBACK|awk '{print $3}'); do
         myids=$myids"/mac="$mac
     done
-    myname=$(curl -sH "CONFLUENT_IDS: $myids" https://$confluenthttpsrv/confluent-api/self/whoami)
+    if [[ "$confluentsrv" = *":"* ]]; then
+        confluenthttpsrv=[$confluentsrv]
+        /usr/libexec/nm-initrd-generator ip=:dhcp6
+        myname=$(curl -sH "CONFLUENT_IDS: $myids" https://$confluenthttpsrv/confluent-api/self/whoami)
+    else
+        confluenthttpsrv=$confluentsrv
+        # the first nic with a link may not reach the server, try each until whoami answers
+        for try in {1..30}; do
+            for ifname in $(ip -br link|grep LOWER_UP|grep -v ib|grep -v UNKNOWN|awk '{print $1}'); do
+                echo -n "Attempting to use dhcp to bring up $ifname..."
+                dhclient -nw -pf /tmp/dhclient.$ifname.pid $ifname
+                for w in {1..20}; do
+                    ip -4 -o addr show dev $ifname scope global | grep -q inet && break
+                    sleep 0.5
+                done
+                if ip -4 -o addr show dev $ifname scope global | grep -q inet; then
+                    echo -n "Complete: "
+                    ip -br addr show dev $ifname
+                    myname=$(curl -sf --connect-timeout 10 --max-time 30 -H "CONFLUENT_IDS: $myids" https://$confluenthttpsrv/confluent-api/self/whoami)
+                    if [ ! -z "$myname" ]; then
+                        DIDDHCP=1
+                        break 2
+                    fi
+                    echo "No answer from $confluentsrv on $ifname"
+                else
+                    echo "No lease on $ifname"
+                fi
+                dhclient -x -pf /tmp/dhclient.$ifname.pid $ifname
+                ip -4 addr flush dev $ifname
+            done
+            sleep 1
+        done
+    fi
     if [ ! -z "$myname" ]; then
         echo NODENAME: $myname > /etc/confluent/confluent.info
         echo MANAGER: $confluentsrv >> /etc/confluent/confluent.info
@@ -270,6 +281,11 @@ elif [ "$autoconfigmethod" = "static" ]; then
     fi
     v4nm=$(grep ^prefix: /etc/confluent/confluent.deploycfg)
     v4nm=${v4nm#prefix: }
+    if [ "$DIDDHCP" = "1" ]; then
+        # the lease from the confluent= lookup would expire in the image
+        dhclient -x -pf /tmp/dhclient.$ifname.pid $ifname
+        ip -4 addr flush dev $ifname
+    fi
     echo "Setting up $ifname as static at $v4addr/$v4nm"
     ip addr add dev $ifname $v4addr/$v4nm
     if [ ! -z "$v4gw" ]; then
