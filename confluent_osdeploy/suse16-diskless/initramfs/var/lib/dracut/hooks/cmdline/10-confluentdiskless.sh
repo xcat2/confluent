@@ -123,6 +123,50 @@ cd - > /dev/null
 rm -rf $tpmdir
 touch /etc/confluent/confluent.info
 cd /sys/class/net
+confluentsrv=$(getarg confluent)
+DIDDHCP=0
+if [ ! -z "$confluentsrv" ]; then
+    for i in *; do
+        ip link set $i up
+    done
+    myids=uuid=$(cat /sys/devices/virtual/dmi/id/product_uuid)
+    for mac in $(ip -br link|grep -v LOOPBACK|awk '{print $3}'); do
+        myids=$myids"/mac="$mac
+    done
+    if [[ "$confluentsrv" = *":"* ]]; then
+        confluenthttpsrv=[$confluentsrv]
+        myname=$(curl -sH "CONFLUENT_IDS: $myids" https://$confluenthttpsrv/confluent-api/self/whoami)
+    else
+        confluenthttpsrv=$confluentsrv
+        # the first nic with a link may not reach the server, try each until whoami answers
+        for try in {1..30}; do
+            for ifname in $(ip -br link|grep LOWER_UP|grep -v ib|grep -v UNKNOWN|awk '{print $1}'); do
+                echo -n "Attempting to use dhcp to bring up $ifname..."
+                dhcpcd -4 -L -t 10 $ifname
+                if ip -4 -o addr show dev $ifname scope global | grep -q inet; then
+                    echo -n "Complete: "
+                    ip -br addr show dev $ifname
+                    myname=$(curl -sf --connect-timeout 10 --max-time 30 -H "CONFLUENT_IDS: $myids" https://$confluenthttpsrv/confluent-api/self/whoami)
+                    if [ ! -z "$myname" ]; then
+                        DIDDHCP=1
+                        break 2
+                    fi
+                    echo "No answer from $confluentsrv on $ifname"
+                else
+                    echo "No lease on $ifname"
+                fi
+                dhcpcd -4 -x $ifname > /dev/null 2>&1
+                ip -4 addr flush dev $ifname
+            done
+            sleep 1
+        done
+    fi
+    if [ ! -z "$myname" ]; then
+        echo NODENAME: $myname > /etc/confluent/confluent.info
+        echo MANAGER: $confluentsrv >> /etc/confluent/confluent.info
+        echo EXTMGRINFO: $confluentsrv'||1' >> /etc/confluent/confluent.info
+    fi
+fi
 echo -n "Scanning for network configuration..."
 while ! grep ^EXTMGRINFO: /etc/confluent/confluent.info | awk -F'|' '{print $3}' | grep 1 >& /dev/null && [ "$TRIES" -lt 30 ]; do
     TRIES=$((TRIES + 1))
@@ -217,10 +261,12 @@ if [ "$linktype" = infiniband ]; then
 fi
 autoconfigmethod=$(grep ipv4_method /etc/confluent/confluent.deploycfg |awk '{print $2}')
 if [ "$autoconfigmethod" = "dhcp" ]; then
-    echo -n "Attempting to use dhcp to bring up $ifname..."
-    dhcpcd $ifname
-    echo "Complete:"
-    ip addr show dev $ifname
+    if [ "$DIDDHCP" = "0" ]; then
+        echo -n "Attempting to use dhcp to bring up $ifname..."
+        dhcpcd $ifname
+        echo "Complete:"
+        ip addr show dev $ifname
+    fi
     printf '\n[ipv4]\nmethod=auto\n' >> $nmcfg
 else
     v4addr=$(grep ^ipv4_address: /etc/confluent/confluent.deploycfg)
@@ -232,6 +278,16 @@ else
     fi
     v4nm=$(grep ^prefix: /etc/confluent/confluent.deploycfg)
     v4nm=${v4nm#prefix: }
+    if [ "$DIDDHCP" = "1" ]; then
+        # the lease from the confluent= lookup would expire in the image
+        dhcpcd -4 -x $ifname > /dev/null 2>&1
+        TRIES=0
+        while grep -qx dhcpcd /proc/[0-9]*/comm 2> /dev/null && [ "$TRIES" -lt 20 ]; do
+            sleep 0.5
+            TRIES=$((TRIES + 1))
+        done
+        ip -4 addr flush dev $ifname
+    fi
     echo "Setting up $ifname as static at $v4addr/$v4nm"
     ip addr add dev $ifname $v4addr/$v4nm
     if [ ! -z "$v4gw" ]; then
