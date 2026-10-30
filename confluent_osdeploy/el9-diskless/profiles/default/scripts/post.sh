@@ -32,10 +32,6 @@ mkdir -p /opt/confluent/bin
 curl -f https://$confluent_websrv/confluent-public/os/$confluent_profile/scripts/firstboot.sh > /opt/confluent/bin/firstboot.sh
 chmod +x /opt/confluent/bin/firstboot.sh
 systemctl enable firstboot
-selinuxpolicy=$(grep ^SELINUXTYPE /etc/selinux/config |awk -F= '{print $2}')
-if [ ! -z "$selinuxpolicy" ]; then
-    setfiles /etc/selinux/${selinuxpolicy}/contexts/files/file_contexts /etc/
-fi
 run_remote_python syncfileclient
 run_remote post.custom
 # post scripts may be placed into post.d, e.g. post.d/01-firstaction.sh, post.d/02-secondaction.sh
@@ -48,6 +44,11 @@ fetch_remote confignet
 # rebuild initrd, pick up new drivers if needed
 dracut -f /boot/initramfs-$(uname -r).img $(uname -r)
 
+selinuxpolicy=$(grep ^SELINUXTYPE /etc/selinux/config |awk -F= '{print $2}')
+if [ ! -z "$selinuxpolicy" ] && grep -Eq '^SELINUX=(enforcing|permissive)' /etc/selinux/config; then
+    # Label what the install wrote, setfiles does not cross mounts
+    setfiles /etc/selinux/${selinuxpolicy}/contexts/files/file_contexts $(awk '$3 ~ /^(xfs|ext[34]|btrfs)$/ {print $2}' /proc/mounts) || echo "Warning: SELinux labeling failed"
+fi
 curl -sf -X POST -d 'status: staged' -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $confluent_apikey" https://$confluent_websrv/confluent-api/self/updatestatus
 
 kill $logshowpid
