@@ -241,31 +241,33 @@ def get_deployment_storage():
 def filter_deployment_storage(disks, storagespec, slotinfo=None):
     if not storagespec:
         return disks
-    spec = storagespec.strip().lower()
-    for disk in list(disks):
-        if spec == 'm2':
-            if disk.is_m2:
-                continue
-            if disk.model.lower() in PRIORITY_MODELS:
-                continue
-            if slotinfo is None:
-                slotinfo = get_m2_slot_info()
-            if not getattr(disk, 'busaddr', None):
-                for kernname in getattr(disk, 'kernnames', []):
-                    if kernname in slotinfo:
-                        break
-                else:
-                    disks.remove(disk)
-                continue
-            if disk.busaddr not in slotinfo:
-                disks.remove(disk)
-        elif spec.startswith('/dev/'):
-            bspec = os.path.basename(spec)
-            if disk.name.lower() == bspec:
+    spec = storagespec.strip()
+    if spec.lower() != 'm2':
+        # A device name with or without /dev/, or a persistent link such as
+        # /dev/disk/by-path/..., resolved to its kernel name
+        if spec.startswith('/dev/'):
+            spec = os.path.realpath(spec)
+        devname = os.path.basename(spec).lower()
+        for disk in disks:
+            if disk.name.lower() == devname:
                 return [disk]
-        else:
-            raise Exception("Unknown deployment.storage specification: {0}".format(storagespec))
-    
+        raise Exception("No disks match deployment.storage specification: {0}".format(storagespec))
+    for disk in list(disks):
+        if disk.is_m2:
+            continue
+        if disk.model.lower() in PRIORITY_MODELS:
+            continue
+        if slotinfo is None:
+            slotinfo = get_m2_slot_info()
+        if not getattr(disk, 'busaddr', None):
+            for kernname in getattr(disk, 'kernnames', []):
+                if kernname in slotinfo:
+                    break
+            else:
+                disks.remove(disk)
+            continue
+        if disk.busaddr not in slotinfo:
+            disks.remove(disk)
     if not disks:
         raise Exception("No disks match deployment.storage specification: {0}".format(storagespec))
     return disks
