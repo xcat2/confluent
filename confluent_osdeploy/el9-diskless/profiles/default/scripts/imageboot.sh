@@ -4,7 +4,13 @@ if [[ "$confluent_whost" == *:* ]] && [[ "$confluent_whost" != "["* ]]; then
     confluent_whost="[$confluent_mgr]"
 fi
 mkdir -p /mnt/remoteimg /mnt/remote /mnt/overlay /sysroot
-if [ "untethered" = "$(getarg confluent_imagemethod)" -o "uncompressed" = "$(getarg confluent_imagemethod)" ]; then
+imagemethod=$(getarg confluent_imagemethod)
+if grep installtodisk /proc/cmdline > /dev/null; then
+    # installimage copies from the mounted image, which an untethered or
+    # uncompressed boot would extract to RAM and unmount first
+    imagemethod=tethered
+fi
+if [ "untethered" = "$imagemethod" -o "uncompressed" = "$imagemethod" ]; then
     mount -t tmpfs untethered /mnt/remoteimg
     while ! curl -f https://$confluent_whost/confluent-public/os/$confluent_profile/rootimg.sfs -o /mnt/remoteimg/rootimg.sfs; do
         echo "Failed downloading image, retrying..."
@@ -44,7 +50,7 @@ fi
 
 
 #mount -t tmpfs overlay /mnt/overlay
-if [ ! "uncompressed" = "$(getarg confluent_imagemethod)" ]; then
+if [ ! "uncompressed" = "$imagemethod" ]; then
     modprobe zram
     memtot=$(grep ^MemTotal: /proc/meminfo|awk '{print $2}')
     memtot=$((memtot/2))$(grep ^MemTotal: /proc/meminfo | awk '{print $3'})
@@ -52,8 +58,8 @@ if [ ! "uncompressed" = "$(getarg confluent_imagemethod)" ]; then
     mkfs.xfs /dev/zram0 > /dev/null
 fi
 TETHERED=0
-if [ "untethered" = "$(getarg confluent_imagemethod)" -o "uncompressed" = "$(getarg confluent_imagemethod)" ]; then
-    if [ "untethered" = "$(getarg confluent_imagemethod)" ]; then
+if [ "untethered" = "$imagemethod" -o "uncompressed" = "$imagemethod" ]; then
+    if [ "untethered" = "$imagemethod" ]; then
         mount -o discard /dev/zram0 /sysroot
     else
         mount -t tmpfs disklessroot /sysroot
