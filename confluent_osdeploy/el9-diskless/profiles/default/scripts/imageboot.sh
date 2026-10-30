@@ -142,6 +142,37 @@ set_selinux_context system_u:object_r:bin_t:s0 /sysroot/opt/confluent/bin/onboot
 set_selinux_context system_u:object_r:bin_t:s0 /sysroot/opt/confluent/bin/apiclient
 ln -s /etc/systemd/system/onboot.service /sysroot/etc/systemd/system/multi-user.target.wants/onboot.service
 cp /etc/confluent/functions /sysroot/etc/confluent/functions
+if [ $TETHERED -eq 1 ] && [ -x /sysroot/usr/sbin/matchpathcon ] && grep -Eq '^SELINUX=(enforcing|permissive)' /sysroot/etc/selinux/config 2> /dev/null; then
+    # Files written to the upper layer before policy load are unlabeled.
+    # Label only those, using globstar since the initramfs has no find.
+    selinuxpolicy=$(sed -n 's/^SELINUXTYPE=//p' /sysroot/etc/selinux/config)
+    shopt -s globstar dotglob nullglob
+    relabel=()
+    if [ -f /tmp/mountparts.sh ]; then
+        overlayparts=$(awk '{print $3}' /tmp/mountparts.sh)
+    else
+        overlayparts=/mnt/remote
+    fi
+    for srcmount in $overlayparts; do
+        upperdir=/mnt/overlay/upper
+        if [ -f /tmp/mountparts.sh ]; then
+            upperdir=/mnt/overlay${srcmount}/upper
+        fi
+        prefix=${srcmount#/mnt/remote}
+        prefix=${prefix%/}
+        relabel+=("${prefix:-/}")
+        for relpath in "$upperdir"/**; do
+            relabel+=("$prefix${relpath#$upperdir}")
+        done
+    done
+    shopt -u globstar dotglob nullglob
+    # Not setfiles (recurses) or restorecon (no-op before policy load).
+    chroot /sysroot /usr/sbin/matchpathcon -f /etc/selinux/$selinuxpolicy/contexts/files/file_contexts "${relabel[@]}" | while IFS=$'\t' read -r relpath context; do
+        if [ "$context" != "<<none>>" ]; then
+            chcon -h "$context" "/sysroot$relpath"
+        fi
+    done
+fi
 if grep installtodisk /proc/cmdline > /dev/null; then
     . /etc/confluent/functions
     run_remote installimage
