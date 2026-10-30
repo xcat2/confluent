@@ -481,10 +481,12 @@ def get_mydir(oscategory):
 
 class OsHandler(object):
     crossbuild = False
+    selinuxsupport = False
 
     def __init__(self, name, version, arch, args):
         self.name = name
         self._interactive = True
+        self.selinux = getattr(args, 'selinux', False)
         self.version = version
         self.arch = arch
         self.sourcepath = None
@@ -839,9 +841,13 @@ class DebHandler(OsHandler):
 
 class ElHandler(OsHandler):
     crossbuild = True
+    selinuxsupport = True
 
     def __init__(self, name, version, arch, args, hostpath='/'):
         self.oscategory = 'el{0}'.format(version.split('.')[0])
+        if self.oscategory == 'el7':
+            # el7-diskless labels nothing written at boot
+            self.selinuxsupport = False
         self.yumargs = []
         super().__init__(name, version, arch, args)
         needpkgs = []
@@ -878,6 +884,10 @@ class ElHandler(OsHandler):
 
     def add_pkglists(self):
         self.yumargs.extend(self.list_packages())
+        if self.selinux:
+            # policycoreutils (setfiles), libselinux-utils (matchpathcon) and
+            # python3 label files written at boot
+            self.yumargs.extend(['selinux-policy-targeted', 'policycoreutils', 'libselinux-utils', 'python3'])
 
     def set_source(self, sourcepath):
         yumconfig = create_yumconf(sourcepath, self.addrepos)
@@ -914,6 +924,23 @@ class ElHandler(OsHandler):
             subprocess.check_call(['yum'] + self.yumargs)
         else:
             subprocess.check_call(['yum', '-y'] + self.yumargs)
+        if self.selinux:
+            # keep SELinux enabled, build_root labels the tree afterwards
+            seconfigpath = os.path.join(self.targpath, 'etc/selinux/config')
+            if os.path.exists(seconfigpath) and not get_selinux_policy(self.targpath):
+                with open(seconfigpath) as seconfigin:
+                    seconfig = seconfigin.read()
+                if re.search(r'^SELINUX=', seconfig, re.M):
+                    seconfig = re.sub(r'^SELINUX=.*$', 'SELINUX=enforcing', seconfig, flags=re.M)
+                else:
+                    seconfig += '\nSELINUX=enforcing\n'
+                with open(seconfigpath, 'w') as seconfigout:
+                    seconfigout.write(seconfig)
+            if not get_selinux_policy(self.targpath):
+                # not sys.exit, run_constrained would turn it into success
+                sys.stderr.write('SELinux was requested, but the image has no /etc/selinux/config\n')
+                raise Exception('SELinux not enabled in image')
+            return
         try:
             with open(os.path.join(self.targpath, 'etc/selinux/config'), 'r') as seconfigin:
                 seconfig = seconfigin.read().replace('SELINUX=enforcing', 'SELINUX=disabled')
@@ -934,10 +961,79 @@ class ElHandler(OsHandler):
                     sys.stderr.write('Warning: could not relabel target filesystem for SELinux\n')
 
     def relabel_targdir(self):
+        # Prefer the policy of the image over the one of the build host
+        policy = get_selinux_policy(self.targpath, enabledonly=False)
+        try:
+            if selinux_relabel(self.targpath, policy):
+                return
+        except (OSError, subprocess.CalledProcessError) as e:
+            sys.stderr.write('Labeling with the image policy failed ({0}), using the host policy\n'.format(e))
         subprocess.check_call(
             ['setfiles', '-r', self.targpath,
              '/etc/selinux/targeted/contexts/files/file_contexts',
              self.targpath])
+
+
+def get_selinux_policy(rootpath, enabledonly=True):
+    """Return the SELINUXTYPE of the image at rootpath, or None if it has no
+    SELinux config or, with enabledonly, if the config disables SELinux"""
+    mode = None
+    policy = 'targeted'
+    try:
+        with open(os.path.join(rootpath, 'etc/selinux/config')) as seconfig:
+            for line in seconfig.read().split('\n'):
+                line = line.split('#', 1)[0].strip()
+                if line.startswith('SELINUX='):
+                    # libselinux compares case insensitively
+                    mode = line.split('=', 1)[1].strip().strip('"').lower()
+                elif line.startswith('SELINUXTYPE='):
+                    policy = line.split('=', 1)[1].strip().strip('"') or 'targeted'
+    except IOError:
+        return None
+    if enabledonly and mode not in ('enforcing', 'permissive'):
+        return None
+    return policy
+
+
+def selinux_relabel(rootpath, policy):
+    """Label rootpath with its own policy, return False if it has none"""
+    if not policy:
+        return False
+    fcontexts = os.path.join(
+        rootpath, 'etc/selinux', policy, 'contexts/files/file_contexts')
+    if not os.path.exists(fcontexts):
+        return False
+    cmd = ['setfiles', '-r', rootpath]
+    # Validate against the image policy rather than the one loaded on the
+    # build host, which may be older and reject contexts of newer modules
+    binpolicies = [x for x in glob.glob(os.path.join(
+        glob.escape(rootpath), 'etc/selinux', policy, 'policy/policy.*'))
+        if x.rsplit('.', 1)[-1].isdigit()]
+    if binpolicies:
+        cmd.extend(['-c', max(binpolicies, key=lambda x: int(x.rsplit('.', 1)[-1]))])
+    subprocess.check_call(cmd + [fcontexts, rootpath])
+    return True
+
+
+def relabel_image(rootpath):
+    """Label rootpath with its own policy if its config enables SELinux,
+    return False if that was needed but could not be done"""
+    policy = get_selinux_policy(rootpath)
+    if not policy:
+        return True
+    try:
+        if not selinux_relabel(rootpath, policy):
+            sys.stderr.write('SELinux is enabled in {0}, but its {1} policy is missing\n'.format(rootpath, policy))
+            return False
+    except OSError as e:
+        sys.stderr.write('SELinux labeling of {0} failed: {1}\n'.format(rootpath, e))
+        return False
+    except subprocess.CalledProcessError as e:
+        # also when an enforcing build host refuses types its loaded policy lacks
+        sys.stderr.write('SELinux labeling of {0} failed (setfiles exit code {1})\n'.format(rootpath, e.returncode))
+        return False
+    sys.stdout.write('Applied SELinux labels from the {0} policy of the image\n'.format(policy))
+    return True
 
 
 def versionize_string(key):
@@ -1083,6 +1179,9 @@ def main():
     buildp.add_argument('-s', '--source', help='Directory to pull installation from, typically a subdirectory of /var/lib/confluent/distributions. By default, the repositories for the build system are used.  For Ubuntu, this is not supported, the build system repositories are always used.')
     buildp.add_argument('--arch', default=None, help='Target architecture to build for (e.g. aarch64). When it differs from the build host architecture, statically linked qemu-user emulator registered in binfmt_misc with the F flag is required')
     buildp.add_argument('-y', '--non-interactive', help='Avoid prompting for confirmation', action='store_true')
+    buildp.add_argument('--selinux', action='store_true',
+        help='Install the targeted SELinux policy and leave SELinux enforcing '
+        'in the image instead of disabling it (EL8 and newer only)')
     buildp.add_argument('-v', '--volume',
         help='Directory to make available in the build environment.  -v / will '
         'cause it to be mounted in image as /run/external/, -v /:/run/root '
@@ -1530,6 +1629,9 @@ def build_root(args):
                     oshandler.arch, hostarch))
             sys.exit(1)
         check_binfmt(oshandler.arch, args)
+    if args.selinux and not oshandler.selinuxsupport:
+        sys.stderr.write('--selinux is not supported for {0} images\n'.format(oshandler.oscategory))
+        sys.exit(1)
     if args.non_interactive:
         oshandler.set_interactive(False)
     oshandler.set_target(args.scratchdir)
@@ -1540,6 +1642,10 @@ def build_root(args):
     if exitcode:
         sys.stderr.write('Image build failed\n')
         sys.exit(exitcode)
+    if args.selinux:
+        # label with the policy installed in the image
+        if not relabel_image(args.scratchdir):
+            sys.exit(1)
     #if len(args) > 1:
     #    pack_image(opts, args)
 
@@ -1690,6 +1796,10 @@ def pack_image(args):
         initrdname = os.path.join(args.scratchdir, 'boot/initrd-{0}'.format(mostrecent))
     if not os.path.exists(initrdname):
         initrdname = os.path.join(args.scratchdir, 'boot/initrd.img-{0}'.format(mostrecent))
+    # Label with the policy of the image, which also covers changes made after
+    # the build, e.g. with imgutil exec. mksquashfs keeps the labels.
+    if not relabel_image(args.scratchdir):
+        sys.exit(1)
     oum = os.umask(0o077)
     for path in ('/var/lib/confluent', '/var/lib/confluent/private', '/var/lib/confluent/private/os'):
         if not os.path.exists(path):
