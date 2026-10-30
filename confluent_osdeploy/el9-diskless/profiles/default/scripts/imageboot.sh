@@ -148,6 +148,7 @@ set_selinux_context system_u:object_r:bin_t:s0 /sysroot/opt/confluent/bin/onboot
 set_selinux_context system_u:object_r:bin_t:s0 /sysroot/opt/confluent/bin/apiclient
 ln -s /etc/systemd/system/onboot.service /sysroot/etc/systemd/system/multi-user.target.wants/onboot.service
 cp /etc/confluent/functions /sysroot/etc/confluent/functions
+rm -f /sysroot/etc/dracut.conf.d/diskless.conf # remove diskless dracut from runtime, to make kdump happier
 if [ -x /sysroot/usr/sbin/matchpathcon ] && grep -Eq '^SELINUX=(enforcing|permissive)' /sysroot/etc/selinux/config 2> /dev/null; then
     # Files written to /sysroot before policy load are unlabeled.
     selinuxpolicy=$(sed -n 's/^SELINUXTYPE=//p' /sysroot/etc/selinux/config)
@@ -176,7 +177,8 @@ if [ -x /sysroot/usr/sbin/matchpathcon ] && grep -Eq '^SELINUX=(enforcing|permis
         shopt -u globstar dotglob nullglob
         # Not setfiles (recurses into the image) or restorecon (no-op before policy load).
         chroot /sysroot /usr/sbin/matchpathcon -f $fcontexts "${relabel[@]}" | while IFS=$'\t' read -r relpath context; do
-            if [ "$context" != "<<none>>" ]; then
+            # deleted files leave whiteouts in the upper layer
+            if [ "$context" != "<<none>>" ] && { [ -e "/sysroot$relpath" ] || [ -L "/sysroot$relpath" ]; }; then
                 chcon -h "$context" "/sysroot$relpath"
             fi
         done
@@ -219,7 +221,6 @@ if [ -d /lib/firmware ]; then
     mv /lib/firmware /lib/firmware-ramfs
 fi
 ln -s /sysroot/lib/firmware /lib/firmware
-rm -f /sysroot/etc/dracut.conf.d/diskless.conf # remove diskless dracut from runtime, to make kdump happier
 kill $(grep -l ^/usr/lib/systemd/systemd-udevd  /proc/*/cmdline|cut -d/ -f 3)
 if grep debugssh /proc/cmdline >& /dev/null; then
     debugssh=1
