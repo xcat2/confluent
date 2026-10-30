@@ -158,7 +158,7 @@ class PlayRunner(object):
                                 if result is not None:
                                     self.results.append(result)
                         finally:
-                            await asyncio.get_running_loop().sock_close(conn)
+                            conn.close()
                         stdout, stder = await worker.communicate()
                         self.stderr += stder.decode('utf8')
                         self.stdout += stdout.decode('utf8')
