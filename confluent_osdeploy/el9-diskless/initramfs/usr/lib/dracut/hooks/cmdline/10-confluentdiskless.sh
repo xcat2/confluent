@@ -126,6 +126,44 @@ cd - > /dev/null
 rm -rf $tpmdir
 touch /etc/confluent/confluent.info
 cd /sys/class/net
+confluentsrv=$(getarg confluent)
+DIDDHCP=0
+if [ ! -z "$confluentsrv" ]; then
+    for i in *; do
+        ip link set $i up
+    done
+    if [[ "$confluentsrv" = *":"* ]]; then
+        confluenthttpsrv=[$confluentsrv]
+        /usr/libexec/nm-initrd-generator ip=:dhcp6
+    else
+        confluenthttpsrv=$confluentsrv
+        ifname=""
+        while [ -z "$ifname" ]; do
+            ifname=$(ip -br link|grep LOWER_UP|grep -v ib|grep -v UNKNOWN|head -n 1|awk '{print $1}')
+            sleep 0.5
+        done
+        echo -n "Attempting to use dhcp to bring up $ifname..."
+        dhclient $ifname
+        while ! ip -br addr show dev $ifname | grep \\. > /dev/null; do
+            echo -n "Still waiting for IPv4 address on: "
+            ip -br link show dev $ifname
+            sleep 1
+        done
+        echo -n "Complete: "
+        ip -br addr show dev $ifname
+        DIDDHCP=1
+    fi
+    myids=uuid=$(cat /sys/devices/virtual/dmi/id/product_uuid)
+    for mac in $(ip -br link|grep -v LOOPBACK|awk '{print $3}'); do
+        myids=$myids"/mac="$mac
+    done
+    myname=$(curl -sH "CONFLUENT_IDS: $myids" https://$confluenthttpsrv/confluent-api/self/whoami)
+    if [ ! -z "$myname" ]; then
+        echo NODENAME: $myname > /etc/confluent/confluent.info
+        echo MANAGER: $confluentsrv >> /etc/confluent/confluent.info
+        echo EXTMGRINFO: $confluentsrv'||1' >> /etc/confluent/confluent.info
+    fi
+fi
 echo -n "Scanning for network configuration..."
 while ! grep ^EXTMGRINFO: /etc/confluent/confluent.info | awk -F'|' '{print $3}' | grep 1 >& /dev/null && [ "$TRIES" -lt 30 ]; do
     TRIES=$((TRIES + 1))
@@ -221,10 +259,12 @@ fi
 autoconfigmethod=$(grep ^ipv4_method: /etc/confluent/confluent.deploycfg |awk '{print $2}')
 auto6configmethod=$(grep ^ipv6_method: /etc/confluent/confluent.deploycfg |awk '{print $2}')
 if [ "$autoconfigmethod" = "dhcp" ]; then
-    echo -n "Attempting to use dhcp to bring up $ifname..."
-    dhclient $ifname
-    echo "Complete:"
-    ip addr show dev $ifname
+    if [ "$DIDDHCP" = "0" ]; then
+        echo -n "Attempting to use dhcp to bring up $ifname..."
+        dhclient $ifname
+        echo "Complete:"
+        ip addr show dev $ifname
+    fi
     confluent_mgr=$(grep ^deploy_server: /etc/confluent/confluent.deploycfg| awk '{print $2}')
 elif [ "$autoconfigmethod" = "static" ]; then
     confluent_mgr=$(grep ^deploy_server: /etc/confluent/confluent.deploycfg| awk '{print $2}')
