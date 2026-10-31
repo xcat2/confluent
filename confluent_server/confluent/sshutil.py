@@ -49,6 +49,7 @@ async def assure_agent():
             except OSError as e:
                 if e.errno != 17:
                     raise
+            os.chown('/run/confluent/ssh', os.stat('/etc/confluent').st_uid, -1)
             os.chmod('/run/confluent/ssh', 0o700)
             agent_tmpdir = tempfile.mkdtemp(dir='/run/confluent/ssh', prefix='agent.')
             os.chmod(agent_tmpdir, 0o700)
