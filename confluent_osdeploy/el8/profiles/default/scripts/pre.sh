@@ -28,8 +28,11 @@ chmod 600 /tmp/confluent-pre.log
 tail -f /tmp/confluent-pre.log > /dev/tty &
 logshowpid=$!
 confluentpython /etc/confluent/apiclient >& /dev/null
-nicname=$(ip link|grep ^$(cat /tmp/confluent.ifidx): | awk '{print $2}' | awk -F: '{print $1}')
-nmcli c u $nicname
+# no ifidx unless the manager was found via IPv6 link-local
+nicname=$(ip link|grep ^$(cat /tmp/confluent.ifidx 2>/dev/null): | awk '{print $2}' | awk -F: '{print $1}')
+if [ -n "$nicname" ]; then
+    nmcli c u $nicname
+fi
 while ip -6 addr | grep tentative > /dev/null; do
    sleep 0.5
 done
