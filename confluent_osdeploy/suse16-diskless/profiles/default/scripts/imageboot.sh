@@ -134,4 +134,38 @@ if [ -d /lib/firmware ]; then
 fi
 ln -s /sysroot/lib/firmware /lib/firmware
 chroot /sysroot chkstat --system --set --noheader > /dev/null
+if [ -x /sysroot/usr/sbin/matchpathcon ] && grep -Eq '^SELINUX=(enforcing|permissive)' /sysroot/etc/selinux/config 2> /dev/null; then
+    # Files written to the upper layer before policy load are unlabeled.
+    # Label only those, using globstar since the initramfs has no find.
+    selinuxpolicy=$(sed -n 's/^SELINUXTYPE=//p' /sysroot/etc/selinux/config)
+    fcontexts=/etc/selinux/$selinuxpolicy/contexts/files/file_contexts
+    shopt -s globstar dotglob nullglob
+    relabel=()
+    if [ -f /tmp/mountparts.sh ]; then
+        overlayparts=$(awk '{print $3}' /tmp/mountparts.sh)
+    else
+        overlayparts=/mnt/remote
+    fi
+    for srcmount in $overlayparts; do
+        upperdir=/mnt/overlay/upper
+        if [ -f /tmp/mountparts.sh ]; then
+            upperdir=/mnt/overlay${srcmount}/upper
+        fi
+        prefix=${srcmount#/mnt/remote}
+        prefix=${prefix%/}
+        relabel+=("${prefix:-/}")
+        for relpath in "$upperdir"/**; do
+            relabel+=("$prefix${relpath#$upperdir}")
+        done
+    done
+    shopt -u globstar dotglob nullglob
+    # Not setfiles (recurses into the image) or restorecon (no-op before policy load).
+    # The initramfs has no chcon, the image does.
+    chroot /sysroot /usr/sbin/matchpathcon -f $fcontexts "${relabel[@]}" | while IFS=$'\t' read -r relpath context; do
+        # deleted files leave whiteouts in the upper layer
+        if [ "$context" != "<<none>>" ] && { [ -e "/sysroot$relpath" ] || [ -L "/sysroot$relpath" ]; }; then
+            chroot /sysroot chcon -h "$context" "$relpath"
+        fi
+    done
+fi
 exec /opt/confluent/bin/start_root

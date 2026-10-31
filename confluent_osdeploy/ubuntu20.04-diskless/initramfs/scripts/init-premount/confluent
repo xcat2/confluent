@@ -103,10 +103,59 @@ cd - > /dev/null
 mkdir -p /etc/ssl/certs
 cat /tls/*.pem > /etc/ssl/certs/ca-certificates.crt
 cat /tls/*.pem > /etc/confluent/ca.pem
+confluentsrv=$(sed -n 's/.*confluent=\([^ ]*\).*/\1/p' /proc/cmdline)
+DIDDHCP=0
 if [ -e /dev/disk/by-label/CNFLNT_MBI ]; then  # media based image
     mbimntpoint=$(mktemp -d)
     mount /dev/disk/by-label/CNFLNT_MBI $mbimntpoint
     echo 'EXTMGRINFO: media||1' > /etc/confluent/confluent.info
+elif [ ! -z "$confluentsrv" ]; then
+    touch /etc/confluent/confluent.info
+    myids=uuid=$(cat /sys/devices/virtual/dmi/id/product_uuid)
+    for mac in $(ip link | grep link/ether | awk '{print $2}'); do
+        myids=$myids"/mac="$mac
+    done
+    if echo $confluentsrv | grep : > /dev/null; then
+        myname=$(curl --cacert /etc/confluent/ca.pem -sf -H "CONFLUENT_IDS: $myids" https://[$confluentsrv]/confluent-api/self/whoami)
+    else
+        # the first nic with a link may not reach the server, try each until whoami answers
+        try=0
+        while [ $try -lt 30 ]; do
+            try=$((try + 1))
+            for ifname in /sys/class/net/*; do
+                ifname=${ifname##*/}
+                [ "$(cat /sys/class/net/$ifname/carrier 2> /dev/null)" = 1 ] || continue
+                [ "$(cat /sys/class/net/$ifname/type)" = 1 ] || continue  # ethernet only
+                echo -n "Attempting to use dhcp to bring up $ifname..."
+                # 24.04 and newer have dhcpcd in the initramfs, older ones only ipconfig
+                if command -v dhcpcd > /dev/null; then
+                    dhcpcd -1KL -4 -t 10 $ifname > /dev/null 2>&1
+                else
+                    ipconfig -t 10 $ifname > /dev/null 2>&1
+                fi
+                if ip -4 addr show dev $ifname scope global | grep -q inet; then
+                    echo "Complete"
+                    ip -4 addr show dev $ifname scope global | grep inet
+                    myname=$(curl --cacert /etc/confluent/ca.pem -sf --connect-timeout 10 --max-time 30 -H "CONFLUENT_IDS: $myids" https://$confluentsrv/confluent-api/self/whoami)
+                    if [ ! -z "$myname" ]; then
+                        DIDDHCP=1
+                        break 2
+                    fi
+                    echo "No answer from $confluentsrv on $ifname"
+                else
+                    echo "No lease on $ifname"
+                fi
+                ip -4 addr flush dev $ifname
+                rm -f /run/net-$ifname.conf
+            done
+            sleep 1
+        done
+    fi
+    if [ ! -z "$myname" ]; then
+        echo NODENAME: $myname > /etc/confluent/confluent.info
+        echo MANAGER: $confluentsrv >> /etc/confluent/confluent.info
+        echo EXTMGRINFO: $confluentsrv'||1' >> /etc/confluent/confluent.info
+    fi
 else
     /opt/confluent/bin/copernicus -t > /etc/confluent/confluent.info
 fi
@@ -180,6 +229,11 @@ v4meth=$(grep ^ipv4_method: /etc/confluent/confluent.deploycfg|awk '{print $2}')
 if [ "$v4meth" = static ]; then
     v4addr=$(grep ^ipv4_address: /etc/confluent/confluent.deploycfg | awk '{print $2}')
     v4prefix=$(grep ^prefix: /etc/confluent/confluent.deploycfg | awk '{print $2}')
+    if [ "$DIDDHCP" = 1 ]; then
+        # the lease from the confluent= lookup would expire in the image
+        ip -4 addr flush dev $ifname
+        rm -f /run/net-$ifname.conf
+    fi
     ip addr add dev $ifname $v4addr/$v4prefix
     v4gw=$(grep ^ipv4_gateway: /etc/confluent/confluent.deploycfg | awk '{print $2}')
     if [ ! -z "$v4gw" -a "$v4gw" != "null" ]; then
