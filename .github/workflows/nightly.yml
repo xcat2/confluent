@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
     inputs:
       publish:
-        description: Publish the result as the nightly pre-release
+        description: Publish the result as the nightly pre-release (default branch only)
         type: boolean
         default: true
       force:
@@ -27,9 +27,12 @@ on:
       - '**/builddeb'
       - '**/makesetup'
       - '**/setup.py.tmpl'
+      - '**/MANIFEST.in'
       - '**/*.spec'
       - '**/*.spec.tmpl'
       - confluent_osdeploy/utils/**
+      # compiled here, and its debian/ packaging is the only one in the tree
+      - confluent_vtbufferd/**
       - build/arm/**
       - mkversion
       - VERSION
@@ -53,6 +56,7 @@ jobs:
   prepare:
     name: prepare
     runs-on: ubuntu-26.04
+    timeout-minutes: 30
     outputs:
       build: ${{ steps.check.outputs.build }}
       version: ${{ steps.check.outputs.version }}
@@ -96,6 +100,7 @@ jobs:
     needs: prepare
     if: needs.prepare.outputs.build == 'true'
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -123,6 +128,7 @@ jobs:
     needs: prepare
     if: needs.prepare.outputs.build == 'true'
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
     container: ${{ matrix.image }}
     strategy:
       fail-fast: false
@@ -160,6 +166,7 @@ jobs:
     name: osdeploy RPM (${{ matrix.arch }})
     needs: utils
     runs-on: ubuntu-26.04
+    timeout-minutes: 30
     container: almalinux:9
     strategy:
       fail-fast: false
@@ -194,6 +201,7 @@ jobs:
     needs: prepare
     if: needs.prepare.outputs.build == 'true'
     runs-on: ubuntu-26.04
+    timeout-minutes: 30
     container: almalinux:9
     steps:
       - name: Install build dependencies
@@ -212,6 +220,7 @@ jobs:
     needs: prepare
     if: needs.prepare.outputs.build == 'true'
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
     container: almalinux:10
     strategy:
       fail-fast: false
@@ -238,6 +247,7 @@ jobs:
     name: debs (${{ matrix.release }}-${{ matrix.arch }})
     needs: [osdeploy, ipxe, go]
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
     container: ubuntu:${{ matrix.release }}
     strategy:
       fail-fast: false
@@ -284,6 +294,7 @@ jobs:
     name: assemble bundles
     needs: [prepare, rpms, osdeploy, ipxe, go, debs]
     runs-on: ubuntu-26.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
       - name: Install tools
@@ -347,6 +358,7 @@ jobs:
     name: smoketest (${{ matrix.target }})
     needs: bundle
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
     container: ${{ matrix.image }}
     strategy:
       fail-fast: false
@@ -383,11 +395,15 @@ jobs:
   publish:
     name: publish nightly release
     needs: [prepare, smoketest]
+    # a manual run on a topic branch builds and tests, but must not replace
+    # the nightly with that branch
     if: >-
       needs.prepare.outputs.build == 'true' &&
+      github.ref == format('refs/heads/{0}', github.event.repository.default_branch) &&
       (github.event_name == 'schedule' ||
        (github.event_name == 'workflow_dispatch' && inputs.publish))
     runs-on: ubuntu-26.04
+    timeout-minutes: 30
     permissions:
       contents: write
     env:
@@ -447,14 +463,17 @@ jobs:
           set -e
           if gh release view nightly > /dev/null 2>&1; then
               gh api -X PATCH "repos/$GH_REPO/git/refs/tags/nightly" -f sha="$GITHUB_SHA" -F force=true > /dev/null
-              gh release edit nightly --title "Nightly $VERSION" --notes-file notes.md --prerelease --latest=false
               for old in $(gh release view nightly --json assets -q '.assets[].name'); do
                   [ -f "bundles/$old" ] || gh release delete-asset nightly "$old" -y
               done
-              gh release upload nightly bundles/*.tar.gz --clobber
           else
               # a stale tag without a release would keep pointing at its old commit
               gh api -X DELETE "repos/$GH_REPO/git/refs/tags/nightly" > /dev/null 2>&1 || true
-              gh release create nightly bundles/*.tar.gz --target "$GITHUB_SHA" \
-                  --title "Nightly $VERSION" --notes-file notes.md --prerelease --latest=false
+              gh release create nightly --target "$GITHUB_SHA" \
+                  --title "Nightly $VERSION" --notes "" --prerelease --latest=false
           fi
+          gh release upload nightly bundles/*.tar.gz --clobber
+          # The notes carry the build key prepare compares against, so write
+          # them only once every bundle is up: after a failed upload the old
+          # key stays, and the next night rebuilds instead of skipping.
+          gh release edit nightly --title "Nightly $VERSION" --notes-file notes.md --prerelease --latest=false
