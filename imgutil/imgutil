@@ -22,6 +22,7 @@ import stat
 import struct
 import subprocess
 import sys
+import tarfile
 import tempfile
 import time
 try:
@@ -654,6 +655,13 @@ class OsHandler(object):
     selinuxsupport = False
     # downloaded packages and repository metadata left by the package manager
     pkgcaches = ()
+    # set by import, the target is an existing root that installs packages
+    # with its own package manager and repositories
+    imported = False
+    # shell snippets for has_packages: list every installed name once, then
+    # look up each package in it
+    pkgsetup = 'inst=$(rpm -qa --qf \'[%{PROVIDES}\\n]%{NAME}.%{ARCH}\\n\'); '
+    pkgquery = 'printf "%s\\n" "$inst" | grep -xF -- "$p"'
 
     def __init__(self, name, version, arch, args):
         self.name = name
@@ -765,6 +773,54 @@ class OsHandler(object):
             retpkgs.extend(self.list_packages(addpkglist))
         return retpkgs
 
+    def copy_to_target(self, src, dst):
+        if self.imported:
+            # the image may already have it
+            copy_tree(src, dst)
+            return
+        try:
+            shutil.copytree(src, dst)
+        except Exception:
+            sys.stderr.write('Target directory already exists, cannot build\n')
+            raise
+
+    def has_packages(self, args):
+        # an imported image that already has every package skips its package
+        # manager, and with it the need to reach its repositories
+        args.cmd = ['sh', '-c', self.pkgsetup + 'm=; for p; do ' + self.pkgquery + ' >/dev/null 2>&1 || m="$m $p"; done; '
+                    '[ -z "$m" ] || { echo "Not in the image, installing with the package manager:$m"; exit 1; }',
+                    'sh'] + self.packages()
+        if run_constrainedx(fancy_chroot, (args, self.targpath)):
+            return False
+        sys.stdout.write('All packages are already in the image, skipping package installation\n')
+        sys.stdout.flush()
+        return True
+
+    def snapshot_initrds(self, initrdname):
+        # the initramfs of each kernel before the package manager runs
+        initrds = {}
+        moddir = os.path.join(self.targpath, 'lib/modules')
+        for kver in os.listdir(moddir) if os.path.isdir(moddir) else []:
+            initrd = os.path.join(self.targpath, initrdname.format(kver))
+            initrds[kver] = os.path.getmtime(initrd) if os.path.exists(initrd) else None
+        return initrds
+
+    def stale_kernels(self, initrds, initrdname):
+        # kernels of an imported image that need their initramfs built: it is
+        # missing, or unchanged since before the package manager ran and so
+        # without confluent. One the package manager built or updated has it.
+        # A modules directory left behind by a removed kernel is skipped.
+        moddir = os.path.join(self.targpath, 'lib/modules')
+        for kver in sorted(os.listdir(moddir)) if os.path.isdir(moddir) else []:
+            bootkernel = os.path.join(self.targpath, 'boot/vmlinuz-' + kver)
+            if not os.path.exists(bootkernel) and not os.path.exists(os.path.join(moddir, kver, 'vmlinuz')):
+                continue
+            initrd = os.path.join(self.targpath, initrdname.format(kver))
+            if (os.path.exists(bootkernel) and os.path.exists(initrd)
+                    and os.path.getmtime(initrd) != initrds.get(kver)):
+                continue
+            yield kver
+
 class SuseHandler(OsHandler):
     pkgcaches = ('var/cache/zypp/*',)
 
@@ -784,6 +840,9 @@ class SuseHandler(OsHandler):
 
     def add_pkglists(self):
         self.zyppargs.extend(self.list_packages())
+
+    def packages(self):
+        return self.zyppargs
 
     def set_source(self, sourcepath):
         self.sources.append('file://' + sourcepath)
@@ -806,7 +865,7 @@ class SuseHandler(OsHandler):
     def prep_root(self, args):
         gpgkeys = []
         mkdirp(self.targpath)
-        if not self.sources:
+        if not self.sources and not self.imported:
             gpgkeys = glob.glob('/usr/lib/rpm/gnupg/keys/*.asc')
             targzypp = os.path.join(self.targpath, 'etc/zypp')
             mkdirp(targzypp)
@@ -861,13 +920,20 @@ class SuseHandler(OsHandler):
         mkdirp(os.path.join(self.targpath, 'etc/dracut.conf.d'))
         dracutdir = os.path.join(mydir, 'dracut')
         targdir = os.path.join(self.targpath, 'usr/lib/dracut/modules.d/97diskless')
-        shutil.copytree(dracutdir, targdir)
+        self.copy_to_target(dracutdir, targdir)
         with open(os.path.join(self.targpath, 'etc/dracut.conf.d/diskless.conf'), 'w') as dracutconf:
             dracutconf.write('compress=xz\nhostonly=no\ndracutmodules+=" diskless base terminfo "\n')
         cmd = ['chmod', 'a+x']
         cmd.extend(glob.glob(os.path.join(targdir, '*')))
         subprocess.check_call(cmd)
-        if self._interactive:
+        if self.imported:
+            initrds = self.snapshot_initrds('boot/initrd-{0}')
+            if not self.has_packages(args):
+                args.cmd = ['zypper'] if self._interactive else ['zypper', '-n']
+                args.cmd += ['install'] + self.zyppargs
+                if run_constrainedx(fancy_chroot, (args, self.targpath)):
+                    raise Exception('Package installation failed')
+        elif self._interactive:
             subprocess.check_call(self.zypper_cmd() + ['install'] + self.zyppargs)
         else:
             subprocess.check_call(self.zypper_cmd() + ['-n', 'install'] + self.zyppargs)
@@ -881,10 +947,16 @@ class SuseHandler(OsHandler):
         keysign = 'usr/libexec/ssh/ssh-keysign'
         if not os.path.exists(os.path.join(self.targpath, keysign)):
             keysign = 'usr/lib/ssh/ssh-keysign'
-        with open(os.path.join(self.targpath, 'etc/permissions.local'), 'a') as permout:
-            permout.write(
-                '/{0} root:root 4711\n'.format(keysign)
-            )
+        permline = '/{0} root:root 4711'.format(keysign)
+        # an imported image may have it already
+        permfile = os.path.join(self.targpath, 'etc/permissions.local')
+        havelines = []
+        if os.path.exists(permfile):
+            with open(permfile) as permin:
+                havelines = permin.read().splitlines()
+        if permline not in havelines:
+            with open(permfile, 'a') as permout:
+                permout.write(permline + '\n')
         if os.path.exists(os.path.join(self.targpath, 'usr/bin/permctl')):
             args.cmd = ['permctl', '--system', '--set']
         else:
@@ -893,6 +965,12 @@ class SuseHandler(OsHandler):
                                         self.targpath))
 
 
+        if self.imported:
+            for kver in self.stale_kernels(initrds, 'boot/initrd-{0}'):
+                args.cmd = ['dracut', '-f', '/boot/initrd-{0}'.format(kver), kver]
+                if run_constrainedx(fancy_chroot, (args, self.targpath)):
+                    raise Exception('Building the initramfs of {0} failed'.format(kver))
+            return
         if os.path.exists(os.path.join(self.targpath, 'sbin/mkinitrd')):
             args.cmd = ['mkinitrd']
         else:
@@ -941,8 +1019,15 @@ class DebHandler(OsHandler):
             needapt = 'Missing packages needed in target for capture, to add required packages: apt install ' + ' '.join(needpkgs)
             self.captureprereqs.append(needapt)
 
+    # a name can be provided by a renamed package, libuv1 by libuv1t64
+    pkgsetup = ('inst=$(dpkg-query -W -f=\'${db:Status-Status} ${Package} ${Provides}\\n\' | '
+                'awk \'$1 == "installed" { for (i = 2; i <= NF; i++) { sub(/,$/, "", $i); print $i } }\'); ')
+
     def add_pkglists(self):
         self.includepkgs.extend(self.list_packages())
+
+    def packages(self):
+        return self.includepkgs
 
     def set_target(self, targpath):
         self.targpath = targpath
@@ -952,12 +1037,10 @@ class DebHandler(OsHandler):
         mydir = get_mydir(self.oscategory)
         srcdir = os.path.join(mydir, 'initramfs-tools')
         targdir = os.path.join(self.targpath, 'etc/initramfs-tools')
-        try:
-            shutil.copytree(srcdir, targdir)
-        except Exception:
-            sys.stderr.write('Target directory already exists, cannot build\n')
-            raise
+        self.copy_to_target(srcdir, targdir)
         os.chmod(os.path.join(targdir, 'hooks/confluent'), 0o755)
+        if self.imported:
+            return
         #cmd = ['debootstrap', '--include={0}'.format(','.join(self.includepkgs)), self.codename, self.targpath]
         if self.arch != os.uname().machine:
             cmd = ['debootstrap', '--arch={0}'.format(deb_arch_map.get(self.arch, self.arch)), self.codename, self.targpath]
@@ -975,41 +1058,55 @@ class DebHandler(OsHandler):
             raise Exception('apt failed in image')
 
     def prep_root(self, args):
-        mkdirp(os.path.join(self.targpath, 'etc/apt'))
-        for aptdir in ('sources.list.d', 'trusted.gpg.d', 'keyrings'):
-            mkdirp(os.path.join(self.targpath, 'etc/apt', aptdir))
-        shutil.copy('/etc/apt/sources.list', os.path.join(self.targpath, 'etc/apt/sources.list'))
-        for listfile in glob.glob('/etc/apt/sources.list.d/*'):
-            shutil.copy(listfile, os.path.join(self.targpath, listfile[1:]))
-        for keydir in ('/etc/apt/trusted.gpg.d', '/etc/apt/keyrings'):
-            for keyfile in glob.glob(os.path.join(keydir, '*')):
-                if not os.path.isfile(keyfile):
-                    continue
-                tkeyfile = os.path.join(
-                    self.targpath, os.path.relpath(keyfile, '/'))
-                mkdirp(os.path.dirname(tkeyfile))
-                shutil.copy(keyfile, tkeyfile)
-        if os.path.exists('/etc/apt/trusted.gpg'):
-            trustedgpg = os.path.join(self.targpath, 'etc/apt/trusted.gpg')
-            mkdirp(os.path.dirname(trustedgpg))
-            shutil.copy(
-                '/etc/apt/trusted.gpg', trustedgpg)
-        self._apt(args, ['apt-get', 'update'])
-        if self.includepkgs:
-            self._apt(args, ['apt-get', '-y', 'install'] + self.includepkgs)
+        # an imported image brings its own sources
+        if not self.imported:
+            mkdirp(os.path.join(self.targpath, 'etc/apt'))
+            for aptdir in ('sources.list.d', 'trusted.gpg.d', 'keyrings'):
+                mkdirp(os.path.join(self.targpath, 'etc/apt', aptdir))
+            shutil.copy('/etc/apt/sources.list', os.path.join(self.targpath, 'etc/apt/sources.list'))
+            for listfile in glob.glob('/etc/apt/sources.list.d/*'):
+                shutil.copy(listfile, os.path.join(self.targpath, listfile[1:]))
+            for keydir in ('/etc/apt/trusted.gpg.d', '/etc/apt/keyrings'):
+                for keyfile in glob.glob(os.path.join(keydir, '*')):
+                    if not os.path.isfile(keyfile):
+                        continue
+                    tkeyfile = os.path.join(
+                        self.targpath, os.path.relpath(keyfile, '/'))
+                    mkdirp(os.path.dirname(tkeyfile))
+                    shutil.copy(keyfile, tkeyfile)
+            if os.path.exists('/etc/apt/trusted.gpg'):
+                trustedgpg = os.path.join(self.targpath, 'etc/apt/trusted.gpg')
+                mkdirp(os.path.dirname(trustedgpg))
+                shutil.copy(
+                    '/etc/apt/trusted.gpg', trustedgpg)
+        if self.imported:
+            initrds = self.snapshot_initrds('boot/initrd.img-{0}')
+        if not (self.imported and self.has_packages(args)):
+            self._apt(args, ['apt-get', 'update'])
+            if self.includepkgs:
+                self._apt(args, ['apt-get', '-y', 'install'] + self.includepkgs)
+        if self.imported:
+            for kver in self.stale_kernels(initrds, 'boot/initrd.img-{0}'):
+                # update mode skips a kernel whose initramfs the image build removed
+                mode = '-u' if os.path.exists(os.path.join(self.targpath, 'boot/initrd.img-' + kver)) else '-c'
+                args.cmd = ['update-initramfs', mode, '-k', kver]
+                if run_constrainedx(fancy_chroot, (args, self.targpath)):
+                    raise Exception('Regenerating the initramfs failed')
         servicefile = os.path.join(
             self.targpath, 'usr/lib/systemd/system/ssh.service')
         if os.path.exists(servicefile):
             targfile = os.path.join(
                 self.targpath,
                 'etc/systemd/system/multi-user.target.wants/ssh.service')
-            if not os.path.exists(targfile):
+            if not os.path.lexists(targfile):
+                mkdirp(os.path.dirname(targfile))
                 os.symlink('/usr/lib/systemd/system/ssh.service', targfile)
         else:
             targfile = os.path.join(
                 self.targpath,
                 'etc/systemd/system/multi-user.target.wants/sshd.service')
-            if not os.path.exists(targfile):
+            if not os.path.lexists(targfile):
+                mkdirp(os.path.dirname(targfile))
                 os.symlink('/usr/lib/systemd/system/sshd.service', targfile)
 
 
@@ -1062,6 +1159,12 @@ class ElHandler(OsHandler):
             # python3 label files written at boot
             self.yumargs.extend(['selinux-policy-targeted', 'policycoreutils', 'libselinux-utils', 'python3'])
 
+    def packages(self):
+        # set_target puts the options before 'install', the packages follow
+        if 'install' in self.yumargs:
+            return self.yumargs[self.yumargs.index('install') + 1:]
+        return self.yumargs
+
     def set_source(self, sourcepath):
         yumconfig = create_yumconf(sourcepath, self.addrepos)
         self.yumargs.extend(
@@ -1073,30 +1176,49 @@ class ElHandler(OsHandler):
 
     def set_target(self, targpath):
         self.targpath = targpath
-        self.yumargs.extend(
-            ['--installroot={0}'.format(targpath),
-             '--releasever={0}'.format(self.version)])
-        if self.arch != os.uname().machine:
-            self.yumargs.append('--forcearch={0}'.format(self.arch))
+        if not self.imported:
+            self.yumargs.extend(
+                ['--installroot={0}'.format(targpath),
+                 '--releasever={0}'.format(self.version)])
+            if self.arch != os.uname().machine:
+                self.yumargs.append('--forcearch={0}'.format(self.arch))
         self.yumargs.append('install')
 
     def prep_root(self, args):
         mkdirp(os.path.join(self.targpath, 'usr/lib/dracut/modules.d'))
         mkdirp(os.path.join(self.targpath, 'etc/dracut.conf.d'))
-        open(os.path.join(self.targpath, 'etc/resolv.conf'),'w').close()
+        # an imported image may link it to a path that only resolves in the image
+        resolv = os.path.join(self.targpath, 'etc/resolv.conf')
+        if not os.path.lexists(resolv):
+            open(resolv, 'w').close()
         mydir = get_mydir(self.oscategory)
         dracutdir = os.path.join(mydir, 'dracut')
         targdir = os.path.join(self.targpath, 'usr/lib/dracut/modules.d/97diskless')
-        shutil.copytree(dracutdir, targdir)
+        self.copy_to_target(dracutdir, targdir)
         with open(os.path.join(self.targpath, 'etc/dracut.conf.d/diskless.conf'), 'w') as dracutconf:
             dracutconf.write('compress=xz\nhostonly=no\ndracutmodules+=" diskless base terminfo "\n')
         cmd = ['chmod', 'a+x']
         cmd.extend(glob.glob(os.path.join(targdir, '*')))
         subprocess.check_call(cmd)
-        if self._interactive:
-            subprocess.check_call(['yum'] + self.yumargs)
+        yumcmd = ['yum'] if self._interactive else ['yum', '-y']
+        if self.imported:
+            initrds = self.snapshot_initrds('boot/initramfs-{0}.img')
+            if not self.has_packages(args):
+                args.cmd = yumcmd + self.yumargs
+                if run_constrainedx(fancy_chroot, (args, self.targpath)):
+                    raise Exception('Package installation failed')
+            # a container build may also not have put the kernel in /boot
+            for kver in self.stale_kernels(initrds, 'boot/initramfs-{0}.img'):
+                modkernel = 'lib/modules/{0}/vmlinuz'.format(kver)
+                if os.path.exists(os.path.join(self.targpath, modkernel)):
+                    args.cmd = ['kernel-install', 'add', kver, '/' + modkernel]
+                else:
+                    # only /boot has the kernel, so only the initramfs is missing
+                    args.cmd = ['dracut', '-f', '/boot/initramfs-{0}.img'.format(kver), kver]
+                if run_constrainedx(fancy_chroot, (args, self.targpath)):
+                    raise Exception('Installing kernel {0} failed'.format(kver))
         else:
-            subprocess.check_call(['yum', '-y'] + self.yumargs)
+            subprocess.check_call(yumcmd + self.yumargs)
         # boot entries written in the chroot carry the kernel command line of
         # the build system, and installing to disk writes its own entries
         for loadent in glob.glob(os.path.join(self.targpath, 'boot/loader/entries/*.conf')):
@@ -1365,7 +1487,8 @@ def main():
     buildp.add_argument('-p', '--packagelist', help='Filename of package list to replace default pkglist', default='')
     buildp.add_argument('-a', '--addpackagelist', action='append', default=[],
                         help='A list of additional packages to include, may be specified multiple times')
-    buildp.add_argument('-s', '--source', help='Directory to pull installation from, typically a subdirectory of /var/lib/confluent/distributions. By default, the repositories for the build system are used.  For Ubuntu, this is not supported, the build system repositories are always used.')
+    buildp.add_argument('-s', '--source', help='Directory to pull installation from, typically a subdirectory of /var/lib/confluent/distributions. By default, the repositories for the build system are used.  For Ubuntu, a distribution directory is not supported, the build system repositories are always used. '
+                        'A container image made elsewhere, for example in CI, can be the source instead: a SIF file, an OCI or Docker archive, an OCI layout directory, or a podman reference with its transport such as docker://registry.example.com/compute:latest or containers-storage:localhost/compute')
     buildp.add_argument('--arch', default=None, help='Target architecture to build for (e.g. aarch64). When it differs from the build host architecture, statically linked qemu-user emulator registered in binfmt_misc with the F flag is required. aarch64 is emulated as a Neoverse N1 cpu (qemu 7.1 or later), set QEMU_CPU to choose another')
     buildp.add_argument('-y', '--non-interactive', help='Avoid prompting for confirmation', action='store_true')
     buildp.add_argument('--selinux', action='store_true',
@@ -1401,7 +1524,10 @@ def main():
         parser.print_usage()
         sys.exit(1)
     if args.subcommand == 'build':
-        build_root(args)
+        if args.source and container_source(args.source):
+            import_root(args)
+        else:
+            build_root(args)
     elif args.subcommand == 'capture':
         capture_remote(args)
     elif args.subcommand == 'unpack':
@@ -1556,6 +1682,10 @@ def check_root(installroot):
 qemu_arch_map = {
     'aarch64': 'qemu-aarch64',
     'x86_64': 'qemu-x86_64',
+}
+elf_arch_map = {
+    62: 'x86_64',
+    183: 'aarch64',
 }
 
 
@@ -1806,19 +1936,18 @@ def fingerprint_host(args, hostpath='/'):
             return oshandler
     return oshandler
 
-def build_root(args):
-    if args.scratchdir:
-        args.scratchdir = os.path.abspath(args.scratchdir)
+def build_root(args, oshandler=None):
     check_root(args.scratchdir)
-    yumargs = ['yum', '--installroot={0}'.format(args.scratchdir)]
-    if args.source:
-        if '/' not in args.source and not os.path.exists(args.source):
-            args.source = os.path.join('/var/lib/confluent/distributions/', args.source)
-        oshandler = fingerprint_source(args.source, args)
-        if oshandler is not None:
-            oshandler.set_source(args.source)
-    else:
-        oshandler = fingerprint_host(args)
+    # an imported image comes with its handler
+    if oshandler is None:
+        if args.source:
+            if '/' not in args.source and not os.path.exists(args.source):
+                args.source = os.path.join('/var/lib/confluent/distributions/', args.source)
+            oshandler = fingerprint_source(args.source, args)
+            if oshandler is not None:
+                oshandler.set_source(args.source)
+        else:
+            oshandler = fingerprint_host(args)
     if oshandler is None:
         if args.source:
             sys.stderr.write(
@@ -1829,10 +1958,10 @@ def build_root(args):
                 'Unable to recognize build system os\n')
         sys.exit(1)
     hostarch = os.uname().machine
-    if args.arch and args.arch != oshandler.arch:
+    if args.arch and uname_arch_map.get(args.arch, args.arch) != oshandler.arch:
         if args.source:
             sys.stderr.write(
-                'Requested architecture {0} conflicts with source directory '
+                'Requested architecture {0} conflicts with source '
                 'architecture {1}\n'.format(args.arch, oshandler.arch))
             sys.exit(1)
         oshandler.set_arch(args.arch)
@@ -1866,6 +1995,206 @@ def build_root(args):
             sys.exit(1)
     #if len(args) > 1:
     #    pack_image(opts, args)
+
+container_minversions = {'el': 9, 'ubuntu': 24.04, 'suse': 16}
+# podman transports for a container image that is not a local file
+container_transports = ('containers-storage:', 'dir:', 'docker://', 'docker-archive:',
+                        'oci:', 'oci-archive:')
+
+def container_supported(oscategory):
+    """Whether building from container images supports oscategory, for
+    example el10 or ubuntu24.04"""
+    match = re.match(r'^(el|ubuntu|suse)([0-9]+(\.[0-9]+)?)$', oscategory)
+    return bool(match) and float(match.group(2)) >= container_minversions[match.group(1)]
+
+def container_source(source):
+    """Whether the build source is a container image rather than a
+    distribution directory"""
+    if os.path.isdir(source):
+        return os.path.exists(os.path.join(source, 'oci-layout'))
+    return os.path.isfile(source) or source.startswith(container_transports)
+
+def get_sif_offset(sifname):
+    """Return the offset of the squashfs root partition of the SIF file
+    sifname, or None if it is not a SIF file"""
+    with open(sifname, 'rb') as sifin:
+        header = sifin.read(128)
+        if header[32:41] != b'SIF_MAGIC':
+            return None
+        # descriptor count, offset and total size, little endian like the
+        # rest of the format
+        dtotal, doffset, dsize = struct.unpack('<qqq', header[88:112])
+        if dtotal < 1 or dsize < dtotal * 25 or doffset + dsize > os.fstat(sifin.fileno()).st_size:
+            raise Exception('{0} is not a valid SIF file'.format(sifname))
+        for idx in range(dtotal):
+            sifin.seek(doffset + idx * (dsize // dtotal))
+            # data type, in use flag, three ids, then the data offset
+            dtype, used, offset = struct.unpack('<i?12xq', sifin.read(25))
+            if dtype != 0x4004 or not used:  # only partitions
+                continue
+            sifin.seek(offset)
+            if sifin.read(4) == b'hsqs':
+                return offset
+    raise Exception('No squashfs partition found in {0}'.format(sifname))
+
+def import_root(args):
+    if args.addrepos:
+        sys.stderr.write('A container image brings its own repositories, -r is not supported\n')
+        sys.exit(1)
+    if os.path.exists(args.scratchdir) and (not os.path.isdir(args.scratchdir) or os.listdir(args.scratchdir)):
+        sys.stderr.write('{0} is not an empty directory\n'.format(args.scratchdir))
+        sys.exit(1)
+    try:
+        _import_root(args)
+    except BaseException:
+        # kept for inspection, but a new build needs an empty directory
+        if os.path.isdir(args.scratchdir) and os.listdir(args.scratchdir):
+            sys.stderr.write('{0} holds what was imported so far, remove it before '
+                             'building again\n'.format(args.scratchdir))
+        raise
+
+def _import_root(args):
+    image = args.source
+    sifoffset = None
+    if os.path.isdir(image):
+        image = 'oci:' + image
+    elif os.path.isfile(image):
+        try:
+            sifoffset = get_sif_offset(image)
+        except Exception as e:
+            sys.stderr.write('{0}\n'.format(e))
+            sys.exit(1)
+        if sifoffset is None:
+            # podman save writes Docker archives unless asked for OCI
+            marker = None
+            try:
+                with tarfile.open(image) as tarin:
+                    for member in tarin:
+                        if os.path.normpath(member.name) in ('oci-layout', 'manifest.json'):
+                            marker = os.path.normpath(member.name)
+                            break
+            except tarfile.TarError:
+                pass
+            if marker == 'oci-layout':
+                image = 'oci-archive:' + image
+            elif marker == 'manifest.json':
+                image = 'docker-archive:' + image
+            else:
+                sys.stderr.write('{0} is not a SIF file or a container image archive\n'.format(image))
+                sys.exit(1)
+    if image != args.source and ':' in args.source:
+        # podman would take what follows the colon for the image reference
+        sys.stderr.write('podman cannot read {0}, as its path contains a colon\n'.format(args.source))
+        sys.exit(1)
+    if sifoffset is not None:
+        if not shutil.which('unsquashfs'):
+            sys.stderr.write('Importing a SIF file requires unsquashfs from squashfs-tools\n')
+            sys.exit(1)
+        if subprocess.call(['unsquashfs', '-f', '-o', str(sifoffset),
+                            '-d', args.scratchdir, image]):
+            sys.stderr.write('Unable to extract {0}\n'.format(image))
+            sys.exit(1)
+    elif not shutil.which('podman'):
+        sys.stderr.write('Importing a container image requires podman\n')
+        sys.exit(1)
+    else:
+        # podman pulls or loads the image as needed, so any of its transports
+        # work. Other than a local image, it goes to a storage of its own,
+        # removed afterwards, so it never replaces images and tags of the
+        # system, for example with the variant of another architecture.
+        podman = ['podman']
+        tmpstorage = None
+        if not image.startswith('containers-storage:'):
+            mkdirp(os.path.dirname(args.scratchdir))
+            tmpstorage = tempfile.mkdtemp(prefix='.imgutil-storage-', dir=os.path.dirname(args.scratchdir))
+            # vfs leaves no mounts behind that would keep it from being removed
+            podman += ['--root', os.path.join(tmpstorage, 'root'), '--runroot',
+                       os.path.join(tmpstorage, 'run'), '--storage-driver', 'vfs']
+        createcmd = podman + ['create']
+        if args.arch:
+            # the matching variant of an image for several architectures
+            createcmd += ['--arch', deb_arch_map.get(uname_arch_map.get(args.arch, args.arch), args.arch)]
+        try:
+            try:
+                cid = subprocess.check_output(createcmd + [image, '/bin/sh']).decode('utf8').strip()
+            except subprocess.CalledProcessError:
+                sys.exit(1)  # podman explained why
+            mkdirp(args.scratchdir)
+            try:
+                try:
+                    imageid = subprocess.check_output(
+                        podman + ['container', 'inspect', '--format', '{{.Image}}', cid]).decode('utf8').strip()
+                    imagearch = subprocess.check_output(
+                        podman + ['image', 'inspect', '--format', '{{.Architecture}}', imageid]).decode('utf8').strip()
+                except subprocess.CalledProcessError:
+                    sys.exit(1)  # podman explained why
+                imagearch = uname_arch_map.get(imagearch, imagearch)
+                # before extracting what would be refused later, an image that
+                # does not name its architecture is checked after extracting
+                if args.arch and imagearch and uname_arch_map.get(args.arch, args.arch) != imagearch:
+                    sys.stderr.write('Requested architecture {0} conflicts with source '
+                                     'architecture {1}\n'.format(args.arch, imagearch))
+                    sys.exit(1)
+                export = subprocess.Popen(podman + ['export', cid], stdout=subprocess.PIPE)
+                untar = subprocess.call(
+                    ['tar', '-x', '-p', '--numeric-owner', '--xattrs', '--xattrs-include=*',
+                     '-C', args.scratchdir, '-f', '-'], stdin=export.stdout)
+                export.stdout.close()
+                if export.wait() or untar:
+                    sys.stderr.write('Unable to extract {0}\n'.format(image))
+                    sys.exit(1)
+            finally:
+                # not check_call, it would hide why the extraction failed
+                if subprocess.call(podman + ['rm', cid], stdout=subprocess.DEVNULL):
+                    sys.stderr.write('Unable to remove container {0}\n'.format(cid))
+        finally:
+            if tmpstorage:
+                shutil.rmtree(tmpstorage, ignore_errors=True)
+    oshandler = fingerprint_host(args, args.scratchdir)
+    if oshandler is None:
+        sys.stderr.write('Unable to recognize the os of {0}\n'.format(args.source))
+        sys.exit(1)
+    if not container_supported(oshandler.oscategory):
+        sys.stderr.write('Building from {0} container images is not supported\n'.format(oshandler.oscategory))
+        sys.exit(1)
+    if not os.path.exists(oshandler.pkglist):
+        sys.stderr.write('No package list found for {0}\n'.format(oshandler.oscategory))
+        sys.exit(1)
+    # an image without merged /usr has bash only in /bin. Links are not
+    # followed, an absolute one would resolve on this system
+    for elfpath in ('usr/bin/bash', 'bin/bash'):
+        elfpath = os.path.join(args.scratchdir, elfpath)
+        if os.path.isfile(elfpath) and not os.path.islink(elfpath):
+            break
+    else:
+        sys.stderr.write('No bash in {0} to detect its architecture from\n'.format(args.source))
+        sys.exit(1)
+    with open(elfpath, 'rb') as elfin:
+        elfin.seek(18)
+        imagearch = elf_arch_map.get(struct.unpack('<H', elfin.read(2))[0])
+    if not imagearch:
+        sys.stderr.write('The architecture of {0} is not supported, only {1}\n'.format(
+            args.source, ' and '.join(elf_arch_map.values())))
+        sys.exit(1)
+    oshandler.set_arch(imagearch)
+    # container base images mask units a booted node needs, for example
+    # remounting the root filesystem read-write, and keep services from
+    # starting on package updates
+    for unit in ('console-getty.service', 'dev-hugepages.mount', 'getty.target',
+                 'sys-fs-fuse-connections.mount', 'systemd-logind.service',
+                 'systemd-remount-fs.service'):
+        unitpath = os.path.join(args.scratchdir, 'etc/systemd/system', unit)
+        if os.path.islink(unitpath) and os.readlink(unitpath) == '/dev/null':
+            os.remove(unitpath)
+            sys.stdout.write('Unmasked {0}, as masked by container images\n'.format(unit))
+    policyrc = os.path.join(args.scratchdir, 'usr/sbin/policy-rc.d')
+    if os.path.exists(policyrc):
+        os.remove(policyrc)
+        sys.stdout.write('Removed /usr/sbin/policy-rc.d, which keeps services from starting\n')
+    sys.stdout.flush()  # before build_root forks, or the output repeats
+    oshandler.imported = True
+    build_root(args, oshandler)
+
 
 def prep_decrypt(indir):
     indir = os.path.abspath(indir)
