@@ -3,6 +3,7 @@
 ## SYNOPSIS
 
 `imgutil` `build` [<options>] <scratchdir>  
+`imgutil` `build` `--containerfile` [<options>] <file>  
 `imgutil` `exec` [<options>] <scratchdir> [<cmd>...]  
 `imgutil` `unpack` <profilename> <scratchdir>  
 `imgutil` `pack` [<options>] <scratchdir> <profilename>  
@@ -19,7 +20,9 @@
   With a container image as `-s` source, the image is extracted to the
   scratch directory instead, and completed with the confluent initramfs
   configuration, the package list and a regenerated initramfs. This
-  builds images made elsewhere, for example in CI.
+  builds images made elsewhere, for example in CI. With
+  `--containerfile`, a Containerfile to start such an image from is
+  written instead.
 
 * `exec`:
   Start the specified scratch directory as a container and optionally run a command inside it.
@@ -105,8 +108,30 @@
 * `-v`, `--volume` <mount>:
   Directory to make available in the build environment. `-v /` will cause it to be mounted in image as `/run/external/`. `-v /:/run/root` will override the target to be `/run/root`. Something like `/var/lib/repository:-` will cause it to mount to the identical path inside the image. May be specified multiple times.
 
+* `--containerfile`:
+  Write a Containerfile instead of building. It installs every package
+  `build` checks for, generated from the same package lists, so building
+  from the image needs no network access. Add site specific content and
+  build it in CI. The OS is that of the `-s` distribution or of the build
+  system, as for a build, and `--arch` names the platform, so the image
+  can be built on another architecture with emulation. `-p`, `-a` and
+  `--selinux` change the packages. Pass the same options to `build`
+  later, as the command shown in the file does. `-r` is not supported,
+  as the image installs from the repositories of its base image. EL9,
+  Ubuntu 24.04 and SUSE 16 or later are supported.
+
+* `--apptainer`:
+  With `--containerfile`, write an Apptainer definition file for building
+  a SIF instead.
+
+* `--from` <image>:
+  With `--containerfile`, the base image to use instead of the default for
+  the OS (AlmaLinux for EL, the official Ubuntu image, openSUSE Leap for
+  SUSE).
+
 * <scratchdir>:
-  Directory to build new diskless root in.
+  Directory to build new diskless root in. With `--containerfile`, the file
+  to write, or `-` for standard output.
 
 ## EXEC OPTIONS
 
@@ -177,6 +202,20 @@ Build from an image that CI pushed to a registry:
 Build from an Apptainer image:
 
     imgutil build -s /var/tmp/compute.sif /tmp/myimage
+
+Prepare an image of the build system OS in CI that builds without network
+access:
+
+    imgutil build --containerfile Containerfile
+    podman build -t localhost/compute .
+    podman save -o compute.tar localhost/compute
+    imgutil build -s compute.tar /tmp/compute
+
+The same for EL10 as a SIF:
+
+    imgutil build --containerfile --apptainer -s alma-10.0-x86_64 compute.def
+    apptainer build compute.sif compute.def
+    imgutil build -s compute.sif /tmp/compute
 
 Execute a shell in an unpacked image:
 

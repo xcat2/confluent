@@ -1498,7 +1498,14 @@ def main():
         help='Directory to make available in the build environment.  -v / will '
         'cause it to be mounted in image as /run/external/, -v /:/run/root '
         'will override the target to be /run/root, and something like /var/lib/repository:- will cause it to mount to the identical path inside the image', action='append')
-    buildp.add_argument('scratchdir', help='Directory to build new diskless root in')
+    buildp.add_argument('--containerfile', action='store_true',
+        help='Write a Containerfile instead of building, for an image with every package build checks for, '
+        'so that building from the image needs no repositories')
+    buildp.add_argument('--apptainer', action='store_true',
+        help='With --containerfile, write an Apptainer definition file for building a SIF instead')
+    buildp.add_argument('--from', dest='base', default=None,
+        help='With --containerfile, the base image to use instead of the default for the OS')
+    buildp.add_argument('scratchdir', help='Directory to build new diskless root in, or with --containerfile the file to write, - for standard output')
     execp = sps.add_parser('exec', help='Start specified scratch directory as container')
     execp.add_argument('-v', '--volume',
         help='Directory to make available in the build environment.  -v / will '
@@ -1518,12 +1525,20 @@ def main():
     capturep.add_argument('node', help='Node to capture image from')
     capturep.add_argument('profilename', help='Profile name for captured image')
     args = parser.parse_args()
-    if hasattr(args, 'scratchdir') and args.scratchdir:
+    if hasattr(args, 'scratchdir') and args.scratchdir and not (
+            getattr(args, 'containerfile', False) and args.scratchdir == '-'):
         args.scratchdir = os.path.abspath(args.scratchdir)
     if not args or not args.subcommand:
         parser.print_usage()
         sys.exit(1)
     if args.subcommand == 'build':
+        if (args.apptainer or args.base) and not args.containerfile:
+            sys.stderr.write('--apptainer and --from require --containerfile\n')
+            sys.exit(1)
+        if args.containerfile and args.addrepos:
+            sys.stderr.write('-r is not supported with --containerfile, the image installs '
+                             'from the repositories of its base image\n')
+            sys.exit(1)
         if args.source and container_source(args.source):
             import_root(args)
         else:
@@ -1937,14 +1952,16 @@ def fingerprint_host(args, hostpath='/'):
     return oshandler
 
 def build_root(args, oshandler=None):
-    check_root(args.scratchdir)
+    if not args.containerfile:
+        check_root(args.scratchdir)
     # an imported image comes with its handler
     if oshandler is None:
         if args.source:
             if '/' not in args.source and not os.path.exists(args.source):
                 args.source = os.path.join('/var/lib/confluent/distributions/', args.source)
             oshandler = fingerprint_source(args.source, args)
-            if oshandler is not None:
+            # a Containerfile installs from the repositories of its base image
+            if oshandler is not None and not args.containerfile:
                 oshandler.set_source(args.source)
         else:
             oshandler = fingerprint_host(args)
@@ -1965,6 +1982,9 @@ def build_root(args, oshandler=None):
                 'architecture {1}\n'.format(args.arch, oshandler.arch))
             sys.exit(1)
         oshandler.set_arch(args.arch)
+    if args.containerfile:
+        write_containerfile(args, oshandler)
+        return
     if oshandler.arch != hostarch:
         if not oshandler.crossbuild:
             sys.stderr.write(
@@ -2002,8 +2022,8 @@ container_transports = ('containers-storage:', 'dir:', 'docker://', 'docker-arch
                         'oci:', 'oci-archive:')
 
 def container_supported(oscategory):
-    """Whether building from container images supports oscategory, for
-    example el10 or ubuntu24.04"""
+    """Whether building from container images and generating a Containerfile
+    support oscategory, for example el10 or ubuntu24.04"""
     match = re.match(r'^(el|ubuntu|suse)([0-9]+(\.[0-9]+)?)$', oscategory)
     return bool(match) and float(match.group(2)) >= container_minversions[match.group(1)]
 
@@ -2038,6 +2058,10 @@ def get_sif_offset(sifname):
     raise Exception('No squashfs partition found in {0}'.format(sifname))
 
 def import_root(args):
+    if args.containerfile:
+        sys.stderr.write('--containerfile takes the OS from a distribution or the build system, '
+                         'not from a container image\n')
+        sys.exit(1)
     if args.addrepos:
         sys.stderr.write('A container image brings its own repositories, -r is not supported\n')
         sys.exit(1)
@@ -2195,6 +2219,86 @@ def _import_root(args):
     oshandler.imported = True
     build_root(args, oshandler)
 
+
+def write_containerfile(args, oshandler):
+    # A starting point for a CI built image that has every package build
+    # checks for, generated from the same package list
+    if os.path.isdir(args.scratchdir):
+        sys.stderr.write('{0} is a directory, give the file to write or - for '
+                         'standard output\n'.format(args.scratchdir))
+        sys.exit(1)
+    if oshandler.arch not in elf_arch_map.values():
+        sys.stderr.write('Unsupported architecture {0}, use one of {1}\n'.format(
+            oshandler.arch, ', '.join(elf_arch_map.values())))
+        sys.exit(1)
+    if not container_supported(oshandler.oscategory):
+        sys.stderr.write('Generating a Containerfile for {0} is not supported\n'.format(oshandler.oscategory))
+        sys.exit(1)
+    if args.selinux and not oshandler.selinuxsupport:
+        sys.stderr.write('--selinux is not supported for {0} images\n'.format(oshandler.oscategory))
+        sys.exit(1)
+    if not os.path.exists(oshandler.pkglist):
+        sys.stderr.write('No package list found for {0}\n'.format(oshandler.oscategory))
+        sys.exit(1)
+    if oshandler.oscategory.startswith('el'):
+        baseimage = 'docker.io/library/almalinux:{0}'.format(oshandler.oscategory[2:])
+        # container bases ship coreutils-single, a build gets full coreutils
+        install = ['dnf -y upgrade', 'dnf -y install --allowerasing coreutils {0}', 'dnf clean all']
+        example = 'dnf -y install munge slurm-slurmd'
+    elif oshandler.oscategory.startswith('ubuntu'):
+        baseimage = 'docker.io/library/ubuntu:{0}'.format(oshandler.version)
+        install = ['apt-get update', 'DEBIAN_FRONTEND=noninteractive apt-get -y dist-upgrade',
+                   'DEBIAN_FRONTEND=noninteractive apt-get -y install {0}', 'apt-get clean',
+                   'rm -rf /var/lib/apt/lists/*']
+        example = 'apt-get update && apt-get -y install munge slurmd'
+    else:
+        # Leap tags name the minor version
+        version = oshandler.version if '.' in oshandler.version else oshandler.version + '.0'
+        baseimage = 'registry.opensuse.org/opensuse/leap:{0}'.format(version)
+        install = ['zypper -n update', 'zypper -n install {0}', 'zypper clean -a']
+        example = 'zypper -n install munge slurm-node'
+    oshandler.add_pkglists()
+    pkgs = list(dict.fromkeys(oshandler.packages()))
+    pkglines = [' '.join(pkgs[idx:idx + 8]) for idx in range(0, len(pkgs), 8)]
+    pkgtext = '\\\n        ' + ' \\\n        '.join(pkglines)
+    buildopts = ''
+    if args.selinux:
+        buildopts += ' --selinux'
+    if args.packagelist:
+        buildopts += ' -p {0}'.format(args.packagelist)
+    for plist in args.addpackagelist:
+        buildopts += ' -a {0}'.format(plist)
+    platform = 'linux/' + deb_arch_map[oshandler.arch]
+    lines = ['# Generated by imgutil build --containerfile for {0} {1}'.format(
+                 oshandler.oscategory, oshandler.arch),
+             '# It installs every package imgutil build checks for, so building from the',
+             '# image does not run the package manager and needs no repositories.']
+    if args.apptainer:
+        lines += ['Bootstrap: docker', 'From: {0}'.format(args.base or baseimage), '', '%post']
+        lines += ['    ' + cmd.format(pkgtext) for cmd in install]
+        lines += ['    # Site specific content goes here, for example:',
+                  '    # {0}'.format(example),
+                  '',
+                  '# Build the SIF, then the diskless root from it:',
+                  '#   apptainer build --arch {0} myimage.sif myimage.def'.format(platform.split('/')[-1]),
+                  '#   imgutil build{0} -s myimage.sif /var/lib/confluent/scratch/myimage'.format(buildopts)]
+    else:
+        lines += ['FROM --platform={0} {1}'.format(platform, args.base or baseimage),
+                  'RUN ' + ' && \\\n    '.join(install).format(pkgtext),
+                  '',
+                  '# Site specific content goes here, for example:',
+                  '# RUN {0}'.format(example),
+                  '',
+                  '# Build and save the image, then the diskless root from it:',
+                  '#   podman build --platform {0} -t localhost/myimage .'.format(platform),
+                  '#   podman save -o myimage.tar localhost/myimage',
+                  '#   imgutil build{0} -s myimage.tar /var/lib/confluent/scratch/myimage'.format(buildopts)]
+    text = ''.join(line + '\n' for line in lines)
+    if args.scratchdir == '-':
+        sys.stdout.write(text)
+    else:
+        with open(args.scratchdir, 'w') as outfile:
+            outfile.write(text)
 
 def prep_decrypt(indir):
     indir = os.path.abspath(indir)
