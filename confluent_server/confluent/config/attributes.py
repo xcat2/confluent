@@ -218,6 +218,13 @@ node = {
     'deployment.client_ip': {
         'description': ('Client IP used when most recently reporting state.')
     },
+    'deployment.kernelargs': {
+        'description': ('Additional kernel command line arguments to pass at '
+                        'network boot, appended after the kernelargs of the '
+                        'profile. These arguments are not made '
+                        'persistent in the installed OS, except on SUSE 16, '
+                        'whose installer keeps its own kernel arguments.'),
+    },
     'deployment.lock': {
         'description': ('Indicates whether deployment actions should be impeded. '
                         'If locked, it indicates that a pending profile should not be applied. '
