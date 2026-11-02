@@ -1000,8 +1000,9 @@ def get_selinux_policy(rootpath, enabledonly=True):
     return policy
 
 
-def selinux_relabel(rootpath, policy):
-    """Label rootpath with its own policy, return False if it has none"""
+def selinux_relabel(rootpath, policy, force=False):
+    """Label rootpath with its own policy, return False if it has none.
+    force also resets user, role and range, not only the type"""
     if not policy:
         return False
     fcontexts = os.path.join(
@@ -1009,6 +1010,8 @@ def selinux_relabel(rootpath, policy):
     if not os.path.exists(fcontexts):
         return False
     cmd = ['setfiles', '-r', rootpath]
+    if force:
+        cmd.append('-F')
     # Validate against the image policy rather than the one loaded on the
     # build host, which may be older and reject contexts of newer modules
     binpolicies = [x for x in glob.glob(os.path.join(
@@ -1020,14 +1023,14 @@ def selinux_relabel(rootpath, policy):
     return True
 
 
-def relabel_image(rootpath):
+def relabel_image(rootpath, force=False):
     """Label rootpath with its own policy if its config enables SELinux,
     return False if that was needed but could not be done"""
     policy = get_selinux_policy(rootpath)
     if not policy:
         return True
     try:
-        if not selinux_relabel(rootpath, policy):
+        if not selinux_relabel(rootpath, policy, force):
             sys.stderr.write('SELinux is enabled in {0}, but its {1} policy is missing\n'.format(rootpath, policy))
             return False
     except OSError as e:
@@ -1665,8 +1668,10 @@ def build_root(args):
         sys.stderr.write('Image build failed\n')
         sys.exit(exitcode)
     if args.selinux:
-        # label with the policy installed in the image
-        if not relabel_image(args.scratchdir):
+        # label with the policy installed in the image, a new tree gets full
+        # contexts: its files carry the SELinux user of whoever created
+        # them, unconfined_u rather than system_u
+        if not relabel_image(args.scratchdir, force=True):
             sys.exit(1)
     #if len(args) > 1:
     #    pack_image(opts, args)
