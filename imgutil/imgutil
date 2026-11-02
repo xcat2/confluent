@@ -293,10 +293,45 @@ def capture_remote(args):
     subprocess.check_call(['osdeploy', 'updateboot', profname])
 
 
+# Processes the initramfs starts before the policy loads keep kernel_t:
+# urlmount serves the root image of a tethered node over https, and
+# imageboot.sh later runs dd from the initramfs
+SELINUX_DISKLESS_RULES = ('(allow kernel_t http_port_t (tcp_socket (name_connect)))\n'
+                          '(allow kernel_t root_t (file (entrypoint)))\n')
+
+
+def install_selinux_module():
+    # Captured images keep the policy of this system, so add the rules that
+    # --selinux builds put in their images. Return whether they were added,
+    # a node installed from such an image already has them
+    if not get_selinux_policy('/'):
+        return
+    sys.stdout.write('Installing SELinux module confluent_diskless for tethered boot of the image\n')
+    sys.stdout.flush()
+    with tempfile.TemporaryDirectory() as tmpdir:
+        modfile = os.path.join(tmpdir, 'confluent_diskless.cil')
+        with open(modfile, 'w') as modout:
+            modout.write(SELINUX_DISKLESS_RULES)
+        try:
+            added = 'confluent_diskless' not in subprocess.check_output(['semodule', '-l']).decode('utf8').split()
+            subprocess.check_call(['semodule', '-i', modfile])
+        except (OSError, subprocess.CalledProcessError) as e:
+            # untethered boot does not need it, so capture anyway
+            sys.stderr.write('Unable to install SELinux module confluent_diskless, tethered boot of the image may fail: {0}\n'.format(e))
+            return
+    return added
+
 def capture_system():
+    added = install_selinux_module()
     mkdirp('/run/imgutil/capout')
     _mount('none', '/run/imgutil/capout', 'tmpfs')
     run_constrained(capture_system_back, None)
+    if added:
+        # the captured image keeps it
+        try:
+            subprocess.check_call(['semodule', '-r', 'confluent_diskless'])
+        except (OSError, subprocess.CalledProcessError) as e:
+            sys.stderr.write('Unable to remove SELinux module confluent_diskless again: {0}\n'.format(e))
 
 def generalize_fstab():
     with open('/etc/fstab') as tabfile:
@@ -960,13 +995,9 @@ class ElHandler(OsHandler):
                 # not sys.exit, run_constrained would turn it into success
                 sys.stderr.write('SELinux was requested, but the image has no /etc/selinux/config\n')
                 raise Exception('SELinux not enabled in image')
-            # Processes the initramfs starts before the policy loads keep
-            # kernel_t: urlmount serves the root image of a tethered node over
-            # https, and imageboot.sh later runs dd from the initramfs
             modfile = os.path.join(self.targpath, 'tmp/confluent_diskless.cil')
             with open(modfile, 'w') as modout:
-                modout.write('(allow kernel_t http_port_t (tcp_socket (name_connect)))\n'
-                             '(allow kernel_t root_t (file (entrypoint)))\n')
+                modout.write(SELINUX_DISKLESS_RULES)
             args.cmd = ['semodule', '-n', '-i', '/tmp/confluent_diskless.cil']
             rc = run_constrainedx(fancy_chroot, (args, self.targpath))
             os.remove(modfile)
