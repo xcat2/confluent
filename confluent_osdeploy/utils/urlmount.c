@@ -403,5 +403,6 @@ int main(int argc, char* argv[]) {
     }
     curl_easy_cleanup(curl);
     curl_global_cleanup();
+    argv[0][0] = '@';  /* Keep this initramfs root storage daemon alive during shutdown. */
     fuse_main(argc, argv, &http_ops, NULL);
 }
