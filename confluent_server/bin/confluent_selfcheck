@@ -51,6 +51,7 @@ def fprint(txt):
 def tftp_works():
     try:
         subprocess.check_call(['curl', '--connect-timeout', '2', '-sf', 'tftp://localhost/confluent/x86_64/ipxe.efi', '-o', '/dev/null'])
+        subprocess.check_call(['curl', '--connect-timeout', '2', '-sf', 'tftp://localhost/confluent/x86_64/ipxe-shim.efi', '-o', '/dev/null'])
         return True
     except Exception:
         return False
