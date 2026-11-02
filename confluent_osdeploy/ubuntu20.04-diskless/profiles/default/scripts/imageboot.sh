@@ -242,6 +242,8 @@ EOF
         fi
     fi
     echo "  version: 2" >> /sysroot/etc/netplan/10-${iface}-confluentcfg.yaml
+    # netplan warns about configuration readable by others, as confignet knows
+    chmod 600 /sysroot/etc/netplan/10-${iface}-confluentcfg.yaml
 fi
 if grep installtodisk /proc/cmdline > /dev/null; then
     . /etc/confluent/functions
