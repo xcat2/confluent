@@ -219,6 +219,7 @@ def clean_exit():
     sys.stdout.write('\x1b[?1003l')  # Disable mouse movement tracking
     sys.stdout.write('\x1b[?1000l')  # Disable mouse click tracking
     sys.stdout.flush()
+    indirect_console()
     if inhandler:
         # consume pending mouse actions rather than inflicting them on the prompt
         inhandler.drain_input()
