@@ -482,6 +482,8 @@ def get_mydir(oscategory):
 class OsHandler(object):
     crossbuild = False
     selinuxsupport = False
+    # downloaded packages and repository metadata left by the package manager
+    pkgcaches = ()
 
     def __init__(self, name, version, arch, args):
         self.name = name
@@ -515,6 +517,15 @@ class OsHandler(object):
             self.addrepos = args.addrepos
         except AttributeError:
             self.addrepos = []
+
+    def clean_pkgcaches(self):
+        # they only take space in the image, and memory on untethered nodes
+        for pattern in self.pkgcaches:
+            for path in glob.glob(os.path.join(self.targpath, pattern)):
+                if os.path.isdir(path) and not os.path.islink(path):
+                    shutil.rmtree(path)
+                else:
+                    os.remove(path)
 
     def set_interactive(self, shouldbeinteractive):
         self._interactive = shouldbeinteractive
@@ -587,6 +598,8 @@ class OsHandler(object):
         return retpkgs
 
 class SuseHandler(OsHandler):
+    pkgcaches = ('var/cache/zypp/*',)
+
     def __init__(self, name, version, arch, args):
         if not isinstance(version, str):
             version = version.decode('utf8')
@@ -740,6 +753,7 @@ uname_arch_map = {
 
 class DebHandler(OsHandler):
     crossbuild = True
+    pkgcaches = ('var/cache/apt/archives/*.deb', 'var/cache/apt/*.bin', 'var/lib/apt/lists/*')
 
     def set_arch(self, arch):
         super().set_arch(uname_arch_map.get(arch, arch))
@@ -842,6 +856,7 @@ class DebHandler(OsHandler):
 
 class ElHandler(OsHandler):
     crossbuild = True
+    pkgcaches = ('var/cache/dnf/*',)
     selinuxsupport = True
 
     def __init__(self, name, version, arch, args, hostpath='/'):
@@ -1338,6 +1353,7 @@ def build_root_backend(optargs):
     oshandler.prep_root_premount(args)
     _mount_constrained_fs(args, installroot)
     oshandler.prep_root(args)
+    oshandler.clean_pkgcaches()
     mkdirp(os.path.join(installroot, 'etc/'))
     with open(os.path.join(installroot, 'etc/confluentimg.buildinfo'), 'w') as imginfo:
         imginfo.write('BUILDDATE={}\n'.format(datetime.datetime.now().strftime('%Y-%m-%dT%H:%M')))
