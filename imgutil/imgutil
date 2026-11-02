@@ -945,6 +945,18 @@ class ElHandler(OsHandler):
                 # not sys.exit, run_constrained would turn it into success
                 sys.stderr.write('SELinux was requested, but the image has no /etc/selinux/config\n')
                 raise Exception('SELinux not enabled in image')
+            # Processes the initramfs starts before the policy loads keep
+            # kernel_t: urlmount serves the root image of a tethered node over
+            # https, and imageboot.sh later runs dd from the initramfs
+            modfile = os.path.join(self.targpath, 'tmp/confluent_diskless.cil')
+            with open(modfile, 'w') as modout:
+                modout.write('(allow kernel_t http_port_t (tcp_socket (name_connect)))\n'
+                             '(allow kernel_t root_t (file (entrypoint)))\n')
+            args.cmd = ['semodule', '-n', '-i', '/tmp/confluent_diskless.cil']
+            rc = run_constrainedx(fancy_chroot, (args, self.targpath))
+            os.remove(modfile)
+            if rc:
+                raise Exception('Installing the confluent SELinux module failed')
             return
         try:
             with open(os.path.join(self.targpath, 'etc/selinux/config'), 'r') as seconfigin:
