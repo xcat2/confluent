@@ -698,6 +698,9 @@ if __name__ == '__main__':
         nm = NetworkManager(devtypes, dc)
     elif os.path.exists('/usr/sbin/wicked'):
         nm = WickedManager()
+    else:
+        sys.stderr.write('No netplan, nmcli or wicked found, unable to configure the network\n')
+        sys.exit(1)
     retrynics = []
     if ipaddress:
         dnsbynetname = {}
@@ -731,7 +734,7 @@ if __name__ == '__main__':
         idxmap, devtypes = map_idx_to_name()
         if os.path.exists('/usr/sbin/netplan'):
             nm = NetplanManager(dc)
-        if os.path.exists('/usr/bin/nmcli'):
+        elif os.path.exists('/usr/bin/nmcli'):
             nm = NetworkManager(devtypes, dc)
         elif os.path.exists('/usr/sbin/wicked'):
             nm = WickedManager()
