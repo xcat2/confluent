@@ -99,7 +99,11 @@ elif [ "$imagemethod" = uncompressed ]; then
     mount -t tmpfs disklessroot /sysroot
 fi
 if [ "$TETHERED" = 0 ]; then
-    extract_untethered_rootimg
+    if ! extract_untethered_rootimg; then
+        # a partly extracted root would boot into a broken system
+        echo "Unable to boot: the root filesystem could not be extracted into memory, the image may be too large for an untethered boot on this node"
+        while :; do sleep 86400; done
+    fi
 elif [ ! -f /tmp/mountparts.sh ]; then
     mkdir -p /mnt/overlay/upper /mnt/overlay/work
     mount -t overlay -o upperdir=/mnt/overlay/upper,workdir=/mnt/overlay/work,lowerdir=/mnt/remote disklessroot /sysroot

@@ -65,7 +65,11 @@ if [ "untethered" = "$imagemethod" -o "uncompressed" = "$imagemethod" ]; then
     else
         mount -t tmpfs disklessroot /sysroot
     fi
-    extract_untethered_rootimg
+    if ! extract_untethered_rootimg; then
+        # a partly extracted root would boot into a broken system
+        echo "Unable to boot: the root filesystem could not be extracted into memory, the image may be too large for an untethered boot on this node"
+        while :; do sleep 86400; done
+    fi
 else
     TETHERED=1
     mount -o discard /dev/zram0 /mnt/overlay
