@@ -1742,7 +1742,7 @@ def prep_decrypt(indir):
 def unpack_image(args):
     scratchdir = args.scratchdir
     indir = args.profilename
-    if not os.path.exists(indir) and '/' not in indir:
+    if not os.path.exists(os.path.join(indir, 'rootimg.sfs')) and '/' not in indir:
         indir = os.path.join('/var/lib/confluent/public/os', indir)
     if os.path.isdir(indir):
         indir = os.path.join(indir, 'rootimg.sfs')
