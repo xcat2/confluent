@@ -165,6 +165,14 @@ class PlayRunner(object):
                         stdout, stder = await worker.communicate()
                         self.stderr += stder.decode('utf8')
                         self.stdout += stdout.decode('utf8')
+                        if worker.returncode != 0:
+                            # the play could not run at all
+                            errlines = stder.decode('utf8').strip().splitlines()
+                            self.results.append({
+                                'task_name': os.path.basename(playfilename),
+                                'changed': False, 'state': 'FAILED',
+                                'warnings': [],
+                                'errorinfo': '\n'.join(errlines[-10:])})
         finally:
             self.complete = True
 
@@ -178,18 +186,22 @@ async def run_playbooks(playfiles, nodes):
 
 
 def print_result(result, state, collector=None, callbacksock=None):
+    # _result is deprecated in newer ansible-core
+    taskresult = getattr(result, 'result', None)
+    if taskresult is None:
+        taskresult = result._result
     output = {
         'task_name': result.task_name,
-        'changed': result._result.get('changed', ''),
+        'changed': taskresult.get('changed', ''),
     }
     output['state'] = state
-    output['warnings'] = result._result.get('warnings', [])
+    output['warnings'] = taskresult.get('warnings', [])
     try:
-        del result._result['warnings']
+        del taskresult['warnings']
     except KeyError:
         pass
     if state != 'ok' and collector and hasattr(collector, '_dump_results'):
-        output['errorinfo'] = collector._dump_results(result._result)
+        output['errorinfo'] = collector._dump_results(taskresult)
     msg = msgpack.packb(output, use_bin_type=True)
     msglen = len(msg)
     callbacksock.sendall(struct.pack('=q', msglen))
@@ -205,7 +217,7 @@ if __name__ == '__main__':
     from ansible.module_utils.common.collections import ImmutableDict
     from ansible.plugins.callback import CallbackBase
     import ansible.plugins.loader
-    import yaml
+    import inspect
 
     sockpath = os.environ.get('FEEDBACK_SOCK')
     if not sockpath:
@@ -217,6 +229,8 @@ if __name__ == '__main__':
 
 
     class ResultsCollector(CallbackBase):
+        # used in ansible's callback error messages
+        _load_name = 'confluent'
 
         def v2_runner_on_unreachable(self, result):
             print_result(result, 'UNREACHABLE', self, callbacksock)
@@ -248,14 +262,28 @@ if __name__ == '__main__':
         invlist = sys.argv[1] + ','
         invman = InventoryManager(loader=loader, sources=invlist)
     varman = VariableManager(loader=loader, inventory=invman)
-    plays = yaml.safe_load(open(sys.argv[2]))
+    if 'trusted_as_template' in inspect.signature(
+            loader.load_from_file).parameters:
+        # ansible-core 2.19+ only templates trusted data
+        plays = loader.load_from_file(sys.argv[2], trusted_as_template=True)
+    else:
+        plays = loader.load_from_file(sys.argv[2])
     os.chdir(os.path.dirname(sys.argv[2]))
     if isinstance(plays, dict):
         plays = [plays]
+    callbackbyname = 'stdout_callback_name' in inspect.signature(
+        TaskQueueManager.__init__).parameters
 
     for currplay in plays:
+        collector = ResultsCollector()
+        # newer ansible-core only takes a callback name
+        callbackarg = {} if callbackbyname else {'stdout_callback': collector}
         taskman = TaskQueueManager(inventory=invman, loader=loader, passwords={},
-            variable_manager=varman, stdout_callback=ResultsCollector())
+            variable_manager=varman, **callbackarg)
+        if callbackbyname:
+            # ansible then loads none of its own
+            collector._init_callback_methods()
+            taskman._callback_plugins.append(collector)
 
         currplay['hosts'] = sys.argv[1]
         if 'become' in currplay and 'become_user' not in currplay:
