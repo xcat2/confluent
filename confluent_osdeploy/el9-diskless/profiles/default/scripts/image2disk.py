@@ -25,6 +25,9 @@ def convert_lv(oldlvname):
         return None
     return oldlvname.replace(oldvgname, vgname)
 
+def get_uuid(devname):
+    return subprocess.check_output(['blkid', '-s', 'UUID', '-o', 'value', devname]).decode('utf8').strip()
+
 def get_partname(devname, idx):
     if devname[-1] in '0123456789':
         return '{}p{}'.format(devname, idx)
@@ -116,9 +119,7 @@ def fixup(rootdir, vols):
                     if targetdev.startswith('/dev/{}/'.format(vgname)):
                         entry[0] = targetdev
                     else:
-                        uuid = subprocess.check_output(['blkid', '-s', 'UUID', '-o', 'value', targetdev]).decode('utf8')
-                        uuid = uuid.strip()
-                        entry[0] = 'UUID={}'.format(uuid)
+                        entry[0] = 'UUID={}'.format(get_uuid(targetdev))
                 elif entry[2] == 'swap':
                     if newswapdev and newswapdev.startswith('UUID='):
                         entry[0] = newswapdev
@@ -460,6 +461,7 @@ def install_to_disk(imgpath):
     biggestsize = sectorsize * biggestsectors
     parted.run('mklabel gpt')
     curroffset = 2048
+    partnum = 0
     for volidx in sorted(plainvols):
         vol = plainvols[volidx]
         if vol is not biggestfs:
@@ -471,7 +473,9 @@ def install_to_disk(imgpath):
         if end > lastsector:
             end = lastsector
         parted.run('mkpart primary {}s {}s'.format(curroffset, end))
-        vol['targetdisk'] = get_partname(instdisk, volidx)
+        # parted numbers the new partitions in order, the source may have gaps
+        partnum += 1
+        vol['targetdisk'] = get_partname(instdisk, partnum)
         if vol['mount'] == '/':
             newrootdev = vol['targetdisk']
         curroffset += size + 1
@@ -483,12 +487,12 @@ def install_to_disk(imgpath):
             if end > lastsector:
                 end = lastsector
             parted.run('mkpart swap {}s {}s'.format(curroffset, end))
-            newswapdev = get_partname(instdisk, volidx + 1)
+            newswapdev = get_partname(instdisk, partnum + 1)
             subprocess.check_call(['mkswap', newswapdev])
-            newswapdev = 'UUID=' + subprocess.check_output(['blkid', '-s', 'UUID', '-o', 'value', newswapdev]).decode('utf8').strip()
+            newswapdev = 'UUID=' + get_uuid(newswapdev)
     else:
         parted.run('mkpart lvm {}s 100%'.format(curroffset))
-        lvmpart = get_partname(instdisk, volidx + 1)
+        lvmpart = get_partname(instdisk, partnum + 1)
         subprocess.check_call(['pvcreate', '-ff', '-y', lvmpart])
         subprocess.check_call(['vgcreate', vgname, lvmpart])
         vgroupmap = {}
@@ -637,7 +641,7 @@ def install_to_disk(imgpath):
         subprocess.check_call(['mount', vol['targetdisk'], '/run/imginst/targ/' + vol['mount']])
     if newrootdev and not newrootdev.startswith('/dev/{}/'.format(vgname)):
         # partition names are not stable on systems with several disks
-        newrootdev = 'UUID=' + subprocess.check_output(['blkid', '-s', 'UUID', '-o', 'value', newrootdev]).decode('utf8').strip()
+        newrootdev = 'UUID=' + get_uuid(newrootdev)
     fixup('/run/imginst/targ', allvols)
 
 

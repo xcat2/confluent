@@ -14,6 +14,9 @@ import traceback
 
 bootuuid = None
 
+def get_uuid(devname):
+    return subprocess.check_output(['blkid', '-s', 'UUID', '-o', 'value', devname]).decode('utf8').strip()
+
 def get_partname(devname, idx):
     if devname[-1] in '0123456789':
         return '{}p{}'.format(devname, idx)
@@ -105,9 +108,7 @@ def fixup(rootdir, vols):
                     if targetdev.startswith('/dev/localstorage/'):
                         entry[0] = targetdev
                     else:
-                        uuid = subprocess.check_output(['blkid', '-s', 'UUID', '-o', 'value', targetdev]).decode('utf8')
-                        uuid = uuid.strip()
-                        entry[0] = 'UUID={}'.format(uuid)
+                        entry[0] = 'UUID={}'.format(get_uuid(targetdev))
                 elif entry[2] == 'swap':
                     entry[0] = swapdev
                 entry[0] = entry[0].ljust(42)
@@ -358,6 +359,7 @@ def install_to_disk(imgpath):
     biggestsize = sectorsize * biggestsectors
     parted.run('mklabel gpt')
     curroffset = 2048
+    partnum = 0
     for volidx in sorted(plainvols):
         vol = plainvols[volidx]
         if vol is not biggestfs:
@@ -369,7 +371,9 @@ def install_to_disk(imgpath):
         if end > lastsector:
             end = lastsector
         parted.run('mkpart primary {}s {}s'.format(curroffset, end))
-        vol['targetdisk'] = get_partname(instdisk, volidx)
+        # parted numbers the new partitions in order, the source may have gaps
+        partnum += 1
+        vol['targetdisk'] = get_partname(instdisk, partnum)
         curroffset += size + 1
     if not lvmvols:
         if swapsize:
@@ -379,12 +383,12 @@ def install_to_disk(imgpath):
             if end > lastsector:
                 end = lastsector
             parted.run('mkpart swap {}s {}s'.format(curroffset, end))
-            swappart = get_partname(instdisk, volidx + 1)
+            swappart = get_partname(instdisk, partnum + 1)
             subprocess.check_call(['mkswap', swappart])
-            swapdev = 'UUID=' + subprocess.check_output(['blkid', '-s', 'UUID', '-o', 'value', swappart]).decode('utf8').strip()
+            swapdev = 'UUID=' + get_uuid(swappart)
     else:
         parted.run('mkpart lvm {}s 100%'.format(curroffset))
-        lvmpart = get_partname(instdisk, volidx + 1)
+        lvmpart = get_partname(instdisk, partnum + 1)
         subprocess.check_call(['pvcreate', '-ff', '-y', lvmpart])
         subprocess.check_call(['vgcreate', 'localstorage', lvmpart])
         vginfo = subprocess.check_output(['vgdisplay', 'localstorage', '--units', 'b']).decode('utf8')
