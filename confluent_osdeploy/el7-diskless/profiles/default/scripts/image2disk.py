@@ -68,6 +68,8 @@ class PartedRunner():
         else:
             return subprocess.run(command, stdout=subprocess.PIPE).stdout.decode('utf8')
 
+swapdev = '/dev/mapper/localstorage-swap'
+
 def fixup(rootdir, vols):
     devbymount = {}
     for vol in vols:
@@ -92,7 +94,7 @@ def fixup(rootdir, vols):
                         uuid = uuid.strip()
                         entry[0] = 'UUID={}'.format(uuid)
                 elif entry[2] == 'swap':
-                    entry[0] = '/dev/mapper/localstorage-swap'
+                    entry[0] = swapdev
                 entry[0] = entry[0].ljust(42)
                 entry[1] = entry[1].ljust(16)
                 entry[3] = entry[3].ljust(28)
@@ -196,6 +198,7 @@ def had_swap():
     return False
 
 def install_to_disk(imgpath):
+    global swapdev
     lvmvols = {}
     deftotsize = 0
     mintotsize = 0
@@ -287,7 +290,9 @@ def install_to_disk(imgpath):
             if end > lastsector:
                 end = lastsector
             parted.run('mkpart swap {}s {}s'.format(curroffset, end))
-            subprocess.check_call(['mkswap', get_partname(instdisk, volidx + 1)])
+            swappart = get_partname(instdisk, volidx + 1)
+            subprocess.check_call(['mkswap', swappart])
+            swapdev = 'UUID=' + subprocess.check_output(['blkid', '-s', 'UUID', '-o', 'value', swappart]).decode('utf8').strip()
     else:
         parted.run('mkpart lvm {}s 100%'.format(curroffset))
         lvmpart = get_partname(instdisk, volidx + 1)
@@ -327,30 +332,51 @@ def install_to_disk(imgpath):
         if swapsize:
             subprocess.check_call(['lvcreate', '-y', '-l', '{}'.format(swapsize // pesize), '-n', 'swap', 'localstorage'])
             subprocess.check_call(['mkswap', '/dev/localstorage/swap'])
-        os.makedirs('/run/imginst/targ')
-        for vol in allvols:
-            with open(vol['targetdisk'], 'wb') as partition:
-                partition.write(b'\x00' * 1 * 1024 * 1024)
-            subprocess.check_call(['mkfs.{}'.format(vol['filesystem']), vol['targetdisk']])
-            subprocess.check_call(['mount', vol['targetdisk'], '/run/imginst/targ'])
-            source = vol['mount'].replace('/', '_')
-            source = '/run/imginst/sources/' + source
-            blankfsstat = os.statvfs('/run/imginst/targ')
-            blankused = (blankfsstat.f_blocks - blankfsstat.f_bfree) * blankfsstat.f_bsize
-            sys.stdout.write('\nWriting {0}: '.format(vol['mount']))
-            with subprocess.Popen(['cp', '-ax', source + '/.', '/run/imginst/targ']) as copier:
+    os.makedirs('/run/imginst/targ')
+    for vol in allvols:
+        with open(vol['targetdisk'], 'wb') as partition:
+            partition.write(b'\x00' * 1 * 1024 * 1024)
+        subprocess.check_call(['mkfs.{}'.format(vol['filesystem']), vol['targetdisk']])
+        subprocess.check_call(['mount', vol['targetdisk'], '/run/imginst/targ'])
+        source = vol['mount'].replace('/', '_')
+        source = '/run/imginst/sources/' + source
+        blankfsstat = os.statvfs('/run/imginst/targ')
+        blankused = (blankfsstat.f_blocks - blankfsstat.f_bfree) * blankfsstat.f_bsize
+        sys.stdout.write('\nWriting {0}: '.format(vol['mount']))
+        with subprocess.Popen(['cp', '-ax', source + '/.', '/run/imginst/targ']) as copier:
+            stillrunning = copier.poll()
+            lastprogress = 0.0
+            while stillrunning is None:
+                currfsstat = os.statvfs('/run/imginst/targ')
+                currused = (currfsstat.f_blocks - currfsstat.f_bfree) * currfsstat.f_bsize
+                currused -= blankused
+                with open('/proc/meminfo') as meminf:
+                    for line in meminf.read().split('\n'):
+                        if line.startswith('Dirty:'):
+                            _, dirty, _ = line.split()
+                            dirty = int(dirty) * 1024
+                progress = (currused - dirty) / vol['minsize']
+                if progress < lastprogress:
+                    progress = lastprogress
+                if progress > 0.99:
+                    progress = 0.99
+                lastprogress = progress
+                progress = progress * 100
+                sys.stdout.write('\x1b[1K\rWriting {0}: {1:3.2f}%'.format(vol['mount'], progress))
+                sys.stdout.flush()
+                time.sleep(0.5)
                 stillrunning = copier.poll()
-                lastprogress = 0.0
+            if stillrunning != 0:
+                raise Exception("Error copying volume")
+            with subprocess.Popen(['sync']) as syncrun:
+                stillrunning = syncrun.poll()
                 while stillrunning is None:
-                    currfsstat = os.statvfs('/run/imginst/targ')
-                    currused = (currfsstat.f_blocks - currfsstat.f_bfree) * currfsstat.f_bsize
-                    currused -= blankused
                     with open('/proc/meminfo') as meminf:
                         for line in meminf.read().split('\n'):
                             if line.startswith('Dirty:'):
                                 _, dirty, _ = line.split()
                                 dirty = int(dirty) * 1024
-                    progress = (currused - dirty) / vol['minsize']
+                    progress = (vol['minsize'] - dirty) / vol['minsize']
                     if progress < lastprogress:
                         progress = lastprogress
                     if progress > 0.99:
@@ -360,35 +386,14 @@ def install_to_disk(imgpath):
                     sys.stdout.write('\x1b[1K\rWriting {0}: {1:3.2f}%'.format(vol['mount'], progress))
                     sys.stdout.flush()
                     time.sleep(0.5)
-                    stillrunning = copier.poll()
-                if stillrunning != 0:
-                    raise Exception("Error copying volume")
-                with subprocess.Popen(['sync']) as syncrun:
                     stillrunning = syncrun.poll()
-                    while stillrunning is None:
-                        with open('/proc/meminfo') as meminf:
-                            for line in meminf.read().split('\n'):
-                                if line.startswith('Dirty:'):
-                                    _, dirty, _ = line.split()
-                                    dirty = int(dirty) * 1024
-                        progress = (vol['minsize'] - dirty) / vol['minsize']
-                        if progress < lastprogress:
-                            progress = lastprogress
-                        if progress > 0.99:
-                            progress = 0.99
-                        lastprogress = progress
-                        progress = progress * 100
-                        sys.stdout.write('\x1b[1K\rWriting {0}: {1:3.2f}%'.format(vol['mount'], progress))
-                        sys.stdout.flush()
-                        time.sleep(0.5)
-                        stillrunning = syncrun.poll()
-                sys.stdout.write('\x1b[1K\rDone writing {0}'.format(vol['mount']))
-                sys.stdout.write('\n')
-                sys.stdout.flush()
-            subprocess.check_call(['umount', '/run/imginst/targ'])
-        for vol in allvols:
-            subprocess.check_call(['mount', vol['targetdisk'], '/run/imginst/targ/' + vol['mount']])
-        fixup('/run/imginst/targ', allvols)
+            sys.stdout.write('\x1b[1K\rDone writing {0}'.format(vol['mount']))
+            sys.stdout.write('\n')
+            sys.stdout.flush()
+        subprocess.check_call(['umount', '/run/imginst/targ'])
+    for vol in allvols:
+        subprocess.check_call(['mount', vol['targetdisk'], '/run/imginst/targ/' + vol['mount']])
+    fixup('/run/imginst/targ', allvols)
 
 
 if __name__ == '__main__':
