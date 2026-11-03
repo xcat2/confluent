@@ -149,6 +149,59 @@ class FileMasker():
                     secontext = secontext.split(b'\x00', 1)[0].decode('utf8')
                     subprocess.check_call(['chcon', secontext, tmaskwith])
 
+# Directories whose contents are host specific leftovers (scratch space,
+# crash dumps, logs, caches, cached credentials). The directories themselves
+# are kept so their mode, ownership and labels survive.
+CAPTURE_EMPTY_DIRS = (
+    '/tmp', '/var/tmp', '/var/crash', '/var/log/journal',
+    '/var/lib/systemd/coredump', '/var/spool/abrt', '/var/spool/mail',
+    '/var/mail', '/var/lib/sss/db', '/var/cache/dnf', '/var/cache/yum')
+# Directories where daemons expect the subdirectories to exist, only the
+# files are dropped
+CAPTURE_DIRS_ONLY = ('/var/log', '/var/cache/apt')
+# Individual files, may be globs
+CAPTURE_DROP_FILES = (
+    '/var/lib/systemd/random-seed', '/var/lib/rsyslog/imjournal.state',
+    '/var/lib/NetworkManager/*.lease', '/var/lib/dhclient/*.lease',
+    '/root/.*_history', '/root/.lesshst', '/root/.viminfo')
+
+def get_capture_excludes(mdir):
+    prefix = mdir.rstrip('/') + '/'
+
+    def capin_path(path):
+        if path != mdir and not path.startswith(prefix):
+            return None
+        return os.path.normpath(os.path.join(
+            '/run/imgutil/capin', os.path.relpath(path, mdir)))
+
+    excludes = []
+    emptied = set()
+    for scratch in CAPTURE_EMPTY_DIRS:
+        top = capin_path(scratch)
+        if top is None or os.path.islink(top) or not os.path.isdir(top):
+            continue
+        emptied.add(top)
+        excludes.extend(os.path.join(top, x) for x in os.listdir(top))
+    for scratch in CAPTURE_DIRS_ONLY:
+        top = capin_path(scratch)
+        if top is None or os.path.islink(top) or not os.path.isdir(top):
+            continue
+        pending = [top]
+        while pending:
+            for entry in os.scandir(pending.pop()):
+                if not entry.is_dir(follow_symlinks=False):
+                    excludes.append(entry.path)
+                elif entry.path not in emptied:
+                    pending.append(entry.path)
+    for dropglob in CAPTURE_DROP_FILES:
+        top = capin_path(dropglob)
+        if top is None:
+            continue
+        for dropfile in glob.glob(top):
+            if os.path.islink(dropfile) or not os.path.isdir(dropfile):
+                excludes.append(dropfile)
+    return excludes
+
 def capture_fs(args):
     fsinfo, fname = args
     _mount(fsinfo['mount'], '/run/imgutil/capin', flags=MS_BIND|MS_RDONLY)
@@ -165,7 +218,22 @@ def capture_fs(args):
         masker.mask('/etc/pki/tls/private/*')
         masker.mask('/root/.ssh/id_*')
         masker.mask('/etc/netplan/*.yaml')
-        subprocess.check_call(['mksquashfs', '/run/imgutil/capin', fname + '.sfs', '-comp', 'xz'])
+        mksquashargs = ['mksquashfs', '/run/imgutil/capin', fname + '.sfs', '-comp', 'xz']
+        excludes = get_capture_excludes(mdir)
+        exfile = None
+        if excludes:
+            # absolute paths, matched by inode, one per line
+            exfd, exfile = tempfile.mkstemp(dir='/run/imgutil/captmp')
+            with os.fdopen(exfd, 'w') as exout:
+                for exclude in excludes:
+                    if '\n' not in exclude:
+                        exout.write(exclude + '\n')
+            mksquashargs += ['-ef', exfile]
+        try:
+            subprocess.check_call(mksquashargs)
+        finally:
+            if exfile:
+                os.remove(exfile)
 
 def capture_local_cleanup():
     try:
