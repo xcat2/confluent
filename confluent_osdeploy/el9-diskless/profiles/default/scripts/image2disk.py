@@ -20,6 +20,12 @@ bootuuid = None
 vgname = 'localstorage'
 oldvgname = None
 
+def split_mapper_name(devname):
+    # device mapper joins VG and LV name with a hyphen and doubles hyphens
+    # inside either name
+    names = re.split(r'(?<!-)-(?!-)', devname, 1) + ['']
+    return names[0].replace('--', '-'), names[1].replace('--', '-')
+
 def convert_lv(oldlvname):
     if oldvgname is None:
         return None
@@ -409,8 +415,8 @@ def install_to_disk(imgpath):
                 osname = oldvgname.split('_')[0]
                 nodename = socket.gethostname().split('.')[0]
                 vgname = '{}_{}'.format(osname, nodename)
-            elif '-' in odevname: # unique one
-                vgmap[odevname] = odevname.split('-')[0]
+            elif '-' in odevname and split_mapper_name(odevname)[0] != vgname: # unique one
+                vgmap[odevname] = split_mapper_name(odevname)[0]
                 lvmvols[odevname] = fs
 
                 continue
@@ -499,7 +505,7 @@ def install_to_disk(imgpath):
                 subprocess.check_call(['pvcreate', '-ff', '-y', morelvmpart])
                 subprocess.check_call(['vgcreate', morevg, morelvmpart])
                 donedisks[targdisk] = 1
-            morelvname = morevolname.split('-', 1)[1]
+            morelvname = split_mapper_name(morevolname)[1]
             subprocess.check_call(['lvcreate', '-L', '{}b'.format(lvmvols[morevolname]['initsize']), '-y', '-n', morelvname, morevg])
             lvmvols[morevolname]['targetdisk'] = '/dev/{}/{}'.format(morevg, morelvname)
 
