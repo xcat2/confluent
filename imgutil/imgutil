@@ -285,12 +285,16 @@ def capture_remote(args):
     label = '{0} {1} ({2})'.format(finfo['name'], finfo['version'], profname)
     with open(os.path.join(outdir, 'profile.yaml'), 'w') as profileout:
         profileout.write('label: {}\n'.format(label))
-        profileout.write('kernelargs: quiet installtodisk # remove installtodisk to boot stateless')
+        profileout.write('kernelargs: quiet installtodisk # remove installtodisk to boot stateless\n')
+        profileout.write('# A diskless boot only gets the kernelargs above, not the kernel arguments\n'
+                         '# of the source. Add those it relies on and run osdeploy updateboot.\n')
     subprocess.check_call(['chmod', 'o+r,go-w,a-t', '-R', outdir])
     subprocess.check_call(['chown', '-R', 'confluent', outdir])
     sys.stdout.write('Updating boot image... ')
     sys.stdout.flush()
     subprocess.check_call(['osdeploy', 'updateboot', profname])
+    print('Note: a diskless boot of {0} only gets the kernelargs in {1}, add kernel '
+          'arguments of the source it relies on there'.format(profname, os.path.join(outdir, 'profile.yaml')))
 
 
 def capture_system():
