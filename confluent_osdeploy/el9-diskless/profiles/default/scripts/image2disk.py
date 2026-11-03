@@ -409,13 +409,17 @@ def install_to_disk(imgpath):
 
         if fs['device'].startswith('/dev/mapper'):
             odevname = fs['device'].rsplit('/', 1)[-1]
+            if split_mapper_name(odevname)[0] == vgname:
+                # already in the volume group the install creates, as when
+                # recapturing a node that was installed this way
+                pass
             # if node has - then /dev/mapper will double up the hypen
-            if '_' in odevname and '-' in odevname.split('_', 1)[-1]:
+            elif '_' in odevname and '-' in odevname.split('_', 1)[-1]:
                 oldvgname = odevname.rsplit('-', 1)[0].replace('--', '-')
                 osname = oldvgname.split('_')[0]
                 nodename = socket.gethostname().split('.')[0]
                 vgname = '{}_{}'.format(osname, nodename)
-            elif '-' in odevname and split_mapper_name(odevname)[0] != vgname: # unique one
+            elif '-' in odevname: # unique one
                 vgmap[odevname] = split_mapper_name(odevname)[0]
                 lvmvols[odevname] = fs
 
