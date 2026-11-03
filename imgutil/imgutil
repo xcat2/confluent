@@ -240,6 +240,8 @@ def capture_fs(args):
         masker.mask('/etc/pki/tls/private/*')
         masker.mask('/root/.ssh/id_*')
         masker.mask('/etc/netplan/*.yaml')
+        # an empty hostname keeps the node name the deployment initramfs set
+        masker.mask('/etc/hostname', '/run/imgutil/captmp/empty')
         mksquashargs = ['mksquashfs', '/run/imgutil/capin', fname + '.sfs', '-comp', 'xz']
         excludes = get_capture_excludes(mdir)
         exfile = None
