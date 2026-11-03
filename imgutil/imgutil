@@ -160,11 +160,17 @@ CAPTURE_EMPTY_DIRS = (
 # Directories where daemons expect the subdirectories to exist, only the
 # files are dropped
 CAPTURE_DIRS_ONLY = ('/var/log', '/var/cache/apt')
-# Individual files, may be globs
+# Individual files, may be globs. The network profiles of the source would
+# keep its addresses on interfaces confignet does not configure, deployment
+# writes the node's own (as with the netplan files masked in capture_fs)
 CAPTURE_DROP_FILES = (
     '/var/lib/systemd/random-seed', '/var/lib/rsyslog/imjournal.state',
     '/var/lib/NetworkManager/*.lease', '/var/lib/dhclient/*.lease',
-    '/root/.*_history', '/root/.lesshst', '/root/.viminfo')
+    '/root/.*_history', '/root/.lesshst', '/root/.viminfo',
+    '/etc/NetworkManager/system-connections/*',
+    '/etc/sysconfig/network-scripts/ifcfg-*')
+# Matches of the globs above to keep
+CAPTURE_KEEP_FILES = ('/etc/sysconfig/network-scripts/ifcfg-lo',)
 
 def get_capture_excludes(mdir):
     prefix = mdir.rstrip('/') + '/'
@@ -210,7 +216,10 @@ def get_capture_excludes(mdir):
         top = capin_path(dropglob)
         if top is None:
             continue
+        keep = [capin_path(x) for x in CAPTURE_KEEP_FILES]
         for dropfile in glob.glob(top):
+            if dropfile in keep:
+                continue
             if (os.path.islink(dropfile) or not os.path.isdir(dropfile)) and droppable(dropfile):
                 excludes.append(dropfile)
     return excludes
