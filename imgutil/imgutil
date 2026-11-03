@@ -268,6 +268,7 @@ def capture_fs(args):
         masker.mask('/etc/netplan/*.yaml')
         # an empty hostname keeps the node name the deployment initramfs set
         masker.mask('/etc/hostname', '/run/imgutil/captmp/empty')
+        masker.mask('/etc/machine-id', '/run/imgutil/captmp/machine-id')
         mksquashargs = ['mksquashfs', '/run/imgutil/capin', fname + '.sfs', '-comp', 'xz']
         excludes = get_capture_excludes(mdir)
         exfile = None
@@ -491,6 +492,11 @@ def capture_system_back(args):
         shadowout.write(newgshadow)
     with open('/run/imgutil/captmp/empty', 'w') as shadowout:
         pass
+    # an empty machine-id makes systemd generate one at boot without first
+    # boot semantics, the deployment sets a stable one per node
+    with open('/run/imgutil/captmp/machine-id', 'w') as midout:
+        pass
+    os.chmod('/run/imgutil/captmp/machine-id', 0o444)
     i = 0
     todelete = []
     with open('/run/imgutil/capout/rootimg.sfs.plain', 'wb') as outimg:

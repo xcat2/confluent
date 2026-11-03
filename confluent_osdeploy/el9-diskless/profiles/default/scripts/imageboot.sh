@@ -153,6 +153,14 @@ set_selinux_context system_u:object_r:bin_t:s0 /sysroot/opt/confluent/bin/onboot
 set_selinux_context system_u:object_r:bin_t:s0 /sysroot/opt/confluent/bin/apiclient
 ln -s /etc/systemd/system/onboot.service /sysroot/etc/systemd/system/multi-user.target.wants/onboot.service
 cp /etc/confluent/functions /sysroot/etc/confluent/functions
+# give every node its own stable machine-id instead of the one baked into the
+# image, which every node booting it would otherwise share (the initramfs has
+# openssl but no sha512sum)
+machineid=$( (echo $nodename; cat /sys/devices/virtual/dmi/id/product_uuid 2> /dev/null) | openssl dgst -sha512 -r | head -c 32)
+if [ ${#machineid} -eq 32 ]; then
+    echo $machineid > /sysroot/etc/machine-id
+    chmod 444 /sysroot/etc/machine-id
+fi
 rm -f /sysroot/etc/dracut.conf.d/diskless.conf # remove diskless dracut from runtime, to make kdump happier
 if [ -x /sysroot/usr/sbin/matchpathcon ] && grep -Eq '^SELINUX=(enforcing|permissive)' /sysroot/etc/selinux/config 2> /dev/null; then
     # Files written to /sysroot before policy load are unlabeled.

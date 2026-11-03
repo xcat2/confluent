@@ -113,6 +113,14 @@ chmod +x /sysroot/opt/confluent/bin/onboot.sh
 cp /opt/confluent/bin/apiclient /sysroot/opt/confluent/bin
 ln -s /etc/systemd/system/onboot.service /sysroot/etc/systemd/system/multi-user.target.wants/onboot.service
 cp /etc/confluent/functions /sysroot/etc/confluent/functions
+# give every node its own stable machine-id instead of the one baked into the
+# image, which every node booting it would otherwise share (the initramfs has
+# openssl but no sha512sum)
+machineid=$( (echo $nodename; cat /sys/devices/virtual/dmi/id/product_uuid 2> /dev/null) | openssl dgst -sha512 -r | head -c 32)
+if [ ${#machineid} -eq 32 ]; then
+    echo $machineid > /sysroot/etc/machine-id
+    chmod 444 /sysroot/etc/machine-id
+fi
 
 nameserversec=0
 nameservers=""

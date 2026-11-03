@@ -74,6 +74,34 @@ class PartedRunner():
         else:
             return subprocess.run(command, stdout=subprocess.PIPE).stdout.decode('utf8')
 
+def set_machine_id(rootdir):
+    # the image carries the machine-id of the system it was captured from, or
+    # none at all, use the one this node got for its diskless boot instead
+    if not os.path.exists('/etc/machine-id'):
+        return
+    with open('/etc/machine-id') as midin:
+        machineid = midin.read().strip()
+    if not re.match('^[0-9a-f]{32}$', machineid):
+        return
+    midfile = os.path.join(rootdir, 'etc/machine-id')
+    if os.path.islink(midfile):
+        os.unlink(midfile)
+    with open(midfile, 'w') as midout:
+        midout.write(machineid + '\n')
+    os.chmod(midfile, 0o444)
+    # boot loader entries are named after the machine-id, rename them so
+    # kernel-install replaces them rather than adding duplicates
+    entdir = os.path.join(rootdir, 'boot/loader/entries')
+    for loadent in glob.glob(os.path.join(entdir, '*.conf')):
+        oldid, _, entname = os.path.basename(loadent).partition('-')
+        if oldid == machineid or not re.match('^[0-9a-f]{32}$', oldid):
+            continue
+        newent = os.path.join(entdir, '{}-{}'.format(machineid, entname))
+        if os.path.exists(newent):
+            os.unlink(loadent)
+        else:
+            os.rename(loadent, newent)
+
 swapdev = '/dev/mapper/localstorage-swap'
 
 def fixup(rootdir, vols):
@@ -106,6 +134,7 @@ def fixup(rootdir, vols):
             tfile.write(tab + '\n')
     with open(os.path.join(rootdir, 'etc/hostname'), 'w') as nameout:
         nameout.write(socket.gethostname() + '\n')
+    set_machine_id(rootdir)
     selinuxconfig = os.path.join(rootdir, 'etc/selinux/config')
     policy = None
     if os.path.exists(selinuxconfig):
