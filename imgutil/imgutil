@@ -165,7 +165,9 @@ CAPTURE_DIRS_ONLY = ('/var/log', '/var/cache/apt')
 # writes the node's own (as with the netplan files masked in capture_fs)
 CAPTURE_DROP_FILES = (
     '/var/lib/systemd/random-seed', '/var/lib/rsyslog/imjournal.state',
-    '/var/lib/NetworkManager/*.lease', '/var/lib/dhclient/*.lease',
+    '/var/lib/NetworkManager/*.lease', '/var/lib/dhclient/*.lease*',
+    # dhclient on Debian and Ubuntu, unlike dhcpd.leases of a DHCP server
+    '/var/lib/dhcp/dhclient*.leases',
     '/root/.*_history', '/root/.lesshst', '/root/.viminfo',
     '/etc/NetworkManager/system-connections/*',
     '/etc/sysconfig/network-scripts/ifcfg-*')
