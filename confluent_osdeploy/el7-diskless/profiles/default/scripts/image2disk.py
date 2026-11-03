@@ -256,7 +256,13 @@ def install_to_disk(imgpath):
     minsectors = mintotsize // sectorsize
     if sectors < (minsectors + 65536):
         raise Exception('Disk too small to fit image')
-    biggestsectors = sectors - (minexcsize // sectorsize)
+    # leave room for the 1MiB gap before the first partition, up to 1MiB of
+    # rounding per partition and the backup GPT at the end of the disk
+    lastsector = sectors - 2048
+    nparts = len(plainvols)
+    if swapsize and not lvmvols:
+        nparts += 1
+    biggestsectors = lastsector - 2048 * (nparts + 1) - (minexcsize // sectorsize)
     biggestsize = sectorsize * biggestsectors
     parted.run('mklabel gpt')
     curroffset = 2048
@@ -268,18 +274,18 @@ def install_to_disk(imgpath):
             size = biggestsize // sectorsize
         size += 2047 - (size % 2048)
         end = curroffset + size
-        if end > sectors:
-            end = sectors
+        if end > lastsector:
+            end = lastsector
         parted.run('mkpart primary {}s {}s'.format(curroffset, end))
         vol['targetdisk'] = get_partname(instdisk , volidx)
         curroffset += size + 1
     if not lvmvols:
         if swapsize:
             swapsize = swapsize // sectorsize
-            swapsize += 2047 - (size % 2048)
+            swapsize += 2047 - (swapsize % 2048)
             end = curroffset + swapsize
-            if end > sectors:
-                end = sectors
+            if end > lastsector:
+                end = lastsector
             parted.run('mkpart swap {}s {}s'.format(curroffset, end))
             subprocess.check_call(['mkswap', get_partname(instdisk, volidx + 1)])
     else:
