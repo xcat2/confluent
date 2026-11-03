@@ -23,7 +23,7 @@ oldvgname = None
 def split_mapper_name(devname):
     # device mapper joins VG and LV name with a hyphen and doubles hyphens
     # inside either name
-    names = re.split(r'(?<!-)-(?!-)', devname, 1) + ['']
+    names = re.split(r'(?<!-)-(?!-)', devname, maxsplit=1) + ['']
     return names[0].replace('--', '-'), names[1].replace('--', '-')
 
 def convert_lv(oldlvname):
