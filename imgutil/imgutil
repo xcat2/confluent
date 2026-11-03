@@ -168,6 +168,11 @@ CAPTURE_DROP_FILES = (
     '/var/lib/NetworkManager/*.lease', '/var/lib/dhclient/*.lease*',
     # dhclient on Debian and Ubuntu, unlike dhcpd.leases of a DHCP server
     '/var/lib/dhcp/dhclient*.leases',
+    # dhcpcd (Ubuntu 24.04 and later, EL10) and NetworkManager keep a per host
+    # DUID and secret, shared ones would give every clone the same DHCPv6
+    # identity and stable privacy IPv6 addresses
+    '/var/lib/dhcpcd/*.lease*', '/var/lib/dhcpcd/duid', '/var/lib/dhcpcd/secret',
+    '/var/lib/NetworkManager/secret_key',
     '/root/.*_history', '/root/.lesshst', '/root/.viminfo',
     '/etc/NetworkManager/system-connections/*',
     '/etc/sysconfig/network-scripts/ifcfg-*')
