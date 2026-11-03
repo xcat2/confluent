@@ -570,7 +570,7 @@ async def handle_request(req, make_response, mimetype):
                 if filename.endswith('.yaml') or filename.endswith('.yml'):
                     playlist.append(os.path.join(dirname, filename))
         if playlist:
-            await runansible.run_playbooks(playlist, [nodename])
+            await runansible.run_playbooks(playlist, [nodename], cfg)
             return await make_response(mimetype, 202, 'Queued', body='Queued')
         else:
             return await make_response(mimetype, 200, 'OK', body='OK')
