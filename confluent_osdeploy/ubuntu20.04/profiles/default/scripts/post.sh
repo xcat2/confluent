@@ -46,7 +46,7 @@ if [ "$textcons" = "true" ] && ! grep console= /proc/cmdline > /dev/null; then
         updategrub=1
     fi
 fi
-kargs=$(curl https://$confluent_mgr/confluent-public/os/$confluent_profile/profile.yaml | grep ^installedargs: | sed -e 's/#.*//')
+kargs=$(curl https://$confluent_mgr/confluent-public/os/$confluent_profile/profile.yaml | grep ^installedargs: | sed -e 's/^installedargs:[[:space:]]*//' -e 's/#.*//')
 if [ ! -z "$kargs" ]; then
     sed -i 's/GRUB_CMDLINE_LINUX="\([^"]*\)"/GRUB_CMDLINE_LINUX="\1 '"${kargs}"'"/' /target/etc/default/grub
 fi
