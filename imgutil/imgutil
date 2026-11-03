@@ -160,9 +160,7 @@ CAPTURE_EMPTY_DIRS = (
 # Directories where daemons expect the subdirectories to exist, only the
 # files are dropped
 CAPTURE_DIRS_ONLY = ('/var/log', '/var/cache/apt')
-# Individual files, may be globs. The network profiles of the source would
-# keep its addresses on interfaces confignet does not configure, deployment
-# writes the node's own (as with the netplan files masked in capture_fs)
+# Individual files, may be globs
 CAPTURE_DROP_FILES = (
     '/var/lib/systemd/random-seed', '/var/lib/rsyslog/imjournal.state',
     '/var/lib/NetworkManager/*.lease', '/var/lib/dhclient/*.lease*',
@@ -173,9 +171,17 @@ CAPTURE_DROP_FILES = (
     # identity and stable privacy IPv6 addresses
     '/var/lib/dhcpcd/*.lease*', '/var/lib/dhcpcd/duid', '/var/lib/dhcpcd/secret',
     '/var/lib/NetworkManager/secret_key',
-    '/root/.*_history', '/root/.lesshst', '/root/.viminfo',
-    '/etc/NetworkManager/system-connections/*',
-    '/etc/sysconfig/network-scripts/ifcfg-*')
+    '/root/.*_history', '/root/.lesshst', '/root/.viminfo')
+# Network profiles with static addresses of the source, which would come up
+# on interfaces confignet does not configure (deployment writes the node's
+# own, as with the netplan files masked in capture_fs). Profiles without
+# addresses, such as bonds, MTU or InfiniBand mode settings, are kept.
+CAPTURE_DROP_STATIC = {
+    '/etc/NetworkManager/system-connections/*':
+        re.compile(r'^\s*(address\d*|addresses|method\s*=\s*manual)\b', re.M),
+    '/etc/sysconfig/network-scripts/ifcfg-*':
+        re.compile(r'^\s*(IPADDR\d*|IPV6ADDR(_SECONDARIES)?)\s*=', re.M),
+}
 # Matches of the globs above to keep
 CAPTURE_KEEP_FILES = ('/etc/sysconfig/network-scripts/ifcfg-lo',)
 
@@ -219,16 +225,24 @@ def get_capture_excludes(mdir):
                         excludes.append(entry.path)
                 elif entry.path not in emptied:
                     pending.append(entry.path)
-    for dropglob in CAPTURE_DROP_FILES:
+    keep = [capin_path(x) for x in CAPTURE_KEEP_FILES]
+    for dropglob in CAPTURE_DROP_FILES + tuple(CAPTURE_DROP_STATIC):
         top = capin_path(dropglob)
         if top is None:
             continue
-        keep = [capin_path(x) for x in CAPTURE_KEEP_FILES]
         for dropfile in glob.glob(top):
             if dropfile in keep:
                 continue
-            if (os.path.islink(dropfile) or not os.path.isdir(dropfile)) and droppable(dropfile):
-                excludes.append(dropfile)
+            if (os.path.isdir(dropfile) and not os.path.islink(dropfile)) or not droppable(dropfile):
+                continue
+            if dropglob in CAPTURE_DROP_STATIC:
+                try:
+                    with open(dropfile, errors='replace') as profilein:
+                        if not CAPTURE_DROP_STATIC[dropglob].search(profilein.read()):
+                            continue
+                except OSError:
+                    continue
+            excludes.append(dropfile)
     return excludes
 
 def capture_fs(args):
