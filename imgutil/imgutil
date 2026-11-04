@@ -293,8 +293,7 @@ def capture_remote(args):
     sys.stdout.write('Updating boot image... ')
     sys.stdout.flush()
     subprocess.check_call(['osdeploy', 'updateboot', profname])
-    print('Note: a diskless boot of {0} only gets the kernelargs in {1}, add kernel '
-          'arguments of the source it relies on there'.format(profname, os.path.join(outdir, 'profile.yaml')))
+    print('Review {0} before deploying {1}'.format(os.path.join(outdir, 'profile.yaml'), profname))
 
 
 def capture_system():
