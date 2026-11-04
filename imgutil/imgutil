@@ -18,6 +18,7 @@ import os
 import pwd
 import re
 import shutil
+import stat
 import struct
 import subprocess
 import sys
@@ -149,6 +150,106 @@ class FileMasker():
                     secontext = secontext.split(b'\x00', 1)[0].decode('utf8')
                     subprocess.check_call(['chcon', secontext, tmaskwith])
 
+# What capture adds to an Ubuntu source to build the deployment initramfs.
+# MODULES=list in there would also shrink the initramfs of the source and of
+# installed clones to the hook's driver list.
+CAPTURE_BOOT_FILES = ('/etc/initramfs-tools/hooks/confluent',
+                      '/etc/initramfs-tools/conf.d/confluent.conf')
+# Directories whose contents are host specific leftovers (scratch space,
+# crash dumps, logs, caches, cached credentials). The directories themselves
+# are kept so their mode, ownership and labels survive.
+CAPTURE_EMPTY_DIRS = (
+    '/tmp', '/var/tmp', '/var/crash', '/var/log/journal',
+    '/var/lib/systemd/coredump', '/var/spool/abrt', '/var/spool/mail',
+    '/var/mail', '/var/lib/sss/db', '/var/cache/dnf', '/var/cache/yum')
+# Directories where daemons expect the subdirectories to exist, only the
+# files are dropped
+CAPTURE_DIRS_ONLY = ('/var/log', '/var/cache/apt')
+# Individual files, may be globs
+CAPTURE_DROP_FILES = (
+    '/var/lib/systemd/random-seed', '/var/lib/rsyslog/imjournal.state',
+    '/var/lib/NetworkManager/*.lease', '/var/lib/dhclient/*.lease*',
+    # dhclient on Debian and Ubuntu, unlike dhcpd.leases of a DHCP server
+    '/var/lib/dhcp/dhclient*.leases',
+    # dhcpcd (Ubuntu 24.04 and later, EL10) and NetworkManager keep a per host
+    # DUID and secret, shared ones would give every clone the same DHCPv6
+    # identity and stable privacy IPv6 addresses
+    '/var/lib/dhcpcd/*.lease*', '/var/lib/dhcpcd/duid', '/var/lib/dhcpcd/secret',
+    '/var/lib/NetworkManager/secret_key',
+    '/root/.*_history', '/root/.lesshst', '/root/.viminfo') + CAPTURE_BOOT_FILES
+# Network profiles with static addresses of the source, which would come up
+# on interfaces confignet does not configure (deployment writes the node's
+# own, as with the netplan files masked in capture_fs). Profiles without
+# addresses, such as bonds, MTU or InfiniBand mode settings, are kept.
+CAPTURE_DROP_STATIC = {
+    '/etc/NetworkManager/system-connections/*':
+        re.compile(r'^\s*(address\d*|addresses|method\s*=\s*manual)\b', re.M),
+    '/etc/sysconfig/network-scripts/ifcfg-*':
+        re.compile(r'^\s*(IPADDR\d*|IPV6ADDR(_SECONDARIES)?)\s*=', re.M),
+}
+# Matches of the globs above to keep
+CAPTURE_KEEP_FILES = ('/etc/sysconfig/network-scripts/ifcfg-lo',)
+
+def get_capture_excludes(mdir):
+    prefix = mdir.rstrip('/') + '/'
+
+    def droppable(path):
+        # mksquashfs excludes by inode, which would also drop the other
+        # links of a hard linked file
+        try:
+            pinfo = os.lstat(path)
+        except OSError:
+            return False
+        return stat.S_ISDIR(pinfo.st_mode) or pinfo.st_nlink == 1
+
+    def capin_path(path):
+        if path != mdir and not path.startswith(prefix):
+            return None
+        return os.path.normpath(os.path.join(
+            '/run/imgutil/capin', os.path.relpath(path, mdir)))
+
+    excludes = []
+    emptied = set()
+    for scratch in CAPTURE_EMPTY_DIRS:
+        top = capin_path(scratch)
+        if top is None or os.path.islink(top) or not os.path.isdir(top):
+            continue
+        emptied.add(top)
+        for entry in os.listdir(top):
+            if droppable(os.path.join(top, entry)):
+                excludes.append(os.path.join(top, entry))
+    for scratch in CAPTURE_DIRS_ONLY:
+        top = capin_path(scratch)
+        if top is None or os.path.islink(top) or not os.path.isdir(top):
+            continue
+        pending = [top]
+        while pending:
+            for entry in os.scandir(pending.pop()):
+                if not entry.is_dir(follow_symlinks=False):
+                    if droppable(entry.path):
+                        excludes.append(entry.path)
+                elif entry.path not in emptied:
+                    pending.append(entry.path)
+    keep = [capin_path(x) for x in CAPTURE_KEEP_FILES]
+    for dropglob in CAPTURE_DROP_FILES + tuple(CAPTURE_DROP_STATIC):
+        top = capin_path(dropglob)
+        if top is None:
+            continue
+        for dropfile in glob.glob(top):
+            if dropfile in keep:
+                continue
+            if (os.path.isdir(dropfile) and not os.path.islink(dropfile)) or not droppable(dropfile):
+                continue
+            if dropglob in CAPTURE_DROP_STATIC:
+                try:
+                    with open(dropfile, errors='replace') as profilein:
+                        if not CAPTURE_DROP_STATIC[dropglob].search(profilein.read()):
+                            continue
+                except OSError:
+                    continue
+            excludes.append(dropfile)
+    return excludes
+
 def capture_fs(args):
     fsinfo, fname = args
     _mount(fsinfo['mount'], '/run/imgutil/capin', flags=MS_BIND|MS_RDONLY)
@@ -165,13 +266,41 @@ def capture_fs(args):
         masker.mask('/etc/pki/tls/private/*')
         masker.mask('/root/.ssh/id_*')
         masker.mask('/etc/netplan/*.yaml')
-        subprocess.check_call(['mksquashfs', '/run/imgutil/capin', fname + '.sfs', '-comp', 'xz'])
+        # an empty hostname keeps the node name the deployment initramfs set
+        masker.mask('/etc/hostname', '/run/imgutil/captmp/empty')
+        mksquashargs = ['mksquashfs', '/run/imgutil/capin', fname + '.sfs', '-comp', 'xz']
+        excludes = get_capture_excludes(mdir)
+        exfile = None
+        # older mksquashfs splits exclude file lines on whitespace, pass such
+        # paths on the command line instead
+        oddexcludes = [x for x in excludes if re.search(r'[\s\\]', x)]
+        excludes = [x for x in excludes if not re.search(r'[\s\\]', x)]
+        if excludes:
+            # absolute paths, matched by inode, one per line
+            exfd, exfile = tempfile.mkstemp(dir='/run/imgutil/captmp')
+            with os.fdopen(exfd, 'w') as exout:
+                for exclude in excludes:
+                    exout.write(exclude + '\n')
+            mksquashargs += ['-ef', exfile]
+        if oddexcludes:
+            # -e takes the rest of the command line, so it goes last
+            mksquashargs += ['-e'] + oddexcludes
+        try:
+            subprocess.check_call(mksquashargs)
+        finally:
+            if exfile:
+                os.remove(exfile)
 
 def capture_local_cleanup():
     try:
         shutil.rmtree('/usr/lib/dracut/modules.d/97confluent')
     except Exception:
         pass
+    for bootfile in CAPTURE_BOOT_FILES:
+        try:
+            os.remove(bootfile)
+        except FileNotFoundError:
+            pass
     subprocess.check_call(['umount', '/run/imgutil/capout'])
 
 def build_boot_tree(targpath):
