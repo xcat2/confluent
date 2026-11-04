@@ -41,7 +41,7 @@ if [ ! -f /sysroot/tmp/installdisk ]; then
         sleep 1
     done
 fi
-lvm vgchange -a n
+if command -v lvm > /dev/null; then lvm vgchange -a n; fi # lvm is optional in the initramfs
 /sysroot/usr/sbin/wipefs -a /dev/$(cat /sysroot/tmp/installdisk)
 udevadm control -e
 if [ -f /sysroot/etc/lvm/devices/system.devices ]; then
