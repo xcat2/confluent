@@ -146,23 +146,43 @@ class PlayRunner(object):
                             stdout=asyncio.subprocess.PIPE,
                             stderr=asyncio.subprocess.PIPE,
                             env=localenv)
-                        conn, _ = await asyncio.get_running_loop().sock_accept(feedback)
-                        conn.setblocking(False)
-                        try:
-                            result = True
-                            while result is not None:
-                                result = await recv_message(conn)
-                                if result:
-                                    self.results.append(result)
-                                if worker.returncode is not None:
-                                    break
-                            while result:
-                                result = await recv_message(conn)
-                                if result is not None:
-                                    self.results.append(result)
-                        finally:
-                            conn.close()
-                        stdout, stder = await worker.communicate()
+                        # drain output so a full pipe cannot block the play
+                        outreader = asyncio.ensure_future(worker.stdout.read())
+                        errreader = asyncio.ensure_future(worker.stderr.read())
+                        exiter = asyncio.ensure_future(worker.wait())
+                        accepter = asyncio.ensure_future(
+                            asyncio.get_running_loop().sock_accept(feedback))
+                        await asyncio.wait((accepter, exiter),
+                                           return_when=asyncio.FIRST_COMPLETED)
+                        conn = None
+                        if accepter.done():
+                            conn, _ = accepter.result()
+                        else:
+                            # exited before or right after connecting
+                            accepter.cancel()
+                            try:
+                                conn, _ = feedback.accept()
+                            except BlockingIOError:
+                                pass
+                        if conn:
+                            conn.setblocking(False)
+                            try:
+                                result = True
+                                while result is not None:
+                                    result = await recv_message(conn)
+                                    if result:
+                                        self.results.append(result)
+                                    if worker.returncode is not None:
+                                        break
+                                while result:
+                                    result = await recv_message(conn)
+                                    if result is not None:
+                                        self.results.append(result)
+                            finally:
+                                conn.close()
+                        await exiter
+                        stdout = await outreader
+                        stder = await errreader
                         self.stderr += stder.decode('utf8')
                         self.stdout += stdout.decode('utf8')
                         if worker.returncode != 0:
