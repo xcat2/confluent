@@ -5,3 +5,5 @@ confluent_client/man/man*
 .*.sw*
 .sw*
 .idea/*
+confluent_client/doc/man/nodeattrib.ronn
+confluent_client/doc/man/nodegroupattrib.ronn
