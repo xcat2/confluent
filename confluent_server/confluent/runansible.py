@@ -99,8 +99,8 @@ def get_hostvars(cfg, node):
             data = data.get('value')
             if not data:
                 continue
-            if isinstance(data, bytes):
-                data = data.decode()
+        if isinstance(data, bytes):
+            data = data.decode()
         attribs[attrib] = data
     return nest_attributes(attribs)
 
