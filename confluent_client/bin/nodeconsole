@@ -236,6 +236,7 @@ async def watch_input():
     sys.stdout.write('\x1b[?1000h')  # Enable mouse click tracking
     sys.stdout.write('\x1b[?1003h')  # Enable mouse movement tracking
     sys.stdout.write('\x1b[?1006h')  # Enable SGR extended mode for mouse
+    sys.stdout.write('\x1b[?25l') # disable cursor
     # 1016 isn't as ubiquitous as the other mouse tracking modes, see if 1006 is good enough for now
     # Notably, Konsole seems to bug out and revert to ambiguous mouse release with 1016
     sys.stdout.flush()
@@ -1038,6 +1039,7 @@ def do_resize(nodelist, winch=False):
             sys.stdout.write('\x1b[?1000h')  # Enable mouse click tracking
             sys.stdout.write('\x1b[?1003h')  # Enable mouse movement tracking
             sys.stdout.write('\x1b[?1006h')  # Enable SGR extended mode for mouse
+            sys.stdout.write('\x1b[?25l') # disable cursor
     global numrows
     global cwidth
     global cheight
