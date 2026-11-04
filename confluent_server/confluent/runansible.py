@@ -187,14 +187,20 @@ class PlayRunner(object):
                           'w') as hostvarsout:
                     json.dump(self.hostvars, hostvarsout, default=str)
                 localenv['CONFLUENT_HOSTVARS'] = hostvarspath
+                # ANSIBLE_SSH_ARGS replaces ansible's ssh_args, so start from
+                # its defaults to keep ControlPersist
+                ansiblesshargs = os.environ.get(
+                    'ANSIBLE_SSH_ARGS', '-C -o ControlMaster=auto -o ControlPersist=60s')
                 # limit host based algorithms to avoid excessive authentication attempts
-                ansiblesshargs = os.environ.get('ANSIBLE_SSH_ARGS', '')
                 if 'hostbasedkeytypes' not in ansiblesshargs.lower() and 'hostbasedacceptedalgorithms' not in ansiblesshargs.lower():
                     ansiblesshargs += ' -o HostbasedAcceptedAlgorithms=*ed25519*'
                 # notice a node that was reset mid play, else ssh waits forever
                 if 'serveraliveinterval' not in ansiblesshargs.lower():
                     ansiblesshargs += ' -o ServerAliveInterval=15 -o ServerAliveCountMax=4'
                 localenv['ANSIBLE_SSH_ARGS'] = ansiblesshargs
+                # feed modules over the ssh session rather than copying them over first
+                if 'ANSIBLE_PIPELINING' not in localenv and 'ANSIBLE_SSH_PIPELINING' not in localenv:
+                    localenv['ANSIBLE_PIPELINING'] = 'True'
                 with feedback:
                     for playfilename in self.playfiles:
                         worker = await asyncio.create_subprocess_exec(
