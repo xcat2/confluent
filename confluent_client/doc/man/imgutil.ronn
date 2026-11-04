@@ -54,7 +54,10 @@
   with the F (fix-binary) flag; on Ubuntu this is provided by the
   qemu-user-static package (qemu-user-binfmt as of Ubuntu 26.04). For EL,
   the architecture is also detected automatically when building from a `-s`
-  source tree.
+  source tree. An aarch64 image is emulated as a Neoverse N1 cpu, which needs
+  qemu 7.1 or later and is much faster to emulate than the default cpu of
+  qemu. To emulate another cpu, set `QEMU_CPU`, for example
+  `QEMU_CPU=cortex-a72` for older qemu. The same applies to `imgutil exec`.
 
 * `-y`, `--non-interactive`:
   Avoid prompting for confirmation.

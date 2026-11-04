@@ -1366,7 +1366,7 @@ def main():
     buildp.add_argument('-a', '--addpackagelist', action='append', default=[],
                         help='A list of additional packages to include, may be specified multiple times')
     buildp.add_argument('-s', '--source', help='Directory to pull installation from, typically a subdirectory of /var/lib/confluent/distributions. By default, the repositories for the build system are used.  For Ubuntu, this is not supported, the build system repositories are always used.')
-    buildp.add_argument('--arch', default=None, help='Target architecture to build for (e.g. aarch64). When it differs from the build host architecture, statically linked qemu-user emulator registered in binfmt_misc with the F flag is required')
+    buildp.add_argument('--arch', default=None, help='Target architecture to build for (e.g. aarch64). When it differs from the build host architecture, statically linked qemu-user emulator registered in binfmt_misc with the F flag is required. aarch64 is emulated as a Neoverse N1 cpu (qemu 7.1 or later), set QEMU_CPU to choose another')
     buildp.add_argument('-y', '--non-interactive', help='Avoid prompting for confirmation', action='store_true')
     buildp.add_argument('--selinux', action='store_true',
         help='Install the targeted SELinux policy and leave SELinux enforcing '
@@ -1425,6 +1425,7 @@ def exec_root(args):
         pass
     if imgarch and imgarch != os.uname().machine:
         check_binfmt(imgarch, args)
+        set_qemu_cpu(imgarch)
     exitcode = run_constrained(exec_root_backend, args)
     if exitcode:
         sys.exit(exitcode)
@@ -1556,6 +1557,13 @@ qemu_arch_map = {
     'aarch64': 'qemu-aarch64',
     'x86_64': 'qemu-x86_64',
 }
+
+
+def set_qemu_cpu(targetarch):
+    # The default 'max' cpu of qemu-user emulates SVE and pointer
+    # authentication, which slows down the image build considerably
+    if targetarch == 'aarch64' and 'QEMU_CPU' not in os.environ:
+        os.environ['QEMU_CPU'] = 'neoverse-n1'
 
 
 def check_binfmt(targetarch, args):
@@ -1836,6 +1844,7 @@ def build_root(args):
                     oshandler.arch, hostarch))
             sys.exit(1)
         check_binfmt(oshandler.arch, args)
+        set_qemu_cpu(oshandler.arch)
     if args.selinux and not oshandler.selinuxsupport:
         sys.stderr.write('--selinux is not supported for {0} images\n'.format(oshandler.oscategory))
         sys.exit(1)
