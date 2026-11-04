@@ -125,6 +125,8 @@ fi
 # Hand NetworkManager the connection the initramfs is already using. Without
 # this it claims the interface on its own terms and the tethered root
 # filesystem goes away with the old address. confignet refines it at onboot.
+mkdir -p /sysroot/etc/systemd/system/multi-user.target.wants/
+ln -s /usr/lib/systemd/system/NetworkManager.service /sysroot/etc/systemd/system/multi-user.target.wants/NetworkManager.service
 mkdir -p /sysroot/etc/NetworkManager/system-connections
 for nmcfg in /run/confluent/*.nmconnection; do
     [ -e "$nmcfg" ] || continue
