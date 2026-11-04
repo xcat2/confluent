@@ -165,7 +165,7 @@ while [ $ready = "0" ]; do
     fi
     rm $tmperr
 done
-if [ ! -z "$autocons" ] && grep textconsole: true /etc/confluent/confluent.deploycfg > /dev/null; then /opt/confluent/bin/autocons -c > /dev/null; fi
+if [ ! -z "$autocons" ] && grep 'textconsole: true' /etc/confluent/confluent.deploycfg > /dev/null; then /opt/confluent/bin/autocons -c > /dev/null; fi
 if [ -c /dev/tpmrm0 -a -x /usr/bin/tpm2_pcrextend ]; then
     set_tpm_hashalgo
     tpm2_pcrextend 15:${pcrhashalgo}=${pcrextendvalue}
