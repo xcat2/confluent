@@ -198,6 +198,9 @@ class PlayRunner(object):
                 if 'serveraliveinterval' not in ansiblesshargs.lower():
                     ansiblesshargs += ' -o ServerAliveInterval=15 -o ServerAliveCountMax=4'
                 localenv['ANSIBLE_SSH_ARGS'] = ansiblesshargs
+                # feed modules over the ssh session rather than copying them over first
+                if 'ANSIBLE_PIPELINING' not in localenv and 'ANSIBLE_SSH_PIPELINING' not in localenv:
+                    localenv['ANSIBLE_PIPELINING'] = 'True'
                 with feedback:
                     for playfilename in self.playfiles:
                         worker = await asyncio.create_subprocess_exec(
