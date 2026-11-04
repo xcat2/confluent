@@ -11,7 +11,7 @@ async def update(nodes, element, configmanager, inputdata):
         playlist = selfservice.list_ansible_scripts(configmanager, node, category)
         if playlist:
             _user_initiated_runs[node] = True
-            await runansible.run_playbooks(playlist, [node])
+            await runansible.run_playbooks(playlist, [node], configmanager)
             yield msg.CreatedResource(
                     '/nodes/{0}/deployment/remote_config/active/{0}'.format(node))
         else:

@@ -54,11 +54,63 @@ async def recv_message(conn):
     return msgpack.unpackb(msg, raw=False)
 
 
+class _AttribTree(dict):
+    # a level of nest_attributes, as opposed to a dict attribute value
+    pass
+
+
+def nest_attributes(attribs):
+    # turn dotted attribute names into nested dicts, like hand written
+    # host_vars. A name that is also the prefix of other names keeps its
+    # value under '_value'
+    tree = _AttribTree()
+    conflicts = []
+    # sorting puts a name before any name it is a prefix of
+    for attrib in sorted(attribs):
+        parts = attrib.split('.')
+        currdict = tree
+        for idx, part in enumerate(parts[:-1]):
+            if part in currdict and not isinstance(currdict[part], _AttribTree):
+                currdict[part] = _AttribTree(_value=currdict[part])
+                conflicts.append(
+                    '{0} is also a prefix of other attributes, its value is '
+                    'available as confluent{1}'.format(
+                        '.'.join(parts[:idx + 1]),
+                        ''.join("['{0}']".format(x) for x in
+                                parts[:idx + 1] + ['_value'])))
+            currdict = currdict.setdefault(part, _AttribTree())
+        if parts[-1] in currdict:
+            # only an attribute named _value can collide like this
+            conflicts.append('{0} is left out, its name holds the value of '
+                             '{1}'.format(attrib, '.'.join(parts[:-1])))
+            continue
+        currdict[parts[-1]] = attribs[attrib]
+    return tree, conflicts
+
+
+def get_hostvars(cfg, node):
+    attribs = {}
+    nodeattribs = cfg.get_node_attributes(node, decrypt=False).get(node, {})
+    for attrib, data in nodeattribs.items():
+        if attrib.startswith(('secret.', 'crypted.', 'custom.nodesecret.')):
+            continue
+        if isinstance(data, dict):
+            # skip unset values, like /self/myattribs does
+            data = data.get('value')
+            if not data:
+                continue
+        if isinstance(data, bytes):
+            data = data.decode()
+        attribs[attrib] = data
+    return nest_attributes(attribs)
+
+
 class PlayRunner(object):
-    def __init__(self, playfiles, nodes):
+    def __init__(self, playfiles, nodes, hostvars=None):
         self.stderr = ''
         self.playfiles = playfiles
         self.nodes = nodes
+        self.hostvars = hostvars if hostvars else {}
         self.worker = None
         self.results = []
         self.complete = False
@@ -130,6 +182,11 @@ class PlayRunner(object):
                 feedback.setblocking(False)
                 localenv = os.environ.copy()
                 localenv['FEEDBACK_SOCK'] = sockpath
+                hostvarspath = os.path.join(tmpdir, 'hostvars.json')
+                with open(os.open(hostvarspath, os.O_WRONLY | os.O_CREAT, 0o600),
+                          'w') as hostvarsout:
+                    json.dump(self.hostvars, hostvarsout, default=str)
+                localenv['CONFLUENT_HOSTVARS'] = hostvarspath
                 # limit host based algorithms to avoid excessive authentication attempts
                 ansiblesshargs = os.environ.get('ANSIBLE_SSH_ARGS', '')
                 if 'hostbasedkeytypes' not in ansiblesshargs.lower() and 'hostbasedacceptedalgorithms' not in ansiblesshargs.lower():
@@ -197,9 +254,19 @@ class PlayRunner(object):
             self.complete = True
 
 
-async def run_playbooks(playfiles, nodes):
+async def run_playbooks(playfiles, nodes, cfg=None):
     await sshutil.prep_ssh_key('/etc/confluent/ssh/automation')
-    runner = PlayRunner(playfiles, nodes)
+    hostvars = {}
+    conflicts = []
+    if cfg is not None:
+        for node in nodes:
+            hostvars[node], nodeconflicts = get_hostvars(cfg, node)
+            conflicts.extend(nodeconflicts)
+    runner = PlayRunner(playfiles, nodes, hostvars)
+    if conflicts:
+        runner.results.append({
+            'task_name': 'confluent host variables', 'changed': False,
+            'state': 'ok', 'warnings': conflicts})
     for node in nodes:
         running_status[node] = runner
     runner._start_playbooks()
@@ -281,6 +348,21 @@ if __name__ == '__main__':
     if not invman:
         invlist = sys.argv[1] + ','
         invman = InventoryManager(loader=loader, sources=invlist)
+    hostvarspath = os.environ.get('CONFLUENT_HOSTVARS')
+    if hostvarspath:
+        import ansible.template
+        if hasattr(ansible.template, 'trust_as_template'):
+            # ansible-core 2.19+ never templates untrusted data
+            wrap_var = lambda x: x
+        else:
+            from ansible.utils.unsafe_proxy import wrap_var
+        with open(hostvarspath, 'r') as hostvarsin:
+            hostvars = json.load(hostvarsin)
+        for hostname in hostvars:
+            anshost = invman.get_host(hostname)
+            if anshost:
+                # attribute values are data, never templates
+                anshost.set_variable('confluent', wrap_var(hostvars[hostname]))
     varman = VariableManager(loader=loader, inventory=invman)
     if 'trusted_as_template' in inspect.signature(
             loader.load_from_file).parameters:
