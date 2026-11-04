@@ -142,7 +142,9 @@ if [ -d /lib/firmware ]; then
     mv /lib/firmware /lib/firmware-ramfs
 fi
 ln -s /sysroot/lib/firmware /lib/firmware
-chroot /sysroot chkstat --system --set --noheader > /dev/null
+mount -o bind /proc /sysroot/proc
+chroot /sysroot permctl --system --set --noheader > /dev/null
+umount /sysroot/proc
 if [ -x /sysroot/usr/sbin/matchpathcon ] && grep -Eq '^SELINUX=(enforcing|permissive)' /sysroot/etc/selinux/config 2> /dev/null; then
     # Files written to the upper layer before policy load are unlabeled.
     # Label only those, using globstar since the initramfs has no find.
