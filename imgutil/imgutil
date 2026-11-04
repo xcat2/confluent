@@ -412,12 +412,15 @@ def capture_remote(args):
     label = '{0} {1} ({2})'.format(finfo['name'], finfo['version'], profname)
     with open(os.path.join(outdir, 'profile.yaml'), 'w') as profileout:
         profileout.write('label: {}\n'.format(label))
-        profileout.write('kernelargs: quiet installtodisk # remove installtodisk to boot stateless')
+        profileout.write('kernelargs: quiet installtodisk # remove installtodisk to boot stateless\n')
+        profileout.write('# A diskless boot only gets the kernelargs above, not the kernel arguments\n'
+                         '# of the source. Add those it relies on and run osdeploy updateboot.\n')
     subprocess.check_call(['chmod', 'o+r,go-w,a-t', '-R', outdir])
     subprocess.check_call(['chown', '-R', 'confluent', outdir])
     sys.stdout.write('Updating boot image... ')
     sys.stdout.flush()
     subprocess.check_call(['osdeploy', 'updateboot', profname])
+    print('Review {0} before deploying {1}'.format(os.path.join(outdir, 'profile.yaml'), profname))
 
 
 # Processes the initramfs starts before the policy loads keep kernel_t:
