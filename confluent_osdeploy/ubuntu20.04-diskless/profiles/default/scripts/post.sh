@@ -16,6 +16,14 @@ exec 2>> /var/log/confluent/confluent-post.log
 chmod 600 /var/log/confluent/confluent-post.log
 tail -f /var/log/confluent/confluent-post.log > /dev/console &
 logshowpid=$!
+# The image's initramfs can be specific to the system it was captured from:
+# dracut in host-only mode (Ubuntu 26.04) waits for that system's volume
+# group and filesystem UUIDs. Rebuild it for this disk.
+if command -v update-initramfs > /dev/null 2>&1; then
+    update-initramfs -u -k all
+elif command -v dracut > /dev/null 2>&1; then
+    dracut -f --regenerate-all
+fi
 curl -f https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/firstboot.service > /etc/systemd/system/firstboot.service
 mkdir -p /opt/confluent/bin
 curl -f https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/firstboot.sh > /opt/confluent/bin/firstboot.sh
