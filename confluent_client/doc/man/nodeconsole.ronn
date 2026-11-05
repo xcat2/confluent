@@ -49,6 +49,18 @@ console process which will result in the console window closing.
   if PySixel is installed).  This only presents screenshots, there
   is no input supported to graphical consoles from a terminal.
   
+* `-v`, `--video`:
+  Stream the graphical console of nodes that provide one through confluent
+  and render it in the terminal like `--screenshot`, with keyboard and mouse
+  input. Combine with `-t` to tile several nodes, for example
+  `nodeconsole r3u[21:24] -tv`. See VIDEO MODE below.
+
+* `-o`, `--outputfile` <filename>:
+  Record the video mode output to the given file. When recording several
+  nodes, use an attribute expression such as `{node}.mp4` to give each node
+  its own file, otherwise the node name is inserted into the filename.
+  Requires the Python OpenCV module (cv2).
+
 * `-w`, `--windowed`:
   Open terminal windows for each node.  The
   environment variable **NODECONSOLE_WINDOWED_COMMAND**
@@ -109,6 +121,27 @@ keystroke will be interpreted as a command.  The following commands are availabl
 * `<ent>`:
   Hit enter to skip entering a command at the escape prompt.
 
+
+## VIDEO MODE
+
+In video mode, keyboard and mouse input go to all focused nodes at once.
+Clicking a tile or its title bar focuses that node, `Ctrl` and click adds
+another node to the focus, and `Ctrl` and click on the title bar of a focused
+node removes it. Clicking outside the tiles clears the focus. Once a tile is
+focused, mouse input within it is passed on to the focused nodes.
+
+The escape sequence commands above work in video mode as well, except `b`,
+`o` and `r`. Video mode adds these commands:
+
+* arrow keys, or `f` and arrow keys:
+  Move the focus to a neighboring tile
+* `fa`:
+  Toggle the focus of all nodes
+* `k`:
+  Send a special keystroke: `<DEL>` for Ctrl-Alt-Delete, `w` for the Windows
+  key, `1` to `4` for Ctrl-Alt-F1 to Ctrl-Alt-F4
+* `b` and a key:
+  Send Alt-SysRq and that key instead of a break
 
 ## PASSTHROUGH OPTIONS
 
