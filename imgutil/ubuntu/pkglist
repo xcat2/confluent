@@ -1,4 +1,5 @@
 linux-generic
+ubuntu-minimal
 shim-signed
 busybox-initramfs
 busybox-static

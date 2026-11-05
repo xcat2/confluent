@@ -3,6 +3,7 @@
 ## SYNOPSIS
 
 `imgutil` `build` [<options>] <scratchdir>  
+`imgutil` `build` `--containerfile` [<options>] <file>  
 `imgutil` `exec` [<options>] <scratchdir> [<cmd>...]  
 `imgutil` `unpack` <profilename> <scratchdir>  
 `imgutil` `pack` [<options>] <scratchdir> <profilename>  
@@ -16,6 +17,12 @@
 
 * `build`:
   Build a new diskless image from scratch in the specified scratch directory.
+  With a container image as `-s` source, the image is extracted to the
+  scratch directory instead, and completed with the confluent initramfs
+  configuration, the package list and a regenerated initramfs. This
+  builds images made elsewhere, for example in CI. With
+  `--containerfile`, a Containerfile to start such an image from is
+  written instead.
 
 * `exec`:
   Start the specified scratch directory as a container and optionally run a command inside it.
@@ -43,8 +50,38 @@
 * `-a`, `--addpackagelist` <file>:
   A list of additional packages to include. May be specified multiple times.
 
-* `-s`, `--source` <directory>:
-  Directory to pull installation from, typically a subdirectory of `/var/lib/confluent/distributions`. By default, the repositories for the build system are used. For Ubuntu, this is not supported; the build system repositories are always used.
+* `-s`, `--source` <directory>|<image>:
+  Directory to pull installation from, typically a subdirectory of `/var/lib/confluent/distributions`. By default, the repositories for the build system are used. For Ubuntu, a distribution directory is not supported, the build system repositories are always used.
+
+  A container image made elsewhere, for example in CI, can be the source
+  instead: a SIF file as built by Apptainer or SingularityCE, an OCI or
+  Docker archive file as written by `podman save`, an OCI layout
+  directory with its `oci-layout` file, or a podman reference with its
+  transport, for example `docker://registry.example.com/hpc/compute:latest`
+  or `containers-storage:localhost/compute` for a local image. Local
+  images are looked up in the podman storage of the user running
+  imgutil, normally root. Any other image is pulled or loaded into a
+  temporary storage next to the scratch directory, which is removed
+  afterwards, so the images and tags of the system stay as they are. A
+  path containing a colon cannot be read by podman. A SIF file is
+  extracted from its squashfs partition, which needs
+  squashfs-tools 4.4 or newer but not podman.
+
+  Any other directory or name is a distribution as above. The scratch
+  directory must be empty or not exist. Missing packages are installed
+  from the repositories of the image, so an image that already has every
+  package builds without network access. A package list entry with a
+  version, such as `curl=8.5.0-2ubuntu10`, always runs the package
+  manager and needs the repositories. Units that container images mask
+  are unmasked and `/usr/sbin/policy-rc.d` is removed, so the image boots
+  like an installed system. Package manager settings of the image are
+  kept, for example container base images leaving out documentation. The
+  architecture is detected from the image. With `--arch`, the matching
+  variant of an image for several architectures is used. `-r` is not supported, as the
+  image brings its own repositories. EL9, Ubuntu 24.04 and SUSE 16 or
+  later images are supported. With `--selinux`, the full SELinux context
+  of every file, including the SELinux user, is set from the policy of
+  the image.
 
 * `--arch` <architecture>:
   Target architecture to build for (`x86_64` or `aarch64`). For Ubuntu, the
@@ -71,8 +108,30 @@
 * `-v`, `--volume` <mount>:
   Directory to make available in the build environment. `-v /` will cause it to be mounted in image as `/run/external/`. `-v /:/run/root` will override the target to be `/run/root`. Something like `/var/lib/repository:-` will cause it to mount to the identical path inside the image. May be specified multiple times.
 
+* `--containerfile`:
+  Write a Containerfile instead of building. It installs every package
+  `build` checks for, generated from the same package lists, so building
+  from the image needs no network access. Add site specific content and
+  build it in CI. The OS is that of the `-s` distribution or of the build
+  system, as for a build, and `--arch` names the platform, so the image
+  can be built on another architecture with emulation. `-p`, `-a` and
+  `--selinux` change the packages. Pass the same options to `build`
+  later, as the command shown in the file does. `-r` is not supported,
+  as the image installs from the repositories of its base image. EL9,
+  Ubuntu 24.04 and SUSE 16 or later are supported.
+
+* `--apptainer`:
+  With `--containerfile`, write an Apptainer definition file for building
+  a SIF instead.
+
+* `--from` <image>:
+  With `--containerfile`, the base image to use instead of the default for
+  the OS (AlmaLinux for EL, the official Ubuntu image, openSUSE Leap for
+  SUSE).
+
 * <scratchdir>:
-  Directory to build new diskless root in.
+  Directory to build new diskless root in. With `--containerfile`, the file
+  to write, or `-` for standard output.
 
 ## EXEC OPTIONS
 
@@ -129,6 +188,34 @@ detected from the source tree):
 Build an aarch64 Ubuntu diskless image on an amd64 Ubuntu host:
 
     imgutil build --arch aarch64 /tmp/myimage
+
+Build from an image made from a Dockerfile and pack it:
+
+    podman build -t localhost/myimage .
+    imgutil build -s containers-storage:localhost/myimage /tmp/myimage
+    imgutil pack /tmp/myimage myprofile
+
+Build from an image that CI pushed to a registry:
+
+    imgutil build -s docker://registry.example.com/hpc/compute:latest /tmp/myimage
+
+Build from an Apptainer image:
+
+    imgutil build -s /var/tmp/compute.sif /tmp/myimage
+
+Prepare an image of the build system OS in CI that builds without network
+access:
+
+    imgutil build --containerfile Containerfile
+    podman build -t localhost/compute .
+    podman save -o compute.tar localhost/compute
+    imgutil build -s compute.tar /tmp/compute
+
+The same for EL10 as a SIF:
+
+    imgutil build --containerfile --apptainer -s alma-10.0-x86_64 compute.def
+    apptainer build compute.sif compute.def
+    imgutil build -s compute.sif /tmp/compute
 
 Execute a shell in an unpacked image:
 
