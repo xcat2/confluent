@@ -184,6 +184,80 @@ async def get_srp(pktq, timeout):
         return None
     return srp
 
+async def _handle_confluent_search(value, s, peer, uuidlookup, cloop):
+    try:
+        cfm.check_quorum()
+    except Exception:
+        return
+    forcereply = False
+    for query in value.split('/'):
+        node = None
+        if query.startswith('confluentuuid='):
+            myuuid = cfm.get_global('confluent_uuid')
+            curruuid = query.split('=', 1)[1].lower()
+            if curruuid != myuuid:
+                break
+            forcereply = True
+        elif query.startswith('allconfluent=1'):
+            reply = 'HTTP/1.1 200 OK\r\n\r\nCONFLUENT: PRESENT\r\n'
+            if not isinstance(reply, bytes):
+                reply = reply.encode('utf8')
+            s.setblocking(1)
+            try:
+                s.sendto(reply, peer)
+            except Exception:
+                break
+        elif query.startswith('uuid='):
+            curruuid = query.split('=', 1)[1].lower()
+            node = uuidlookup(curruuid)
+        elif query.startswith('mac='):
+            currmac = query.split('=', 1)[1].lower()
+            node = uuidlookup(currmac)
+        if node:
+            cfg = cfm.ConfigManager(None)
+            cfd = cfg.get_node_attributes(
+                node, ['deployment.pendingprofile', 'collective.managercandidates'])
+            if not forcereply:
+                # Do not bother replying to a node that
+                # we have no deployment activity
+                # planned for
+                if not cfd.get(node, {}).get(
+                        'deployment.pendingprofile', {}).get('value', None):
+                    break
+            candmgrs = cfd.get(node, {}).get('collective.managercandidates', {}).get('value', None)
+            if candmgrs:
+                candmgrs = noderange.NodeRange(candmgrs, cfg).nodes
+                if collective.get_myname() not in candmgrs:
+                    break
+            currtime = time.time()
+            seconds = int(currtime)
+            msecs = int(currtime * 1000 % 1000)
+            reply = 'HTTP/1.1 200 OK\r\nNODENAME: {0}\r\nCURRTIME: {1}\r\nCURRMSECS: {2}\r\n'.format(node, seconds, msecs)
+            theip = peer[0].split('%', 1)[0]
+            if await netutil.ip_on_same_subnet(theip, 'fe80::', 64):
+                if '%' in peer[0]:
+                    ifidx = peer[0].split('%', 1)[1]
+                    iface = (await cloop.getaddrinfo(peer[0], 0, family=socket.AF_INET6,
+                                                     type=socket.SOCK_DGRAM))[0][-1][-1]
+                else:
+                    ifidx = '{}'.format(peer[-1])
+                    iface = peer[-1]
+                reply += 'MGTIFACE: {0}\r\n'.format(ifidx)
+                ncfg = await netutil.get_nic_config(
+                    cfg, node, ifidx=iface)
+                if ncfg.get('matchesnodename', None):
+                    reply += 'DEFAULTNET: 1\r\n'
+            elif not await netutil.address_is_local(peer[0]):
+                continue
+            if not isinstance(reply, bytes):
+                reply = reply.encode('utf8')
+            s.setblocking(1)
+            try:
+                s.sendto(reply, peer)
+            except Exception:
+                pass
+            break
+
 async def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
     """Watch for SSDP notify messages
 
@@ -284,79 +358,8 @@ async def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
                         headline = headline.partition(':')
                         if len(headline) < 3:
                             continue
-                        forcereply = False
                         if  headline[0] == 'ST' and headline[-1].startswith(' urn:xcat.org:service:confluent:'):
-                            try:
-                                cfm.check_quorum()
-                            except Exception:
-                                continue
-                            for query in headline[-1].split('/'):
-                                node = None
-                                if query.startswith('confluentuuid='):
-                                    myuuid = cfm.get_global('confluent_uuid')
-                                    curruuid = query.split('=', 1)[1].lower()
-                                    if curruuid != myuuid:
-                                        break
-                                    forcereply = True
-                                elif query.startswith('allconfluent=1'):
-                                    reply = 'HTTP/1.1 200 OK\r\n\r\nCONFLUENT: PRESENT\r\n'
-                                    if not isinstance(reply, bytes):
-                                        reply = reply.encode('utf8')
-                                    s.setblocking(1)
-                                    try:
-                                        s.sendto(reply, peer)
-                                    except Exception:
-                                        break
-                                elif query.startswith('uuid='):
-                                    curruuid = query.split('=', 1)[1].lower()
-                                    node = uuidlookup(curruuid)
-                                elif query.startswith('mac='):
-                                    currmac = query.split('=', 1)[1].lower()
-                                    node = uuidlookup(currmac)
-                                if node:
-                                    cfg = cfm.ConfigManager(None)
-                                    cfd = cfg.get_node_attributes(
-                                        node, ['deployment.pendingprofile', 'collective.managercandidates'])
-                                    if not forcereply:
-                                        # Do not bother replying to a node that
-                                        # we have no deployment activity
-                                        # planned for
-                                        if not cfd.get(node, {}).get(
-                                                'deployment.pendingprofile', {}).get('value', None):
-                                            break
-                                    candmgrs = cfd.get(node, {}).get('collective.managercandidates', {}).get('value', None)
-                                    if candmgrs:
-                                        candmgrs = noderange.NodeRange(candmgrs, cfg).nodes
-                                        if collective.get_myname() not in candmgrs:
-                                            break
-                                    currtime = time.time()
-                                    seconds = int(currtime)
-                                    msecs = int(currtime * 1000 % 1000)
-                                    reply = 'HTTP/1.1 200 OK\r\nNODENAME: {0}\r\nCURRTIME: {1}\r\nCURRMSECS: {2}\r\n'.format(node, seconds, msecs)
-                                    theip = peer[0].split('%', 1)[0]
-                                    if await netutil.ip_on_same_subnet(theip, 'fe80::', 64):
-                                        if '%' in peer[0]:
-                                            ifidx = peer[0].split('%', 1)[1]
-                                            iface = (await cloop.getaddrinfo(peer[0], 0, family=socket.AF_INET6,
-                                                                             type=socket.SOCK_DGRAM))[0][-1][-1]
-                                        else:
-                                            ifidx = '{}'.format(peer[-1])
-                                            iface = peer[-1]
-                                        reply += 'MGTIFACE: {0}\r\n'.format(ifidx)
-                                        ncfg = await netutil.get_nic_config(
-                                            cfg, node, ifidx=iface)
-                                        if ncfg.get('matchesnodename', None):
-                                            reply += 'DEFAULTNET: 1\r\n'
-                                    elif not await netutil.address_is_local(peer[0]):
-                                        continue
-                                    if not isinstance(reply, bytes):
-                                        reply = reply.encode('utf8')
-                                    s.setblocking(1)
-                                    try:
-                                        s.sendto(reply, peer)
-                                    except Exception:
-                                        pass
-                                    break
+                            tasks.spawn(_handle_confluent_search(headline[-1], s, peer, uuidlookup, cloop))
             if deferrednotifies:
                 await asyncio.sleep(2.2)
             for peerrsp in deferrednotifies:
