@@ -2100,6 +2100,7 @@ class ScreenShot(ConfluentMessage):
         return self.myargs[0]
 
     def strip_node(self, node):
+        self.stripped = True
         self._bynode = False
 
     def json(self):
