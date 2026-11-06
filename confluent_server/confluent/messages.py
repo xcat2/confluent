@@ -2093,6 +2093,10 @@ class ScreenShot(ConfluentMessage):
         self.myargs = (imgdata, node, imgformat)
         self.kvpairs = {node: {'image': {'imgformat': imgformat, 'imgdata': base64.b64encode(imgdata).decode()}}}
 
+    def binary(self, mimetype):
+        if mimetype == 'application/octet-stream':
+            return self.myargs[0]
+
 
 class CryptedAttributes(Attributes):
     defaulttype = 'password'

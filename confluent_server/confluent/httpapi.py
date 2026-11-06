@@ -443,8 +443,12 @@ def _pick_mimetype(req):
         return 'text/html', '.html'
     elif 'Accept' in req.headers and 'application/json' in req.headers['Accept']:
         return 'application/json; charset=utf-8', ''
+    elif 'Accept' in req.headers and 'application/octet-stream' in req.headers['Accept']:
+        return 'application/octet-stream', ''
+    elif 'Accept' in req.headers and 'image/*' in req.headers['Accept']:
+        return 'image/*', ''
     else:
-        return 'text/html', ''
+        return 'application/json; charset=utf-8', ''
 
 
 def _assign_consessionid(consolesession):
@@ -1115,6 +1119,10 @@ async def resourcehandler_backend(req, make_response):
                 for datum in _assemble_html(hdlr, resource, lquerydict, url,
                                             extension):
                     pagecontent += datum
+            elif mimetype in ('application/octet-stream', 'image/png', 'image/jpeg'):
+                pagecontent = b''
+                async for datum in _assemble_binary(hdlr, resource, url, extension, mimetype):
+                    pagecontent += datum
             else:
                 async for datum in _assemble_json(hdlr, resource, url, extension):
                     pagecontent += datum
@@ -1133,6 +1141,10 @@ async def resourcehandler_backend(req, make_response):
             await rsp.write(e.get_error_body().encode('utf8'))
             return rsp
 
+async def _assemble_binary(responses, resource, url, extension, mimetype):
+    async for rsp in pluginapi.iterate_responses(responses):
+        yield rsp.binary(mimetype)
+    
 def _assemble_html(responses, resource, querydict, url, extension):
     yield '<html><body>HTML API Explorer is discontinued, notify developers if you want this back</body></html>'
     return
