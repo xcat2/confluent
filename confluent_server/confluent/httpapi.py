@@ -1119,7 +1119,7 @@ async def resourcehandler_backend(req, make_response):
                 for datum in _assemble_html(hdlr, resource, lquerydict, url,
                                             extension):
                     pagecontent += datum
-            elif mimetype in ('application/octet-stream', 'image/png', 'image/jpeg'):
+            elif mimetype in ('application/octet-stream', 'image/*'):
                 pagecontent = b''
                 async for datum in _assemble_binary(hdlr, resource, url, extension, mimetype):
                     pagecontent += datum

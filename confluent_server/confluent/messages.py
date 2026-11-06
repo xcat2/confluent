@@ -115,6 +115,9 @@ class ConfluentMessage(object):
         self.kvpairs = {}
         raise NotImplementedError("Must be subclassed!")
 
+    def binary(self, mimetype):
+        raise NotImplementedError("Binary data not available for this message")
+    
     def json(self):
         # This will create the canonical json representation of this message
         if hasattr(self, 'stripped') and self.stripped:
@@ -2091,11 +2094,29 @@ class ScreenShot(ConfluentMessage):
         if isinstance(imgformat, bytes):
             imgformat = imgformat.decode()
         self.myargs = (imgdata, node, imgformat)
-        self.kvpairs = {node: {'image': {'imgformat': imgformat, 'imgdata': base64.b64encode(imgdata).decode()}}}
+        self._bynode = True
 
     def binary(self, mimetype):
-        if mimetype == 'application/octet-stream':
-            return self.myargs[0]
+        return self.myargs[0]
+
+    def strip_node(self, node):
+        self._bynode = False
+
+    def json(self):
+        imgdata, node, imgformat = self.myargs
+        if self._bynode:
+            self.kvpairs = {node: {'image': {'imgformat': imgformat, 'imgdata': base64.b64encode(imgdata).decode()}}}
+        else:
+            self.kvpairs = {'image': {'imgformat': imgformat, 'imgdata': base64.b64encode(imgdata).decode()}}
+        return super().json()
+
+    def raw(self):
+        imgdata, node, imgformat = self.myargs
+        if self._bynode:
+            self.kvpairs = {node: {'image': {'imgformat': imgformat, 'imgdata': base64.b64encode(imgdata).decode()}}}
+        else:
+            self.kvpairs = {'image': {'imgformat': imgformat, 'imgdata': base64.b64encode(imgdata).decode()}}
+        return super().raw()
 
 
 class CryptedAttributes(Attributes):
