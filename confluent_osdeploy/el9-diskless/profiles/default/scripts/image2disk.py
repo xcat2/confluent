@@ -213,9 +213,7 @@ def fixup(rootdir, vols):
     with open('/proc/cmdline') as cmdlinein:
         cmdline = cmdlinein.read().strip()
         for arg in cmdline.split():
-            if arg.startswith('console='):
-                currcmdline.append(arg)
-            elif arg == 'quiet':
+            if arg == 'quiet' or arg.startswith(('console=', 'net.ifnames=', 'biosdevname=')):
                 currcmdline.append(arg)
     currcmdlinestr = ' '.join(currcmdline)
     kcmdline = os.path.join(rootdir, 'etc/kernel/cmdline')
@@ -286,7 +284,7 @@ def fixup(rootdir, vols):
         'GRUB_DISABLE_SUBMENU=true',
         'GRUB_TERMINAL=""',
         'GRUB_SERIAL_COMMAND=""',
-        'GRUB_CMDLINE_LINUX="{}crashkernel=1G-4G:192M,4G-64G:256M,64G-:512M rd.lvm.lv=vg/root rd.lvm.lv=vg/swap"'.format(currcmdlinestr),
+        'GRUB_CMDLINE_LINUX="{} crashkernel=1G-4G:192M,4G-64G:256M,64G-:512M rd.lvm.lv=vg/root rd.lvm.lv=vg/swap"'.format(currcmdlinestr),
         'GRUB_DISABLE_RECOVERY="true"',
         'GRUB_ENABLE_BLSCFG=true',
         ]
