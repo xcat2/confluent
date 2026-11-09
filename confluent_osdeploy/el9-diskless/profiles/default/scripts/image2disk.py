@@ -234,6 +234,11 @@ def fixup(rootdir, vols):
                     newkcmdlineent.append(ent)
             else:
                 newkcmdlineent.append(ent)
+        # the network configuration written during the install uses the
+        # interface names of this boot
+        for arg in currcmdline:
+            if arg.startswith(('net.ifnames=', 'biosdevname=')) and arg not in newkcmdlineent:
+                newkcmdlineent.append(arg)
         with open(kcmdline, 'w') as kcmdlineout:
             kcmdlineout.write(' '.join(newkcmdlineent) + '\n')
     for loadent in glob.glob(os.path.join(rootdir, 'boot/loader/entries/*.conf')):
