@@ -7,3 +7,7 @@ if ! grep console= /proc/cmdline > /dev/null; then
     fi
 fi
 echo . /scripts/init-premount/confluent >> /scripts/init-premount/ORDER
+# Same as imageboot.sh, but for the lvm2 udev rules in this initramfs
+if [ -e /etc/lvm/lvm.conf ] && ! grep -qs '^[[:space:]]*auto_activation_volume_list' /etc/lvm/lvm.conf /etc/lvm/lvmlocal.conf; then
+    printf 'activation {\n\tauto_activation_volume_list = []\n}\n' >> /etc/lvm/lvmlocal.conf
+fi
