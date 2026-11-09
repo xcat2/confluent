@@ -25,8 +25,6 @@ else
     done
 fi
 cd /sysroot/run
-[ -f /run/sshd.pid ] && 
-cp /run/sshd.pid /tmp/dbgssh.pid
 chmod 0600 /sysroot/etc/ssh/ssh*key
 chroot /sysroot/ bash -c "/usr/sbin/sshd"
 chroot /sysroot/ bash -c "source /etc/confluent/functions; run_remote_python getinstalldisk"
@@ -49,11 +47,14 @@ if [ -f /sysroot/etc/lvm/devices/system.devices ]; then
 fi
 chroot /sysroot /usr/lib/systemd/systemd-udevd --daemon
 chroot /sysroot bash -c "source /etc/confluent/functions; run_remote_python image2disk.py"
-echo "Port 22" >> /etc/ssh/sshd_config
-echo 'Match LocalPort 22' >> /etc/ssh/sshd_config
-echo '    ChrootDirectory /sysroot/run/imginst/targ' >> /etc/ssh/sshd_config
-kill $(cat /sysroot/var/run/sshd.pid)
-[ -f /tmp/dbgssh.pid ] && kill -HUP $(cat /tmp/dbgssh.pid)
+sshdpid=$(cat /sysroot/var/run/sshd.pid)
+kill $sshdpid
+# wait for the old sshd to release port 22
+for i in {1..50}; do kill -0 $sshdpid 2> /dev/null || break; sleep 0.1; done
+# Serve the install target on port 22 for the syncfiles push of post.sh. Use
+# the sshd of the image: the initramfs sshd only runs with debugssh and may
+# lack helpers of the image's OpenSSH version, like sshd-session
+chroot /sysroot /usr/sbin/sshd -p 22 -o ChrootDirectory=/run/imginst/targ
 cp /sysroot/etc/pki/ca-trust/source/anchors/* /sysroot/run/imginst/targ/etc/pki/ca-trust/source/anchors/
 chroot /sysroot/run/imginst/targ update-ca-trust
 
