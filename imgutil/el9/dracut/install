@@ -8,6 +8,7 @@ dracut_install -o unsquashfs # optional, imageboot extracts with cp when absent
 dracut_install modprobe touch echo cut wc bash uniq grep ip hostname
 dracut_install awk egrep dirname expr sort
 dracut_install ssh sshd reboot parted mkfs mkfs.ext4 mkfs.xfs xfs_db mkswap
+dracut_install -o /usr/libexec/openssh/sshd-session # OpenSSH 9.8 and later, EL 9.8 has 9.9
 dracut_install efibootmgr uuidgen
 dracut_install du df ssh-keygen scp dhclient
 dracut_install /lib64/libnss_dns*
