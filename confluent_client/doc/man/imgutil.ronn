@@ -26,6 +26,10 @@
 
 * `exec`:
   Start the specified scratch directory as a container and optionally run a command inside it.
+  While it runs, `/proc`, `/sys`, `/dev`, an empty `/run` and the build
+  system's `/etc/resolv.conf` are mounted, without changing the scratch
+  directory. A plain `chroot` lacks them (no DNS, no `/dev/null`), so run
+  chroot based tools through `imgutil exec`, see EXAMPLES.
 
 * `unpack`:
   Unpack a diskless image profile to a scratch directory for modification.
@@ -142,7 +146,8 @@
   Directory of an unpacked diskless root.
 
 * <cmd>:
-  Optional command to run (defaults to a shell).
+  Optional command to run (defaults to a shell). Put `--` before a
+  command that has options.
 
 ## UNPACK OPTIONS
 
@@ -223,7 +228,19 @@ Execute a shell in an unpacked image:
 
 Execute a specific command in an image:
 
-    imgutil exec /tmp/myimage /bin/rpm -qa
+    imgutil exec /tmp/myimage -- rpm -qa
+
+Run an ansible playbook in an image through `imgutil exec` (chroot
+connection of community.general):
+
+    cat > /usr/local/sbin/imgutil-chroot << 'EOF'
+    #!/bin/sh
+    exec /opt/confluent/bin/imgutil exec -- "$@"
+    EOF
+    chmod 755 /usr/local/sbin/imgutil-chroot
+    ansible-playbook -c community.general.chroot \
+        -e ansible_chroot_exe=/usr/local/sbin/imgutil-chroot \
+        -i /tmp/myimage, site.yml
 
 Unpack an existing profile for modification:
 
