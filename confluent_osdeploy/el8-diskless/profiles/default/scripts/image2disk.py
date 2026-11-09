@@ -193,9 +193,7 @@ def fixup(rootdir, vols):
     with open('/proc/cmdline') as cmdlinein:
         cmdline = cmdlinein.read().strip()
         for arg in cmdline.split():
-            if arg.startswith('console='):
-                currcmdline.append(arg)
-            elif arg == 'quiet':
+            if arg == 'quiet' or arg.startswith(('console=', 'net.ifnames=', 'biosdevname=')):
                 currcmdline.append(arg)
     currcmdlinestr = ' '.join(currcmdline)
     if os.path.exists(grubsyscfg):

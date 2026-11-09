@@ -213,9 +213,7 @@ def fixup(rootdir, vols):
     with open('/proc/cmdline') as cmdlinein:
         cmdline = cmdlinein.read().strip()
         for arg in cmdline.split():
-            if arg.startswith('console='):
-                currcmdline.append(arg)
-            elif arg == 'quiet':
+            if arg == 'quiet' or arg.startswith(('console=', 'net.ifnames=', 'biosdevname=')):
                 currcmdline.append(arg)
     currcmdlinestr = ' '.join(currcmdline)
     kcmdline = os.path.join(rootdir, 'etc/kernel/cmdline')
@@ -236,6 +234,11 @@ def fixup(rootdir, vols):
                     newkcmdlineent.append(ent)
             else:
                 newkcmdlineent.append(ent)
+        # the network configuration written during the install uses the
+        # interface names of this boot
+        for arg in currcmdline:
+            if arg.startswith(('net.ifnames=', 'biosdevname=')) and arg not in newkcmdlineent:
+                newkcmdlineent.append(arg)
         with open(kcmdline, 'w') as kcmdlineout:
             kcmdlineout.write(' '.join(newkcmdlineent) + '\n')
     for loadent in glob.glob(os.path.join(rootdir, 'boot/loader/entries/*.conf')):
@@ -286,7 +289,7 @@ def fixup(rootdir, vols):
         'GRUB_DISABLE_SUBMENU=true',
         'GRUB_TERMINAL=""',
         'GRUB_SERIAL_COMMAND=""',
-        'GRUB_CMDLINE_LINUX="{}crashkernel=1G-4G:192M,4G-64G:256M,64G-:512M rd.lvm.lv=vg/root rd.lvm.lv=vg/swap"'.format(currcmdlinestr),
+        'GRUB_CMDLINE_LINUX="{} crashkernel=1G-4G:192M,4G-64G:256M,64G-:512M rd.lvm.lv=vg/root rd.lvm.lv=vg/swap"'.format(currcmdlinestr),
         'GRUB_DISABLE_RECOVERY="true"',
         'GRUB_ENABLE_BLSCFG=true',
         ]
