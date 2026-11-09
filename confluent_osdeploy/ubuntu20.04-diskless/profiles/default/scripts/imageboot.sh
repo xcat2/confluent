@@ -208,6 +208,10 @@ else
     hostname | sha512sum | head -c 32 > /sysroot/etc/machine-id
 fi
 echo >> /sysroot/etc/machine-id
+# Do not autoactivate LVM on local disks unless the image sets auto_activation_volume_list
+if [ -e /sysroot/etc/lvm/lvm.conf ] && ! grep -qs '^[[:space:]]*auto_activation_volume_list' /sysroot/etc/lvm/lvm.conf /sysroot/etc/lvm/lvmlocal.conf; then
+    printf 'activation {\n\tauto_activation_volume_list = []\n}\n' >> /sysroot/etc/lvm/lvmlocal.conf
+fi
 ipv4=$(grep ^ipv4_address: /etc/confluent/confluent.deploycfg | awk '{print $2}')
 ipv4method=$(grep ^ipv4_method: /etc/confluent/confluent.deploycfg | awk '{print $2}')
 ipv4gateway=$(grep ^ipv4_gateway: /etc/confluent/confluent.deploycfg | awk '{print $2}')
