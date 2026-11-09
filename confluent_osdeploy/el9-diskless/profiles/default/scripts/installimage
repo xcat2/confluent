@@ -34,7 +34,7 @@ for nameserver in $(sed -n '/^nameservers:/,/^[^-]/p' /etc/confluent/confluent.d
 done
 
 if [ ! -f /sysroot/tmp/installdisk ]; then
-    echo 'Unable to find a suitable installation target device, ssh to port 2222 to investigate'
+    echo 'Unable to find a suitable installation target device, ssh to port 22, or 2222 with debugssh, to investigate'
     while [ ! -f /sysroot/tmp/installdisk ]; do
         sleep 1
     done
