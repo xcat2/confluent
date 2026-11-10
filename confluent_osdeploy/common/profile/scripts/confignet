@@ -608,7 +608,9 @@ if __name__ == '__main__':
     checktarg = None
     if '-c' in sys.argv:
         checktarg = sys.argv[sys.argv.index('-c') + 1]
-    havefirewall = subprocess.call(['systemctl', 'status', 'firewalld'])
+    # quiet: images without firewalld print an error otherwise
+    with open(os.devnull, 'w') as devnull:
+        havefirewall = subprocess.call(['systemctl', 'status', 'firewalld'], stdout=devnull, stderr=devnull)
     havefirewall = havefirewall == 0
     if havefirewall:
         subprocess.check_call(['systemctl', 'stop', 'firewalld'])
