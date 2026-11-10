@@ -125,7 +125,7 @@ pxearchs = {
     b'\x00\x09': 'uefi-x64',
     b'\x00\x0b': 'uefi-aarch64',
     b'\x00\x10': 'uefi-httpboot',
-    b'\x00\x13': 'uefi-httpboot',  # arm httpboot
+    b'\x00\x13': 'uefi-httpboot-arm',  # arm httpboot
 }
 
 
@@ -317,7 +317,7 @@ async def proxydhcp(handler, nodeguess):
                 node, ('deployment.*', 'collective.managercandidates'))
             if disco['arch'] is None:
                 continue
-            if disco['arch'] == 'uefi-httpboot':
+            if disco['arch'] in ('uefi-httpboot', 'uefi-httpboot-arm'):
                 # HTTP boot is offered by the DHCP path, not proxyDHCP
                 continue
             insecuremode = cfd.get(node, {}).get('deployment.useinsecureprotocols',
@@ -621,7 +621,7 @@ async def check_reply(node, info, packet, sock, cfg, reqview, addr, requestor):
             return
         return await reply_dhcp6(node, addr, cfg, packet, cfd, profile, sock)
     else:
-        httpboot = info.get('architecture', None) == 'uefi-httpboot'
+        httpboot = info.get('architecture', None) in ('uefi-httpboot', 'uefi-httpboot-arm')
         return await reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, sock, requestor, niccfg=niccfg)
 
 async def reply_dhcp6(node, addr, cfg, packet, cfd, profile, sock, niccfg=None):
@@ -720,6 +720,7 @@ async def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, 
         requestor = ('0.0.0.0', None)
     if info.get('architecture', None) is None:
         isboot = False
+    bootarch = info.get('architecture', None)
     rqtype = packet[53][0]
     if isboot:
         insecuremode = cfd.get(node, {}).get('deployment.useinsecureprotocols',
@@ -798,12 +799,19 @@ async def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, 
         proto = 'https' if insecuremode == 'never' else 'http'
         if (proto == 'http'
                 and os.path.exists('/var/lib/confluent/public/os/{}/boot.ipxe.shim'.format(profile))
-                and os.path.exists('/var/lib/confluent/public/ipxe/ipxe-shim.efi')):
-            bootfile = '{0}://{1}/confluent-public/ipxe/ipxe-shim.efi'.format(
-                proto, myipn
-            )
-            bootshorturl = '/confluent-public/ipxe/ipxe-shim.efi'
-            bootfilename = '/var/lib/confluent/public/ipxe/ipxe-shim.efi'
+                and os.path.exists('/var/lib/confluent/public/ipxe/x86_64/ipxe-shim.efi')):
+            if bootarch == 'uefi-httpboot':
+                bootfile = '{0}://{1}/confluent-public/ipxe/x86_64/ipxe-shim.efi'.format(
+                    proto, myipn
+                )
+                bootshorturl = '/confluent-public/ipxe/x86_64/ipxe-shim.efi'
+                bootfilename = '/var/lib/confluent/public/ipxe/x86_64/ipxe-shim.efi'
+            elif bootarch == 'uefi-httpboot-arm':
+                bootfile = '{0}://{1}/confluent-public/ipxe/aarch64/ipxe-shim.efi'.format(
+                    proto, myipn
+                )
+                bootshorturl = '/confluent-public/ipxe/aarch64/ipxe-shim.efi'
+                bootfilename = '/var/lib/confluent/public/ipxe/aarch64/ipxe-shim.efi'
         else:
             bootfile = '{0}://{1}/confluent-public/os/{2}/boot.img'.format(
                 proto, myipn, profile
@@ -875,7 +883,7 @@ async def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, 
     # we will simply always do it to provide the boot payload in a consistent
     # matter to both dhcp-elsewhere and fixed ip clients
     if isboot:
-        if info.get('architecture', None) == 'uefi-httpboot':
+        if info.get('architecture', None) in ('uefi-httpboot', 'uefi-httpboot-arm'):
             repview[replen - 1:replen + 11] = b'\x3c\x0aHTTPClient'
             replen += 12
         else:
