@@ -796,12 +796,21 @@ async def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, 
     can302 = True
     if isboot and httpboot:
         proto = 'https' if insecuremode == 'never' else 'http'
-        bootfile = '{0}://{1}/confluent-public/os/{2}/boot.img'.format(
-            proto, myipn, profile
-        )
-        bootshorturl = '/confluent-public/os/{0}/boot.img'.format(profile)
-        bootfilename = '/var/lib/confluent/public/os/{0}/boot.img'.format(profile)
-        can302 = False
+        if (proto == 'http'
+                and os.path.exists('/var/lib/confluent/public/os/{}/boot.ipxe.shim'.format(profile))
+                and os.path.exists('/var/lib/confluent/public/ipxe/ipxe-shim.efi')):
+            bootfile = '{0}://{1}/confluent-public/ipxe/ipxe-shim.efi'.format(
+                proto, myipn
+            )
+            bootshorturl = '/confluent-public/ipxe/ipxe-shim.efi'
+            bootfilename = '/var/lib/confluent/public/ipxe/ipxe-shim.efi'
+        else:
+            bootfile = '{0}://{1}/confluent-public/os/{2}/boot.img'.format(
+                proto, myipn, profile
+            )
+            bootshorturl = '/confluent-public/os/{0}/boot.img'.format(profile)
+            bootfilename = '/var/lib/confluent/public/os/{0}/boot.img'.format(profile)
+            can302 = False
         if not isinstance(bootfile, bytes):
             bootfile = bootfile.encode('utf8')
         if len(bootfile) > 127:
