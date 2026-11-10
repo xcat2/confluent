@@ -32,7 +32,6 @@ if [ ! -f /etc/confluent/firstboot.ran ]; then
     touch /etc/confluent/firstboot.ran
 
 
-    cat /etc/confluent/tls/*.pem >> /etc/pki/tls/certs/ca-bundle.crt
     confluentpython /root/confignet
     rm /root/confignet
     run_remote firstboot.custom
