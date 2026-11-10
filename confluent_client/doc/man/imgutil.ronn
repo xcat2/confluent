@@ -29,7 +29,9 @@
   While it runs, `/proc`, `/sys`, `/dev`, an empty `/run` and the build
   system's `/etc/resolv.conf` are mounted, without changing the scratch
   directory. A plain `chroot` lacks them (no DNS, no `/dev/null`), so run
-  chroot based tools through `imgutil exec`, see EXAMPLES.
+  chroot based tools through `imgutil exec`, see EXAMPLES. `uname` and
+  `/proc` report the newest kernel of the image, so DKMS builds for it,
+  see `-k`.
 
 * `unpack`:
   Unpack a diskless image profile to a scratch directory for modification.
@@ -133,11 +135,20 @@
   the OS (AlmaLinux for EL, the official Ubuntu image, openSUSE Leap for
   SUSE).
 
+* `-k`, `--kernel` <version>:
+  Kernel version that `uname` and `/proc` report in the image. Defaults to
+  the newest kernel of the image, `host` for the build system kernel. Needs
+  Linux 5.0 or later on x86_64 or aarch64, otherwise a warning is printed.
+
 * <scratchdir>:
   Directory to build new diskless root in. With `--containerfile`, the file
   to write, or `-` for standard output.
 
 ## EXEC OPTIONS
+
+* `-k`, `--kernel` <version>:
+  As for `build`. dnf keeps the newest kernel of the image as the running
+  one, use `-k host` to remove it.
 
 * `-v`, `--volume` <mount>:
   Directory to make available in the build environment. `-v /` will cause it to be mounted in image as `/run/external/`. `-v /:/run/root` will override the target to be `/run/root`. May be specified multiple times.

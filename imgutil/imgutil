@@ -17,7 +17,9 @@ import argparse
 import os
 import pwd
 import re
+import select
 import shutil
+import signal
 import stat
 import struct
 import subprocess
@@ -1416,6 +1418,144 @@ def _exitcode_from_status(status):
         return 128 + os.WTERMSIG(status)
     return 1
 
+
+# uname() in the chroot reports the newest kernel of the image instead of the
+# one of this system, so DKMS, kernel Makefiles and scriptlets build for the
+# kernel the image boots. A seccomp filter hands each uname() to the process
+# waiting for the chroot, which writes the answer into the caller.
+SECCOMP_ARCH = {'x86_64': (0xc000003e, 63, 317), 'aarch64': (0xc00000b7, 160, 277)}
+
+
+class _IoVec(ctypes.Structure):
+    _fields_ = [('base', ctypes.c_void_p), ('len', ctypes.c_size_t)]
+
+
+class FakeUname(object):
+    def __init__(self, installroot, release=None):
+        self.installroot = os.path.abspath(installroot)
+        self.fixed = release
+        self.procdir = None
+        self.fd = None
+        self.current = None
+        self.host = os.uname().release
+        self.machine = os.uname().machine
+        uts = ctypes.create_string_buffer(390)
+        libc.uname(uts)
+        self.uts = uts.raw
+        with open('/proc/version') as versin:
+            self.version = versin.read()
+
+    @classmethod
+    def for_args(cls, args):
+        args.fakeuname = None
+        if args.kernel != 'host':
+            args.fakeuname = cls(args.scratchdir, args.kernel)
+        return args.fakeuname
+
+    def release(self):
+        # no uname() here, the filter would have it wait for itself
+        return self.fixed or image_kernel(self.installroot) or self.host
+
+    def install(self):
+        fd = -1
+        if self.machine in SECCOMP_ARCH:
+            arch, nruname, nrseccomp = SECCOMP_ARCH[self.machine]
+            filt = b''.join(struct.pack('<HBBI', *insn) for insn in (
+                (0x20, 0, 0, 4),  # load arch
+                (0x15, 0, 3, arch),
+                (0x20, 0, 0, 0),  # load syscall number
+                (0x15, 0, 1, nruname),
+                (0x06, 0, 0, 0x7fc00000),  # SECCOMP_RET_USER_NOTIF
+                (0x06, 0, 0, 0x7fff0000)))  # SECCOMP_RET_ALLOW
+            fbuf = ctypes.create_string_buffer(filt)
+            prog = struct.pack('<HxxxxxxQ', 6, ctypes.addressof(fbuf))
+            libc.syscall.restype = ctypes.c_long
+            # SECCOMP_SET_MODE_FILTER with SECCOMP_FILTER_FLAG_NEW_LISTENER
+            fd = libc.syscall(nrseccomp, 1, 8, ctypes.c_char_p(prog))
+        if fd < 0:
+            sys.stderr.write('Warning: unable to report the image kernel to uname, '
+                             'the image sees the kernel of this system\n')
+            return
+        self.fd = fd
+        # outside the image, so nothing in it can redirect the writes
+        mkdirp('/run/imgutil')
+        self.procdir = tempfile.mkdtemp(prefix='kernel-', dir='/run/imgutil')
+
+    def mount_proc(self):
+        if self.fd is None:
+            return
+        self.write_proc(self.release())
+        _mount_file(os.path.join(self.procdir, 'osrelease'),
+                    os.path.join(self.installroot, 'proc/sys/kernel/osrelease'))
+        _mount_file(os.path.join(self.procdir, 'version'),
+                    os.path.join(self.installroot, 'proc/version'))
+
+    def write_proc(self, release):
+        # rewritten in place, the bind mounts keep showing these files
+        with open(os.path.join(self.procdir, 'osrelease'), 'w') as relout:
+            relout.write(release + '\n')
+        with open(os.path.join(self.procdir, 'version'), 'w') as versout:
+            versout.write(self.version.replace(self.host, release, 1))
+        self.current = release
+
+    def answer(self):
+        req = ctypes.create_string_buffer(80)
+        if libc.ioctl(self.fd, 0xc0502100, req):  # SECCOMP_IOCTL_NOTIF_RECV
+            return
+        reqid, pid = struct.unpack_from('<QI', req.raw)
+        addr = struct.unpack_from('<Q', req.raw, 32)[0]
+        try:
+            release = self.release()
+            if release != self.current:
+                # a kernel was installed since, show it in /proc too
+                self.write_proc(release)
+        except Exception as e:
+            # the caller waits for an answer, so give one anyway
+            sys.stderr.write('Warning: {0}\n'.format(e))
+            release = self.current or self.host
+        uts = self.uts[:130] + release.encode('utf8')[:64].ljust(65, b'\0') + self.uts[195:]
+        src = ctypes.create_string_buffer(uts, len(uts))
+        local = _IoVec(ctypes.addressof(src), len(uts))
+        remote = _IoVec(addr, len(uts))
+        # SECCOMP_IOCTL_NOTIF_ID_VALID (and its pre 5.7 number): the caller
+        # still waits, so its pid was not reused
+        reqidarg = ctypes.c_uint64(reqid)
+        if all(libc.ioctl(self.fd, cmd, ctypes.byref(reqidarg)) for cmd in (0x40082102, 0x80082102)):
+            return
+        err = 0
+        if libc.process_vm_writev(pid, ctypes.byref(local), 1, ctypes.byref(remote), 1, 0) != len(uts):
+            err = -14  # EFAULT, as uname() itself would
+        resp = struct.pack('<QqiI', reqid, 0, err, 0)
+        libc.ioctl(self.fd, 0xc0182101, ctypes.c_char_p(resp))  # SECCOMP_IOCTL_NOTIF_SEND
+
+    def wait(self, pid):
+        # no threads after unshare(CLONE_NEWPID), so poll the listener and a
+        # SIGCHLD wakeup pipe while waiting
+        wakeup, wakeupw = os.pipe()
+        os.set_blocking(wakeup, False)
+        os.set_blocking(wakeupw, False)
+        signal.signal(signal.SIGCHLD, lambda signum, frame: None)
+        signal.set_wakeup_fd(wakeupw)
+        poller = select.poll()
+        poller.register(self.fd, select.POLLIN)
+        poller.register(wakeup, select.POLLIN)
+        try:
+            while True:
+                wpid, status = os.waitpid(pid, os.WNOHANG)
+                if wpid:
+                    return status
+                for readyfd, _ in poller.poll():
+                    if readyfd == self.fd:
+                        self.answer()
+                    else:
+                        try:
+                            os.read(wakeup, 512)
+                        except BlockingIOError:
+                            pass
+        finally:
+            shutil.rmtree(self.procdir, ignore_errors=True)
+
+
 def run_constrainedx(function, args):
     # first fork to avoid changing namespace of unconstrained environment
     pid = os.fork()
@@ -1440,7 +1580,7 @@ def run_constrainedx(function, args):
     finally:
         os._exit(exitcode)
 
-def run_constrained(function, args):
+def run_constrained(function, args, fakeuname=None):
     # first fork to avoid changing namespace of unconstrained environment
     pid = os.fork()
     if pid:
@@ -1449,12 +1589,21 @@ def run_constrained(function, args):
     exitcode = 0
     try:
         libc.unshare(CLONE_NEWNS|CLONE_NEWPID)
+        if fakeuname:
+            # the chroot inherits the filter, this process answers it
+            fakeuname.install()
         # must fork again due to CLONE_NEWPID, or else lose the ability to make
         # subprocesses
         pid = os.fork()
         if pid:
-            _, status = os.waitpid(pid, 0)
+            if fakeuname and fakeuname.fd is not None:
+                status = fakeuname.wait(pid)
+            else:
+                _, status = os.waitpid(pid, 0)
             os._exit(_exitcode_from_status(status))
+        if fakeuname and fakeuname.fd is not None:
+            # only the waiting process answers
+            os.close(fakeuname.fd)
         # we are pid 1 now
         _mount('none', '/', flags=MS_REC|MS_PRIVATE)
         _mount('proc', '/proc', fstype='proc')
@@ -1505,12 +1654,18 @@ def main():
         help='With --containerfile, write an Apptainer definition file for building a SIF instead')
     buildp.add_argument('--from', dest='base', default=None,
         help='With --containerfile, the base image to use instead of the default for the OS')
+    buildp.add_argument('-k', '--kernel', default=None,
+                        help='Kernel version uname and /proc report in the image, by default the newest kernel '
+                             'in the image, "host" for the kernel of this system')
     buildp.add_argument('scratchdir', help='Directory to build new diskless root in, or with --containerfile the file to write, - for standard output')
     execp = sps.add_parser('exec', help='Start specified scratch directory as container')
     execp.add_argument('-v', '--volume',
         help='Directory to make available in the build environment.  -v / will '
         'cause it to be mounted in image as /run/external/, -v /:/run/root '
         'will override the target to be /run/root', action='append')
+    execp.add_argument('-k', '--kernel', default=None,
+                       help='Kernel version uname and /proc report in the image, by default the newest kernel '
+                            'in the image, "host" for the kernel of this system')
     execp.add_argument('scratchdir', help='Directory of an unpacked diskless root')
     execp.add_argument('cmd', nargs='*', help='Optional command to run (defaults to a shell)')
     unpackp = sps.add_parser('unpack', help='Unpack a diskless image to a scratch directory')
@@ -1567,9 +1722,42 @@ def exec_root(args):
     if imgarch and imgarch != os.uname().machine:
         check_binfmt(imgarch, args)
         set_qemu_cpu(imgarch)
-    exitcode = run_constrained(exec_root_backend, args)
+    exitcode = run_constrained(exec_root_backend, args, FakeUname.for_args(args))
     if exitcode:
         sys.exit(exitcode)
+
+def boot_kernels(installroot):
+    # the kernels in /boot by version, pack boots the newest
+    kvermap = {}
+    for kern in glob.glob(os.path.join(installroot, 'boot/vmlinuz-*')):
+        if 'rescue' not in kern:
+            kvermap[get_kern_version(kern)] = kern
+    return kvermap
+
+
+def newest_kernel(kvers):
+    # sorted first, version_sort ties 4k and 64k kernels of one version
+    return list(version_sort(sorted(kvers)))[-1]
+
+
+def image_kernel(installroot):
+    # the newest kernel of the image, a package may have just unpacked it to
+    # its modules directory and not yet to /boot. Names only, the image files
+    # are not opened from outside the image
+    kvers = set()
+    for kern in glob.glob(os.path.join(installroot, 'boot/vmlinuz-*')):
+        if 'rescue' not in kern:
+            kvers.add(os.path.basename(kern)[len('vmlinuz-'):])
+    moddirs = ['usr/lib/modules']
+    if not os.path.islink(os.path.join(installroot, 'lib')):
+        moddirs.append('lib/modules')
+    for moddir in moddirs:
+        for kern in glob.glob(os.path.join(installroot, moddir, '*/vmlinuz')):
+            kvers.add(os.path.basename(os.path.dirname(kern)))
+    if not kvers:
+        return None
+    return newest_kernel(kvers)
+
 
 def _mount_file(source, dst):
     _mount(source, dst, flags=MS_BIND|MS_RDONLY)
@@ -1669,6 +1857,8 @@ def _mount_constrained_fs(args, installroot):
     _mount('proc', os.path.join(installroot, 'proc'), fstype='proc')
     _mount('sys', os.path.join(installroot, 'sys'), fstype='sysfs')
     _mount('runfs', os.path.join(installroot, 'run'), fstype='tmpfs')
+    if getattr(args, 'fakeuname', None):
+        args.fakeuname.mount_proc()
     if args.volume is None:
         args.volume = []
     for v in args.volume:
@@ -2003,7 +2193,7 @@ def build_root(args, oshandler=None):
     oshandler.add_pkglists()
     for dirname in ('proc', 'sys', 'dev', 'run'):
         mkdirp(os.path.join(args.scratchdir, dirname))
-    exitcode = run_constrained(build_root_backend, (args, oshandler))
+    exitcode = run_constrained(build_root_backend, (args, oshandler), FakeUname.for_args(args))
     if exitcode:
         sys.stderr.write('Image build failed\n')
         sys.exit(exitcode)
@@ -2430,18 +2620,18 @@ def pack_image(args):
                     imgarch = lineinfo.replace('ARCH=', '')
     except IOError:
         pass
-    kerns = glob.glob(os.path.join(args.scratchdir, 'boot/vmlinuz-*'))
-    kvermap = {}
-    for kern in kerns:
-        if 'rescue' in kern:
-            continue
-        kvermap[get_kern_version(kern)] = kern
+    kvermap = boot_kernels(args.scratchdir)
     if not kvermap:
         sys.stderr.write(
             'No kernel found in {0}\n'.format(
                 os.path.join(args.scratchdir, 'boot')))
         sys.exit(1)
-    mostrecent = list(version_sort(kvermap))[-1]
+    mostrecent = newest_kernel(kvermap)
+    newest = image_kernel(args.scratchdir)
+    if newest != mostrecent:
+        # modules built in exec or build were for that kernel
+        sys.stderr.write('Warning: the newest kernel {0} is not in /boot, packing {1}\n'.format(
+            newest, mostrecent))
     initrdname = os.path.join(args.scratchdir, 'boot/initramfs-{0}.img'.format(mostrecent))
     if not os.path.exists(initrdname):
         initrdname = os.path.join(args.scratchdir, 'boot/initrd-{0}'.format(mostrecent))
