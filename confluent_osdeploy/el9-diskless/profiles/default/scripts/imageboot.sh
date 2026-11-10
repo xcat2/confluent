@@ -161,6 +161,10 @@ if [ ${#machineid} -eq 32 ]; then
     echo $machineid > /sysroot/etc/machine-id
     chmod 444 /sysroot/etc/machine-id
 fi
+# Do not autoactivate LVM on local disks unless the image sets auto_activation_volume_list
+if [ -e /sysroot/etc/lvm/lvm.conf ] && ! grep -qs '^[[:space:]]*auto_activation_volume_list' /sysroot/etc/lvm/lvm.conf /sysroot/etc/lvm/lvmlocal.conf; then
+    printf 'activation {\n\tauto_activation_volume_list = []\n}\n' >> /sysroot/etc/lvm/lvmlocal.conf
+fi
 rm -f /sysroot/etc/dracut.conf.d/diskless.conf # remove diskless dracut from runtime, to make kdump happier
 if [ -x /sysroot/usr/sbin/matchpathcon ] && grep -Eq '^SELINUX=(enforcing|permissive)' /sysroot/etc/selinux/config 2> /dev/null; then
     # Files written to /sysroot before policy load are unlabeled.
