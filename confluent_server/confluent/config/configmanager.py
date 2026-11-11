@@ -2584,6 +2584,9 @@ class ConfigManager(object):
                 if skipped is not None:
                     skipped.append(node)
                 continue
+            # callers may pass one dict for several nodes (nodedefine with a
+            # noderange), give each node its own copy before storing it
+            attribmap[node] = copy.deepcopy(attribmap[node])
             if 'groups' not in attribmap[node] and node not in self._cfgstore['nodes']:
                 attribmap[node]['groups'] = []
             for attrname in list(attribmap[node]):
