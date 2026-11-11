@@ -15,6 +15,7 @@ initscripts
 tpm2-tools
 xfsprogs
 e2fsprogs
+dosfstools
 fuse-libs
 libnl3
 dhcpcd
