@@ -489,7 +489,9 @@ class NetworkManager(object):
 
 
 if __name__ == '__main__':
-    havefirewall = subprocess.call(['systemctl', 'status', 'firewalld'])
+    # quiet: images without firewalld print an error otherwise
+    with open(os.devnull, 'w') as devnull:
+        havefirewall = subprocess.call(['systemctl', 'status', 'firewalld'], stdout=devnull, stderr=devnull)
     havefirewall = havefirewall == 0
     if havefirewall:
         subprocess.check_call(['systemctl', 'stop', 'firewalld'])
