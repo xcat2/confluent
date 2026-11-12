@@ -429,6 +429,10 @@ def _init_core():
                     'pluginattrs': ['hardwaremanagement.method'],
                     'default': 'null',
                 }),
+                'certificate_authorities': PluginCollection({
+                    'pluginattrs': ['hardwaremanagement.method'],
+                    'default': 'null',
+                }),
                 'clear': PluginRoute({
                     'pluginattrs': ['hardwaremanagement.method'],
                     'default': 'null',

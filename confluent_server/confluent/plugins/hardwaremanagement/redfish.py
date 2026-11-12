@@ -601,6 +601,8 @@ class IpmiHandler:
             return await self.handle_sysconfig()
         elif self.element[1:3] == ['system', 'advanced']:
             return await self.handle_sysconfig(True)
+        elif self.element[1:3] == ['system', 'certificate_authorities']:
+            return await self.handle_cert_authorities()
         elif self.element[1:3] == ['system', 'clear']:
             return await self.handle_sysconfigclear()
         elif self.element[1:3] == ['management_controller', 'clear']:
@@ -616,17 +618,26 @@ class IpmiHandler:
             'Decoding an alert is not implemented for redfish')
 
     async def handle_cert_authorities(self):
+        uefi = False
+        if self.element[1] == 'system':
+            uefi = True
         if len(self.element) == 3:
             if self.op == 'read':
-                async for cert in self.ipmicmd.get_trusted_cas():
+                if uefi:
+                    trusted = self.ipmicmd.get_trusted_uefi_cas
+                else:
+                    trusted = self.ipmicmd.get_trusted_cas
+                async for cert in trusted():
                     await self.output.put(msg.ChildCollection(cert['id']))
             elif self.op == 'update':
                 cert = self.inputdata.get_pem(self.node)
-                await self.ipmicmd.add_trusted_ca(cert)
+                atc = self.ipmicmd.add_trusted_uefi_ca if uefi else self.ipmicmd.add_trusted_ca
+                await atc(cert)
         elif len(self.element) == 4:
             certid = self.element[-1]
             if self.op == 'read':
-                async for certdata in self.ipmicmd.get_trusted_cas():
+                trusted = self.ipmicmd.get_trusted_uefi_cas if uefi else self.ipmicmd.get_trusted_cas
+                async for certdata in trusted():
                     if certdata['id'] == certid:
                         await self.output.put(msg.CertificateAuthority(
                             pem=certdata['pem'],
@@ -634,7 +645,8 @@ class IpmiHandler:
                             subject=certdata['subject'],
                             san=certdata.get('san', None)))
             elif self.op == 'delete':
-                await self.ipmicmd.del_trusted_ca(certid)
+                deltc = self.ipmicmd.del_trusted_uefi_ca if uefi else self.ipmicmd.del_trusted_ca
+                await deltc(certid)
             return
 
     async def handle_certificate(self):

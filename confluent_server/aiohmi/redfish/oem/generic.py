@@ -591,6 +591,50 @@ class OEMHandler(object):
                         return True
         raise exc.PyghmiException(f'No such certificate found: {certid}')
 
+    async def get_trusted_uefi_cas(self):
+        sysinfo = await self.sysinfo()
+        caurl = sysinfo.get('Boot', {}).get('Certificates', {}).get('@odata.id', None)
+        if not caurl:
+            return
+        cas = await self._get_expanded_data(caurl)
+        cas = cas.get('Members', [])
+        for ca in cas:
+            cadesc = {
+                'id': ca.get('Id', ''),
+                'name': ca.get('Name', ''),
+                'pem': ca.get('CertificateString', None),
+                'subject': ca.get('Subject', {}).get('CommonName', ''),
+                'sans': ca.get('Subject', {}).get('AlternativeNames', []),
+                'issuer': ca.get('Issuer', {}).get('CommonName', ''),
+                'validfrom': ca.get('ValidNotBefore', ''),
+                'validto': ca.get('ValidNotAfter', ''),
+            }
+            yield cadesc
+
+    async def add_trusted_uefi_ca(self, pemdata):
+        sysinfo = await self.sysinfo()
+        caurl = sysinfo.get('Boot', {}).get('Certificates', {}).get('@odata.id', None)
+        if not caurl:
+            raise exc.PyghmiException('Platform does not support UEFI CAs')
+        certpayload = _pem_to_dict(pemdata, uefi=True)
+        await self._do_web_request(caurl, certpayload)
+        self._invalidate_url_cache(caurl)
+        return True
+
+    async def del_trusted_uefi_ca(self, certid):
+        sysinfo = await self.sysinfo()
+        caurl = sysinfo.get('Boot', {}).get('Certificates', {}).get('@odata.id', None)
+        if not caurl:
+            raise exc.PyghmiException('Platform does not support UEFI CAs')
+        cas = await self._get_expanded_data(caurl)
+        cas = cas.get('Members', [])
+        for ca in cas:
+            if ca.get('Id', '') == certid:
+                await self._do_web_request(ca['@odata.id'], method='DELETE')
+                self._invalidate_url_cache(caurl)
+                return True
+        raise exc.PyghmiException(f'No such certificate found: {certid}')
+
     async def get_trusted_cas(self):
         mgrinfo = await self._bmcinfo()
         secpolicy = mgrinfo.get('SecurityPolicy', {}).get('@odata.id', None)

@@ -1,4 +1,4 @@
-nodecertutil(8) -- Manage BMC CA certificates and sign BMC certificates
+nodecertutil(8) -- Manage BMC and UEFI CA certificates and sign BMC certificates
 =======================================================================
 
 ## SYNOPSIS
@@ -8,9 +8,9 @@ nodecertutil(8) -- Manage BMC CA certificates and sign BMC certificates
 ## DESCRIPTION
 
 `nodecertutil` manages the certificate authority (CA) certificates trusted by
-the baseboard management controllers (BMCs) of the nodes matched by
-`<noderange>`, and can sign a BMC certificate. One of the subcommands below
-must be supplied.
+the baseboard management controllers (BMCs) and UEFI firmware of the nodes
+matched by `<noderange>`, and can sign a BMC certificate. One of the
+subcommands below must be supplied.
 
 ## COMMANDS
 
@@ -23,6 +23,17 @@ must be supplied.
 
 * `listbmccacerts`:
     List the CA certificates currently installed on the BMCs.
+
+* `installueficacert <filename>`:
+    Install the CA certificate contained in `<filename>` onto the nodes' UEFI
+    firmware.
+
+* `removeueficacert <id>`:
+    Remove the CA certificate identified by `<id>` from the nodes' UEFI
+    firmware. Use `listueficacerts` to discover the identifiers.
+
+* `listueficacerts`:
+    List the CA certificates currently installed in the nodes' UEFI firmware.
 
 * `signbmccert` [`--days <days>`] [`--added-names <names>`]:
     Sign a BMC certificate. `--days` is required and sets the number of days
@@ -41,6 +52,12 @@ must be supplied.
 
 * Install a CA certificate on a range of nodes:
     `# nodecertutil n1-n4 installbmccacert /etc/confluent/myca.pem`
+
+* List the CA certificates installed in a node's UEFI firmware:
+    `# nodecertutil n1 listueficacerts`
+
+* Install a CA certificate in a range of nodes' UEFI firmware:
+    `# nodecertutil n1-n4 installueficacert /etc/confluent/myca.pem`
 
 * Sign a BMC certificate valid for one year:
     `# nodecertutil n1 signbmccert --days 365`

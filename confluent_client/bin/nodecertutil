@@ -11,16 +11,18 @@ if path.startswith('/opt'):
     sys.path.append(path)
 import confluent.client as client
 
-def removebmccacert(noderange, certid, cmd):
-    for res in cmd.delete(f'/noderange/{noderange}/configuration/management_controller/certificate_authorities/{certid}'):
+def removecacert(noderange, certid, cmd, uefi=False):
+    component = 'system' if uefi else 'management_controller'
+    for res in cmd.delete(f'/noderange/{noderange}/configuration/{component}/certificate_authorities/{certid}'):
         print(repr(res))
 
-def listbmccacerts(noderange, cmd):
+def listcacerts(noderange, cmd, uefi=False):
+    component = 'system' if uefi else 'management_controller'
     certids = []
-    for res in cmd.read(f'/noderange/{noderange}/configuration/management_controller/certificate_authorities'):
+    for res in cmd.read(f'/noderange/{noderange}/configuration/{component}/certificate_authorities'):
         certids.append(res.get('item', {}).get('href', ''))
     for certid in certids:
-        for res in cmd.read(f'/noderange/{noderange}/configuration/management_controller/certificate_authorities/{certid}'):
+        for res in cmd.read(f'/noderange/{noderange}/configuration/{component}/certificate_authorities/{certid}'):
             for node in res.get('databynode', {}):
                 certdata = res['databynode'][node].get('pem', {}).get('value', '')
                 summary = ''
@@ -41,7 +43,7 @@ def listbmccacerts(noderange, cmd):
                 summary += f" (SHA256={sha256})"
                 print(f"{node}: {certid}: {summary}")
 
-def installbmccacert(noderange, certfile, cmd):
+def installcacert(noderange, certfile, cmd, uefi=False):
     if certfile:
         try:
             with open(certfile, 'r') as f:
@@ -55,7 +57,10 @@ def installbmccacert(noderange, certfile, cmd):
             print("Invalid certificate format. Must be a PEM encoded certificate.", file=sys.stderr)
             sys.exit(1)
         payload = {'pem': certdata}
-        for res in cmd.update(f'/noderange/{noderange}/configuration/management_controller/certificate_authorities', payload):
+        url = f'/noderange/{noderange}/configuration/management_controller/certificate_authorities'
+        if uefi:
+            url = f'/noderange/{noderange}/configuration/system/certificate_authorities'
+        for res in cmd.update(url, payload):
             print(repr(res))
 
     
@@ -71,10 +76,18 @@ if __name__ == '__main__':
     install_parser = subparsers.add_parser('installbmccacert', help='Install BMC CA certificate')
     install_parser.add_argument('filename', help='Certificate file to install')
 
+    install_uefi_parser = subparsers.add_parser('installueficacert', help='Install UEFI CA certificate')
+    install_uefi_parser.add_argument('filename', help='Certificate file to install')
+    
+
     remove_parser = subparsers.add_parser('removebmccacert', help='Remove BMC CA certificate')
     remove_parser.add_argument('id', help='Certificate id to remove')
 
+    remove_uefi_parser = subparsers.add_parser('removeueficacert', help='Remove UEFI CA certificate')
+    remove_uefi_parser.add_argument('id', help='Certificate id to remove')
+
     list_parser = subparsers.add_parser('listbmccacerts', help='List BMC CA certificates')
+    list_uefi_parser = subparsers.add_parser('listueficacerts', help='List UEFI CA certificates')
 
     sign_bmc_parser = subparsers.add_parser('signbmccert', help='Sign BMC certificate')
     sign_bmc_parser.add_argument('--days', type=int, help='Number of days the certificate is valid for')
@@ -83,11 +96,17 @@ if __name__ == '__main__':
     args = parser.parse_args()
     c = client.Command()
     if args.command == 'installbmccacert':
-        installbmccacert(args.noderange, args.filename, c)
+        installcacert(args.noderange, args.filename, c)
+    elif args.command == 'installueficacert':
+        installcacert(args.noderange, args.filename, c, uefi=True)
     elif args.command == 'removebmccacert':
-        removebmccacert(args.noderange, args.id, c)
+        removecacert(args.noderange, args.id, c)
+    elif args.command == 'removeueficacert':
+        removecacert(args.noderange, args.id, c, uefi=True)
     elif args.command == 'listbmccacerts':
-        listbmccacerts(args.noderange, c)
+        listcacerts(args.noderange, c)
+    elif args.command == 'listueficacerts':
+        listcacerts(args.noderange, c, uefi=True)
     elif args.command == 'signbmccert':
         payload = {}
         if args.days is not None:

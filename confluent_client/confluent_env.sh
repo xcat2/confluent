@@ -322,10 +322,10 @@ _confluent_nodecertutil_completion()
         return
     fi
     if [ $NUMARGS == 3 ]; then
-        COMPREPLY=($(compgen -W "installbmccacert removebmccacert listbmccacerts signbmccert" -- ${COMP_WORDS[COMP_CWORD]}))
+        COMPREPLY=($(compgen -W "installbmccacert removebmccacert listbmccacerts installueficacert removeueficacert listueficacerts signbmccert" -- ${COMP_WORDS[COMP_CWORD]}))
         return
     fi
-    if [ ${CMPARGS[2]} == 'installbmccacert' ]; then
+    if [ ${CMPARGS[2]} == 'installbmccacert' ] || [ ${CMPARGS[2]} == 'installueficacert' ]; then
         compopt -o default
         COMPREPLY=()
         return

@@ -267,10 +267,10 @@ function _confluent_nodecertutil_complete
     if test $count -lt 3
         _confluent_nr_complete
     else if test $count -eq 3
-        printf '%s\n' installbmccacert removebmccacert listbmccacerts signbmccert
+        printf '%s\n' installbmccacert removebmccacert listbmccacerts installueficacert removeueficacert listueficacerts signbmccert
     else if test (count $args) -ge 3; and test "$args[3]" = signbmccert
         _confluent_unseen '--days --added-names'
-    else if test (count $args) -ge 3; and test "$args[3]" = installbmccacert
+    else if test (count $args) -ge 3; and contains -- "$args[3]" installbmccacert installueficacert
         _confluent_path_complete
     end
 end

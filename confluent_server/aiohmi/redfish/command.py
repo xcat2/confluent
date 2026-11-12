@@ -227,6 +227,19 @@ class Command(object):
         return await oem.get_bmc_csr(
             keytype=keytype, keylength=keylength, cn=cn)
 
+    async def get_trusted_uefi_cas(self):
+        oem = await self.oem()
+        async for ca in oem.get_trusted_uefi_cas():
+            yield ca
+
+    async def add_trusted_uefi_ca(self, pemdata):
+        oem = await self.oem()
+        return await oem.add_trusted_uefi_ca(pemdata)
+
+    async def del_trusted_uefi_ca(self, certid):
+        oem = await self.oem()
+        return await oem.del_trusted_uefi_ca(certid)
+    
     async def install_bmc_certificate(self, certdata):
         oem = await self.oem()
         return await oem.install_bmc_certificate(certdata)
