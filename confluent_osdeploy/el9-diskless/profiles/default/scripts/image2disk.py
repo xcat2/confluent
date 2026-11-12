@@ -664,7 +664,7 @@ def install_to_disk(imgpath):
             sys.stdout.write('\x1b[1K\rDone writing {0}'.format(vol['mount']))
             sys.stdout.write('\n')
             sys.stdout.flush()
-            if vol['mount'] == '/boot':
+            if vol['mount'] == '/boot' or (vol['mount'] == '/' and not bootuuid):  # /boot may live on /
                 tbootuuid = subprocess.check_output(['blkid', vol['targetdisk']])
                 if b'UUID="' in tbootuuid:
                     bootuuid = tbootuuid.split(b'UUID="', 1)[1].split(b'"')[0].decode('utf8')
