@@ -29,6 +29,39 @@ function confluentpython() {
     fi
 }
 
+# Print a node attribute, e.g. 'confluent_attrib custom.foo'. Returns 1 if unset.
+function confluent_attrib() {
+    if [ -z "$1" ]; then
+        echo "Usage: confluent_attrib <attribute>" >&2
+        return 2
+    fi
+    local apiclient=/opt/confluent/bin/apiclient
+    if [ -f /etc/confluent/apiclient ]; then
+        apiclient=/etc/confluent/apiclient
+    fi
+    # program on stdin, data on fd 3: confluentpython splits its args
+    confluentpython - "$1" 3< <(confluentpython $apiclient /confluent-api/self/myattribs -j) <<'EOF'
+import json
+import os
+import sys
+try:
+    attribs = json.load(os.fdopen(3))
+except ValueError:
+    sys.stderr.write('Unable to retrieve node attributes\n')
+    sys.exit(2)
+value = attribs.get(sys.argv[1], None)
+if value is None or value == '':
+    sys.exit(1)
+if isinstance(value, list):
+    value = u','.join(value)
+if not isinstance(value, str):
+    value = u'{0}'.format(value)
+if sys.version_info[0] < 3:
+    value = value.encode('utf8')
+sys.stdout.write(value + '\n')
+EOF
+}
+
 function set_confluent_vars() {
     if [ -z "$nodename" ]; then
         nodename=$(grep ^NODENAME: /etc/confluent/confluent.info | awk '{print $2}')

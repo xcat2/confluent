@@ -275,7 +275,13 @@ async def handle_request(req, make_response, mimetype):
         cfd = cfg.get_node_attributes(nodename, '*', decrypt=True).get(nodename, {})
         rsp = {}
         for k in cfd:
-            if k.startswith('secret') or k.startswith('crypt') or 'value' not in cfd[k] or not cfd[k]['value']:
+            if k.startswith('secret') or k.startswith('crypt'):
+                continue
+            if isinstance(cfd[k], list):
+                if cfd[k]:
+                    rsp[k] = cfd[k]
+                continue
+            if 'value' not in cfd[k] or not cfd[k]['value']:
                 continue
             rsp[k] = cfd[k]['value']
             if isinstance(rsp[k], bytes):
