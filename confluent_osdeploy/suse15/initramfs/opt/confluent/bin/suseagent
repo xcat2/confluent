@@ -229,6 +229,7 @@ append=$(grep ^installedargs: /tmp/profile.yaml | sed -e 's/^installedargs: //' 
 if grep console= /etc/fakecmdline >& /dev/null &&  [[ "$append" != *console=* ]]; then
     append="$append console=${autocons#*/dev/}"
 fi
+append=$(printf '%s' "$append" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g')
 if [ -z "$append" ]; then
     echo "<bootloader/>" > /tmp/bootloader.xml
 else
