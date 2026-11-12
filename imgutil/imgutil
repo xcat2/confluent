@@ -4,6 +4,8 @@ import configparser
 import ctypes
 import ctypes.util
 import datetime
+import enum
+import errno
 import inspect
 from shutil import copytree
 if hasattr(inspect, 'getfullargspec') and 'dirs_exist_ok' in inspect.getfullargspec(copytree).args:
@@ -1423,7 +1425,22 @@ def _exitcode_from_status(status):
 # one of this system, so DKMS, kernel Makefiles and scriptlets build for the
 # kernel the image boots. A seccomp filter hands each uname() to the process
 # waiting for the chroot, which writes the answer into the caller.
-SECCOMP_ARCH = {'x86_64': (0xc000003e, 63, 317), 'aarch64': (0xc00000b7, 160, 277)}
+class SeccompArch(enum.Enum):
+    X86_64 = (0xc000003e, 63, 317, 313, 175)
+    AARCH64 = (0xc00000b7, 160, 277, 273, 105)
+
+    def __init__(
+        self, arch, uname_syscall, seccomp_syscall,
+        finit_module_syscall, init_module_syscall
+    ):
+        self.audit_arch = arch
+        self.uname_syscall = uname_syscall
+        self.seccomp_syscall = seccomp_syscall
+        self.finit_module_syscall = finit_module_syscall
+        self.init_module_syscall = init_module_syscall
+
+
+SECCOMP_ARCH = {'x86_64': SeccompArch.X86_64, 'aarch64': SeccompArch.AARCH64}
 
 
 class _IoVec(ctypes.Structure):
@@ -1459,20 +1476,24 @@ class FakeUname(object):
     def install(self):
         fd = -1
         if self.machine in SECCOMP_ARCH:
-            arch, nruname, nrseccomp = SECCOMP_ARCH[self.machine]
+            seccomp_arch = SECCOMP_ARCH[self.machine]
             filt = (
                 (0x20, 0, 0, 4),  # load arch
-                (0x15, 0, 3, arch),
-                (0x20, 0, 0, 0),  # load syscall number
-                (0x15, 0, 1, nruname),
-                (0x06, 0, 0, 0x7fc00000),  # SECCOMP_RET_USER_NOTIF
+                (0x15, 1, 0, seccomp_arch.audit_arch),  # if arch mismatches, fall through to ALLOW
+                (0x06, 0, 0, 0x7fff0000),  # allow all mismatched arch syscalls by this filter
+                (0x20, 0, 0, 0),  # prepare to examine the system call number
+                (0x15, 0, 1, seccomp_arch.uname_syscall),  # if it is not uname, skip next
+                (0x06, 0, 0, 0x7fc00000),  # SECCOMP_RET_USER_NOTIF, it was uname
+                (0x15, 1, 0, seccomp_arch.finit_module_syscall),  # if it is finit, then skip to blocking
+                (0x15, 0, 1, seccomp_arch.init_module_syscall),  # If it is init_module, then fall into eperm, otherwise skip over to allow
+                (0x06, 0, 0, 0x00050000 | errno.EPERM), # induce the call to do an EPERM error
                 (0x06, 0, 0, 0x7fff0000))  # SECCOMP_RET_ALLOW
             fbuf = ctypes.create_string_buffer(
                 b''.join(struct.pack('<HBBI', *insn) for insn in filt))
             prog = struct.pack('<HxxxxxxQ', len(filt), ctypes.addressof(fbuf))
             libc.syscall.restype = ctypes.c_long
             # SECCOMP_SET_MODE_FILTER with SECCOMP_FILTER_FLAG_NEW_LISTENER
-            fd = libc.syscall(nrseccomp, 1, 8, ctypes.c_char_p(prog))
+            fd = libc.syscall(seccomp_arch.seccomp_syscall, 1, 8, ctypes.c_char_p(prog))
         if fd < 0:
             sys.stderr.write('Warning: unable to report the image kernel to uname, '
                              'the image sees the kernel of this system\n')
