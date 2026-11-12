@@ -196,6 +196,16 @@ def fixup(rootdir, vols):
             if arg == 'quiet' or arg.startswith(('console=', 'net.ifnames=', 'biosdevname=')):
                 currcmdline.append(arg)
     currcmdlinestr = ' '.join(currcmdline)
+    # deployment.installedargs, which the OS installers append to the
+    # kernel arguments of the installed system
+    nodeargs = []
+    with open('/etc/confluent/confluent.deploycfg') as dcfgin:
+        for line in dcfgin:
+            if line.startswith('installedargs: '):
+                argstr = line[len('installedargs: '):].strip()
+                if argstr[:1] == "'" and argstr[-1:] == "'":
+                    argstr = argstr[1:-1].replace("''", "'")
+                nodeargs = argstr.split()
     if os.path.exists(grubsyscfg):
         with open(grubsyscfg) as defgrubin:
             defgrub = defgrubin.read().split('\n')
@@ -213,7 +223,7 @@ def fixup(rootdir, vols):
         ]
     if not os.path.exists(os.path.join(rootdir, "etc/kernel/cmdline")):
         with open(os.path.join(rootdir, "etc/kernel/cmdline"), "w") as cmdlineout:
-            cmdlineout.write("{} root=/dev/mapper/localstorage-root rd.lvm.lv=localstorage/root".format(currcmdlinestr))
+            cmdlineout.write("{} root=/dev/mapper/localstorage-root rd.lvm.lv=localstorage/root".format(' '.join(currcmdline + nodeargs)))
     with open(grubsyscfg, 'w') as defgrubout:
         for gline in defgrub:
             gline = gline.split()
@@ -224,6 +234,10 @@ def fixup(rootdir, vols):
                         newline.append('"')
                     continue
                 newline.append(ent)
+            if nodeargs and newline and newline[0].startswith('GRUB_CMDLINE_LINUX=') and newline[-1].endswith('"'):
+                newline[-1] = newline[-1][:-1]
+                newline.extend(nodeargs)
+                newline[-1] += '"'
             defgrubout.write(' '.join(newline) + '\n')
     grubcfg = subprocess.check_output(['find', os.path.join(rootdir, 'boot'), '-name', 'grub.cfg']).decode('utf8').strip().replace(rootdir, '/').replace('//', '/')
     grubcfg = grubcfg.split('\n')

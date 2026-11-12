@@ -216,6 +216,16 @@ def fixup(rootdir, vols):
             if arg == 'quiet' or arg.startswith(('console=', 'net.ifnames=', 'biosdevname=')):
                 currcmdline.append(arg)
     currcmdlinestr = ' '.join(currcmdline)
+    # deployment.installedargs, which the OS installers append to the
+    # kernel arguments of the installed system
+    nodeargs = []
+    with open('/etc/confluent/confluent.deploycfg') as dcfgin:
+        for line in dcfgin:
+            if line.startswith('installedargs: '):
+                argstr = line[len('installedargs: '):].strip()
+                if argstr[:1] == "'" and argstr[-1:] == "'":
+                    argstr = argstr[1:-1].replace("''", "'")
+                nodeargs = argstr.split()
     kcmdline = os.path.join(rootdir, 'etc/kernel/cmdline')
     if os.path.exists(kcmdline):
         with open(kcmdline) as kcmdlinein:
@@ -240,7 +250,7 @@ def fixup(rootdir, vols):
             if arg.startswith(('net.ifnames=', 'biosdevname=')) and arg not in newkcmdlineent:
                 newkcmdlineent.append(arg)
         with open(kcmdline, 'w') as kcmdlineout:
-            kcmdlineout.write(' '.join(newkcmdlineent) + '\n')
+            kcmdlineout.write(' '.join(newkcmdlineent + nodeargs) + '\n')
     for loadent in glob.glob(os.path.join(rootdir, 'boot/loader/entries/*.conf')):
         with open(loadent) as loadentin:
             currentry = loadentin.read().split('\n')
@@ -277,7 +287,7 @@ def fixup(rootdir, vols):
                             newcfgparts.append(cfgpart)
                     else:
                         newcfgparts.append(cfgpart)
-                loadentout.write(' '.join(newcfgparts) + '\n')
+                loadentout.write(' '.join(newcfgparts + nodeargs) + '\n')
     # the logical volumes this install created, for the defaults below
     lvmargs = ''
     for lvdev in (newrootdev, newswapdev):
@@ -300,7 +310,7 @@ def fixup(rootdir, vols):
         ]
     if not os.path.exists(os.path.join(rootdir, "etc/kernel/cmdline")):
         with open(os.path.join(rootdir, "etc/kernel/cmdline"), "w") as cmdlineout:
-            cmdlineout.write("{} root={}{}".format(currcmdlinestr, newrootdev, lvmargs))
+            cmdlineout.write("{} root={}{}".format(' '.join(currcmdline + nodeargs), newrootdev, lvmargs))
     with open(grubsyscfg, 'w') as defgrubout:
         for gline in defgrub:
             gline = gline.split()
@@ -318,6 +328,10 @@ def fixup(rootdir, vols):
                         newline.append(ent)
                 else:
                     newline.append(ent)
+            if nodeargs and newline and newline[0].startswith('GRUB_CMDLINE_LINUX=') and newline[-1].endswith('"'):
+                newline[-1] = newline[-1][:-1]
+                newline.extend(nodeargs)
+                newline[-1] += '"'
             defgrubout.write(' '.join(newline) + '\n')
     grubcfg = subprocess.check_output(['find', os.path.join(rootdir, 'boot'), '-name', 'grub.cfg']).decode('utf8').strip().replace(rootdir, '/').replace('//', '/')
     grubcfg = grubcfg.split('\n')

@@ -47,6 +47,8 @@ if [ "$textcons" = "true" ] && ! grep console= /proc/cmdline > /dev/null; then
     fi
 fi
 kargs=$(curl https://$confluent_mgr/confluent-public/os/$confluent_profile/profile.yaml | grep ^installedargs: | sed -e 's/^installedargs:[[:space:]]*//' -e 's/#.*//')
+nodeargs=$(confluent_installedargs /target/etc/confluent/confluent.deploycfg)
+if [ -n "$nodeargs" ]; then kargs="${kargs:+$kargs }$nodeargs"; fi
 if [ ! -z "$kargs" ]; then
     kargs=$(printf '%s' "$kargs" | sed -e 's/[\/&]/\\&/g')
     sed -i 's/GRUB_CMDLINE_LINUX="\([^"]*\)"/GRUB_CMDLINE_LINUX="\1 '"${kargs}"'"/' /target/etc/default/grub

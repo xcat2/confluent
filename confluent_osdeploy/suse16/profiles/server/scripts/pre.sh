@@ -46,6 +46,8 @@ sed -i 's@%%ROOTPASSWORD%%@'"$rootpw"'@g' /tmp/autoinstall.json
 sed -i s!%%NODENAME%%!$(hostname)!g /tmp/autoinstall.json
 python3 /opt/confluent/bin/apiclient /confluent-public/os/$profile/profile.yaml > /tmp/instprofile.yaml
 blargs=$(grep ^installedargs: /tmp/instprofile.yaml | sed -e 's/#.*//' -e 's/^installedargs: //')
+nodeargs=$(confluent_installedargs)
+if [ -n "$nodeargs" ]; then blargs="${blargs:+$blargs }$nodeargs"; fi
 blargs=$(printf '%s' "$blargs" | sed -e 's/[\\"]/\\&/g' -e 's/[\\&!]/\\&/g')
 sed -i 's!%%INSTALLEDARGS%%!'"$blargs"'!g' /tmp/autoinstall.json
 python3 /opt/confluent/bin/apiclient /confluent-public/os/$profile/scripts/getinstalldisk > /tmp/getinstalldisk

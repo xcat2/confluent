@@ -226,6 +226,8 @@ proto=$(grep ^protocol: /etc/confluent/confluent.deploycfg)
 proto=${proto#protocol: }
 
 append=$(grep ^installedargs: /tmp/profile.yaml | sed -e 's/^installedargs: //' -e 's/#.*//')
+nodeargs=$(sed -n "s/^installedargs: //p" /etc/confluent/confluent.deploycfg | sed -e "s/^'\(.*\)'\$/\1/" -e "s/''/'/g")
+if [ -n "$nodeargs" ]; then append="${append:+$append }$nodeargs"; fi
 if grep console= /etc/fakecmdline >& /dev/null &&  [[ "$append" != *console=* ]]; then
     append="$append console=${autocons#*/dev/}"
 fi
