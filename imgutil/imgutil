@@ -1460,15 +1460,16 @@ class FakeUname(object):
         fd = -1
         if self.machine in SECCOMP_ARCH:
             arch, nruname, nrseccomp = SECCOMP_ARCH[self.machine]
-            filt = b''.join(struct.pack('<HBBI', *insn) for insn in (
+            filt = (
                 (0x20, 0, 0, 4),  # load arch
                 (0x15, 0, 3, arch),
                 (0x20, 0, 0, 0),  # load syscall number
                 (0x15, 0, 1, nruname),
                 (0x06, 0, 0, 0x7fc00000),  # SECCOMP_RET_USER_NOTIF
-                (0x06, 0, 0, 0x7fff0000)))  # SECCOMP_RET_ALLOW
-            fbuf = ctypes.create_string_buffer(filt)
-            prog = struct.pack('<HxxxxxxQ', 6, ctypes.addressof(fbuf))
+                (0x06, 0, 0, 0x7fff0000))  # SECCOMP_RET_ALLOW
+            fbuf = ctypes.create_string_buffer(
+                b''.join(struct.pack('<HBBI', *insn) for insn in filt))
+            prog = struct.pack('<HxxxxxxQ', len(filt), ctypes.addressof(fbuf))
             libc.syscall.restype = ctypes.c_long
             # SECCOMP_SET_MODE_FILTER with SECCOMP_FILTER_FLAG_NEW_LISTENER
             fd = libc.syscall(nrseccomp, 1, 8, ctypes.c_char_p(prog))
