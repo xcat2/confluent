@@ -459,8 +459,9 @@ def number_to_addr(number):
     return addr
 
 def iterate_addrs(addrs, countonly=False):
-    if '.' not in addrs:
-        raise exc.InvalidArgumentException('IPv4 only supported')
+    if ':' in addrs:
+        if '-' in addrs or '/' in addrs:
+            raise exc.InvalidArgumentException('IPv6 ranges not supported')
     if '-' in addrs:
         first, last = addrs.split('-', 1)
         currn = addr_to_number(first)
@@ -561,8 +562,10 @@ def save_subscriptions(subs):
 
 async def register_remote_addrs(addresses, configmanager):
     async def register_remote_addr(addr):
+        addrinfo = await asyncio.get_running_loop().getaddrinfo(addr, 443, type=socket.SOCK_STREAM)
+        sockaddr = addrinfo[0][4]
         nd = {
-            'addresses': [(addr, 443)]
+            'addresses': [sockaddr]
         }
         try:
             sd = await ssdp.check_fish(('/DeviceDescription.json', nd))
