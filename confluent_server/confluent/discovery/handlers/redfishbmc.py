@@ -237,6 +237,18 @@ class NodeHandler(generic.NodeHandler):
         srvroot = await self.srvroot(wc)
         asrv = srvroot.get('AccountService', {}).get('@odata.id')
         rsp, status = await wc.grab_json_response_with_status(asrv)
+        if status == 403:
+            try:
+                rsp = json.loads(rsp)
+                extinfo = rsp.get('@Message.ExtendedInfo', [])
+                for info in extinfo:
+                    if info.get('MessageId') == 'Base.1.18.1.PasswordChangeRequired':
+                        url = info.get('MessageArgs', [None])[0]
+                        if url:
+                            return url
+                raise Exception("Access forbidden: Password change required but no URL provided")
+            except Exception:
+                raise Exception("Failed to parse JSON response from BMC")
         accts = rsp.get('Accounts', {}).get('@odata.id')
         rsp, status = await wc.grab_json_response_with_status(accts)
         accts = rsp.get('Members', [])
