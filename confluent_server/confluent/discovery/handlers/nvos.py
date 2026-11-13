@@ -26,13 +26,25 @@ class NodeHandler(generic.NodeHandler):
         if not myaddress:
             raise ValueError("No address found for request")
         hwaddr = self.info.get('hwaddr')
-        myaddress = self.info.get('addresses', [[None]])[0][0]
+        mysockaddr = self.info.get('addresses', [[None]])[0]
+        if len(mysockaddr) == 4 and mysockaddr[-1]:
+            myaddress = '{}%{}'.format(mysockaddr[0], mysockaddr[-1])
+        if len(mysockaddr) == 2:
+            myaddress = mysockaddr[0]
         if myaddress:
             attrset = {'deployment.client_ip': myaddress}
             if hwaddr:
-                myip = await netutil.my_ip_facing(myaddress)
+                myip = None
+                if '%' not in myaddress:
+                    myip = await netutil.my_ip_facing(myaddress)
+                else:
+                    myindex = mysockaddr[-1]
+                niccfg = None
                 if myip:
                     niccfg = await netutil.get_nic_config(self.configmanager, nodename, serverip=myip)
+                elif myindex:
+                    niccfg = await netutil.get_nic_config(self.configmanager, nodename, ifidx=myindex)
+                if niccfg:
                     cfgname = niccfg.get('config_name', None)
                     if cfgname:
                         attrname = f'net.{cfgname}.hwaddr'
