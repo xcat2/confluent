@@ -564,17 +564,22 @@ async def register_remote_addrs(addresses, configmanager):
     async def register_remote_addr(addr):
         addrinfo = await asyncio.get_running_loop().getaddrinfo(addr, 443, type=socket.SOCK_STREAM)
         sockaddr = addrinfo[0][4]
+        hwaddr = await neighutil.get_hwaddr(addr)
         nd = {
             'addresses': [sockaddr]
         }
+        if hwaddr:
+            nd['hwaddr'] = hwaddr
         try:
             sd = await ssdp.check_fish(('/DeviceDescription.json', nd))
             if not sd:
-                return addr, await generic_eval(addr)
+                return addr, await generic_eval(addr, hwaddr)
             if 'macaddress' in sd['attributes']:
                 sd['hwaddr'] = sd['attributes']['macaddress']
-            else:
+            elif 'mac-address' in sd['attributes']:
                 sd['hwaddr'] = sd['attributes']['mac-address']
+            elif hwaddr:
+                sd['hwaddr'] = hwaddr
             if 'lenovo-xcc3' in sd['services']:
                 nh = xcc3.NodeHandler(sd, configmanager)
             elif 'lenovo-xcc' in sd['services']:
