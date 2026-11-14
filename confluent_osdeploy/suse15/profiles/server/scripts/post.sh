@@ -25,6 +25,7 @@ chmod og-rwx /etc/confluent/*
 export confluent_mgr confluent_profile nodename
 . /etc/confluent/functions
 
+run_remote setuplogging
 # This will induce server side processing of the syncfile contents if
 # present
 run_remote_python syncfileclient
