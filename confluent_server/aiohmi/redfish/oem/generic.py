@@ -284,6 +284,7 @@ class OEMHandler(object):
         self._varsensormapvintage = 0
         self._gpool = gpool
         self._varsysinfo = sysinfo
+        self._varchassisinfo = None
         self._varsysurl = sysurl
         self._varbmcurl = None
         self._urlcache = cache
@@ -1269,6 +1270,7 @@ class OEMHandler(object):
 
     async def get_inventory_descriptions(self, withids=False):
         yield "System"
+        yield 'Chassis'
         self._hwnamemap = {}
         async for cpu in self._get_cpu_inventory(True, withids):
             yield cpu
@@ -1279,7 +1281,15 @@ class OEMHandler(object):
 
     async def _get_node_info(self):
         nodeinfo = self._varsysinfo
-        if not nodeinfo:
+        if nodeinfo:
+            return nodeinfo  
+        return await self._get_chassis_info()
+
+    DEFAULT_CHASSIS_IDS = ()
+    async def _get_chassis_info(self):
+        if self._varchassisinfo:
+            return self._varchassisinfo
+        else:
             overview = await self._do_web_request('/redfish/v1/')
             chassismembs = overview.get('Chassis', {}).get('@odata.id', None)
             if not chassismembs:
@@ -1289,7 +1299,35 @@ class OEMHandler(object):
             if len(chassismembs) == 1:
                 chassisurl = chassismembs[0]['@odata.id']
                 nodeinfo = await self._do_web_request(chassisurl)
+            elif len(chassismembs) > 1:
+                for chassis in chassismembs:
+                    chassisurl = chassis['@odata.id']
+                    if chassisurl.split('/')[-1] in self.DEFAULT_CHASSIS_IDS:
+                        nodeinfo = await self._do_web_request(chassisurl)
+                        break
         return nodeinfo
+
+    async def _get_chassis_inventory(self):
+        chassisinfo = await self._get_chassis_info()
+        retinfo = {}
+        snum = chassisinfo.get('SerialNumber', '').strip()
+        if snum:
+            retinfo['Serial Number'] = snum
+        mfr = chassisinfo.get('Manufacturer', '').strip()
+        if mfr:
+            retinfo['Manufacturer'] = mfr
+        pname = chassisinfo.get('Model', '').strip()
+        if pname:
+            retinfo['Product name'] = pname
+        model = chassisinfo.get('SKU', '').strip()
+        partnum = chassisinfo.get('PartNumber', '').strip()
+        if model:
+            retinfo['Model'] = model
+            if partnum:
+                retinfo['Part Number'] = partnum
+        elif partnum:
+            retinfo['Model'] = partnum
+        return retinfo
 
     async def get_inventory_of_component(self, component):
         if component.lower() == 'system':
@@ -1310,6 +1348,8 @@ class OEMHandler(object):
             sysinfo['UUID'] = sysinfo['UUID'].lower()
 
             return sysinfo
+        elif component.lower() == 'chassis':
+            return await self._get_chassis_inventory()
         else:
             async for invpair in self.get_inventory():
                 if invpair[0].lower() == component.lower():
@@ -1331,6 +1371,7 @@ class OEMHandler(object):
                 sysinfo['UUID'][20:]))
         sysinfo['UUID'] = sysinfo['UUID'].lower()
         yield ('System', sysinfo)
+        yield ('Chassis', await self._get_chassis_inventory())
         self._hwnamemap = {}
         adpurls = await self._get_adp_urls()
         diskurls = await self._get_disk_urls()

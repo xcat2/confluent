@@ -21,6 +21,7 @@ import aiohmi.exceptions as pygexc
 
 
 class OEMHandler(generic.OEMHandler):
+    DEFAULT_CHASSIS_IDS = ('Chassis_0', 'Self')
     @classmethod
     async def create(cls, sysinfo, sysurl, webclient, cache, gpool=None):
         self = await super().create(sysinfo, sysurl, webclient, cache,
