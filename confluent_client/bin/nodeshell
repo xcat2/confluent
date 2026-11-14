@@ -57,6 +57,8 @@ def run():
                          help='Timeout in seconds for each node ssh connection')
     argparser.add_option('-x', '--noexpression', action='store_true',
                          help='Suppress expression expansion of command')
+    argparser.add_option('-e', '--environmentpassword', type='str',
+                         help='Environment variable containing the password to use for ssh')
     argparser.add_option('-m', '--maxnodes', type='int',
                      help='Specify a maximum number of '
                           'nodes to run remote ssh command to, '
@@ -112,6 +114,14 @@ def run():
             for node in ex:
                 cmdparms.append((node, ex[node]['value']))
     poller = select.epoll()
+    if options.environmentpassword:
+        sshpass = os.environ.get(options.environmentpassword)
+        if sshpass:
+            askpass = '/opt/confluent/libexec/confluent_askpass.sh'
+            os.environ['SSH_ASKPASS_REQUIRE'] = 'force'
+            os.environ['CONFLUENT_SSH_PASSPHRASE'] = sshpass
+            os.environ['DISPLAY'] = 'NONE'
+            os.environ['SSH_ASKPASS'] = askpass
     for node, cmd in cmdparms:
         sshnode = nodemap.get(node, node)
         if not isinstance(cmd, str) and not isinstance(cmd, bytes):
