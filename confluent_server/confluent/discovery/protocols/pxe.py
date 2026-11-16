@@ -324,7 +324,7 @@ async def proxydhcp(handler, nodeguess):
                 {}).get('value', 'never')
             if not insecuremode:
                 insecuremode = 'never'
-            if insecuremode == 'never':
+            if insecuremode == 'never' and opts.get(77, None) != b'iPXE':
                 if not skiplogging:
                     log.log(
                         {'info': 'Boot attempt by {0} detected in insecure mode, but '
@@ -333,6 +333,9 @@ async def proxydhcp(handler, nodeguess):
                                 '`always` to enable support, or use UEFI HTTP boot '
                                 'with HTTPS.'.format(node)})
                 continue
+            webproto = 'http'
+            if insecuremode == 'never':
+                webproto = 'https'
             profile = None
             if not myipn:
                 myipn = socket.inet_aton(recv)
@@ -352,9 +355,9 @@ async def proxydhcp(handler, nodeguess):
                     continue
                 myip = socket.inet_ntoa(myipn)
                 if disco['arch'] == 'bios-x86' or not os.path.exists('/var/lib/confluent/public/os/{0}/boot.ipxe.shim'.format(profile)):
-                    bootfile = 'http://{0}/confluent-public/os/{1}/boot.ipxe'.format(myip, profile).encode('utf8')
+                    bootfile = '{0}://{1}/confluent-public/os/{2}/boot.ipxe'.format(webproto, myip, profile).encode('utf8')
                 else:
-                    bootfile = 'http://{0}/confluent-public/os/{1}/boot.ipxe.shim'.format(myip, profile).encode('utf8')
+                    bootfile = '{0}://{1}/confluent-public/os/{2}/boot.ipxe.shim'.format(webproto, myip, profile).encode('utf8')
             elif disco['arch'] == 'uefi-x64':
                 bootfile = b'confluent/x86_64/ipxe-shim.efi'
             elif disco['arch'] == 'bios-x86':
@@ -727,7 +730,7 @@ async def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, 
             {}).get('value', 'never')
         if not insecuremode:
             insecuremode = 'never'
-        if insecuremode == 'never' and not httpboot:
+        if insecuremode == 'never' and not httpboot and packet.get(77, None) != b'iPXE':
             if (rqtype == 1 and info.get('architecture', None)
                     and time.time() > ignoremacs.get(info['hwaddr'], 0) + 90):
                 ignoremacs[info['hwaddr']] = time.time()
@@ -795,9 +798,9 @@ async def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, 
         log.log({'error': 'Unable to serve {} due to duplicated address between node and interface index "{}"'.format(node, info['netinfo']['ifidx'])})
         return
     can302 = True
+    proto = 'https' if insecuremode == 'never' else 'http'
     if isboot and httpboot:
-        proto = 'https' if insecuremode == 'never' else 'http'
-        if (proto == 'http'
+        if (proto in ('http', 'https')
                 and os.path.exists('/var/lib/confluent/public/os/{}/boot.ipxe.shim'.format(profile))
                 and os.path.exists('/var/lib/confluent/public/ipxe/x86_64/ipxe-shim.efi')):
             if bootarch == 'uefi-httpboot':
@@ -840,9 +843,9 @@ async def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, 
                 log.log({'info': 'No pending profile for {0}, skipping proxyDHCP reply'.format(node)})
                 return
             if not os.path.exists('/var/lib/confluent/public/os/{0}/boot.ipxe.shim'.format(profile)):
-                bootfile = 'http://{0}/confluent-public/os/{1}/boot.ipxe'.format(myipn, profile).encode('utf8')
+                bootfile = '{0}://{1}/confluent-public/os/{2}/boot.ipxe'.format(proto, myipn, profile).encode('utf8')
             else:
-                bootfile = 'http://{0}/confluent-public/os/{1}/boot.ipxe.shim'.format(myipn, profile).encode('utf8')
+                bootfile = '{0}://{1}/confluent-public/os/{2}/boot.ipxe.shim'.format(proto, myipn, profile).encode('utf8')
             if len(bootfile) > 127:
                 if bootfile.startswith(b'http'):
                     bootfile = register_shorturl(bootfile.decode('utf8')).encode('utf8')
