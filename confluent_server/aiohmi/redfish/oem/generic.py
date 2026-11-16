@@ -1287,6 +1287,7 @@ class OEMHandler(object):
 
     DEFAULT_CHASSIS_IDS = ()
     async def _get_chassis_info(self):
+        nodeinfo = None
         if self._varchassisinfo:
             return self._varchassisinfo
         else:
