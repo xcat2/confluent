@@ -704,7 +704,7 @@ async def reply_dhcp6(node, addr, cfg, packet, cfd, profile, sock, niccfg=None):
         return
     if (packet['rqtype'] == 1 and bootfile.endswith(b'/boot.img')
             and cfd.get(node, {}).get('deployment.kernelargs', {}).get('value', None)):
-        log.log({'warning': 'deployment.kernelargs of {0} is not applied, UEFI HTTP boot of profile {1} does not go through iPXE'.format(node, profile)})
+        log.log({'warning': 'deployment.kernelargs of {0} is not applied, UEFI HTTP boot of profile {1} falls back to boot.img, run osdeploy initialize -r to install the iPXE shim'.format(node, profile)})
     # 1 msgtype
     # 3 txid
     # 22 - server ident
@@ -860,7 +860,7 @@ async def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, 
             )
             bootshorturl = '/confluent-public/os/{0}/boot.img'.format(profile)
             if rqtype == 1 and cfd.get(node, {}).get('deployment.kernelargs', {}).get('value', None):
-                log.log({'warning': 'deployment.kernelargs of {0} is not applied, UEFI HTTP boot of profile {1} does not go through iPXE'.format(node, profile)})
+                log.log({'warning': 'deployment.kernelargs of {0} is not applied, UEFI HTTP boot of profile {1} falls back to boot.img, run osdeploy initialize -r to install the iPXE shim'.format(node, profile)})
             bootfilename = '/var/lib/confluent/public/os/{0}/boot.img'.format(profile)
             can302 = False
         if not isinstance(bootfile, bytes):
