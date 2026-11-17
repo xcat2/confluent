@@ -1334,7 +1334,7 @@ class OEMHandler(object):
         if component.lower() == 'system':
             nodeinfo = await self._get_node_info()
             sysinfo = {
-                'UUID': nodeinfo.get('UUID', '').lower(),
+                'UUID': (nodeinfo.get('UUID') or '').lower(),
                 'Serial Number': nodeinfo.get('SerialNumber', ''),
                 'Manufacturer': nodeinfo.get('Manufacturer', ''),
                 'Product name': nodeinfo.get('Model', ''),
@@ -1358,7 +1358,7 @@ class OEMHandler(object):
 
     async def get_inventory(self, withids=False):
         sysinfo = {
-            'UUID': self._varsysinfo.get('UUID', ''),
+            'UUID': self._varsysinfo.get('UUID') or '',
             'Serial Number': self._varsysinfo.get('SerialNumber', ''),
             'Manufacturer': self._varsysinfo.get('Manufacturer', ''),
             'Product name': self._varsysinfo.get('Model', ''),
