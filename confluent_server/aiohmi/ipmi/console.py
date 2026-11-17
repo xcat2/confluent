@@ -170,6 +170,9 @@ class Console(object):
         await self._sendpendingoutput()
 
     async def _got_payload_instance_info(self, response):
+        if self.ipmi_session is None:
+            # console closed while this keepalive was in flight
+            return
         if 'error' in response:
             self.activated = False
             await self._print_error(response['error'])
