@@ -610,7 +610,7 @@ def check_ubuntu(isoinfo):
                 'name': 'ubuntu-{0}-{1}'.format(ver, arch),
                 'method': EXTRACT,
                 'category': 'ubuntu{0}'.format(major)}
-        elif 'efi/boot/bootaa64.efi' in isoinfo[0]:
+        elif 'efi/boot/bootaa64.efi' in isoinfo[0] or 'EFI/boot/bootaa64.efi' in isoinfo[0]:
             exlist = ['casper/*vmlinuz', 'casper/*initrd',
                     'efi/boot/bootaa64.efi', 'efi/boot/grubaa64.efi'
                     ]
