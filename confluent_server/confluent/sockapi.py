@@ -165,26 +165,10 @@ async def sessionhdl(connection, authname, skipauth=False, cert=None):
             try:
                 await process_request(
                     connection, request, cfm, authdata, authname, skipauth)
-            except exc.ConfluentException as e:
-                if ((not isinstance(e, exc.LockedCredentials)) and
-                        e.apierrorcode == 500):
-                    tracelog.log(
-                        traceback.format_exc(), ltype=log.DataTypes.event,
-                        event=log.Events.stacktrace)
-                await send_data(connection, {'errorcode': e.apierrorcode,
-                                             'error': e.apierrorstr,
-                                             'detail': e.get_error_body()})
-                await send_data(connection, {'_requestdone': 1})
             except SystemExit:
                 sys.exit(0)
             except Exception as e:
-                tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
-                             event=log.Events.stacktrace)
-                await send_data(
-                    connection,
-                    {'errorcode': 500,
-                     'error': 'Unexpected error - ' + str(e)})
-                await send_data(connection, {'_requestdone': 1})
+                await send_request_error(connection, e)
             try:
                 request = await tlvdata.recv(connection)
             except Exception:
@@ -197,6 +181,28 @@ async def sessionhdl(connection, authname, skipauth=False, cert=None):
         except Exception as e:
             print(repr(e))
             pass
+
+
+async def send_request_error(connection, e):
+    """Report a failed request, call from the except clause that caught e"""
+    if isinstance(e, exc.ConfluentException):
+        # expected failures are not traced
+        if ((not isinstance(e, exc.LockedCredentials)) and
+                e.apierrorcode == 500):
+            tracelog.log(
+                traceback.format_exc(), ltype=log.DataTypes.event,
+                event=log.Events.stacktrace)
+        await send_data(connection, {'errorcode': e.apierrorcode,
+                                     'error': e.apierrorstr,
+                                     'detail': e.get_error_body()})
+    else:
+        tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
+                     event=log.Events.stacktrace)
+        await send_data(
+            connection,
+            {'errorcode': 500,
+             'error': 'Unexpected error - ' + str(e)})
+    await send_data(connection, {'_requestdone': 1})
 
 
 async def send_response(responses, connection):
@@ -337,14 +343,7 @@ async def term_interact(authdata, authname, ccons, cfm, connection, consession,
                     await process_request(connection, data, cfm, authdata, authname,
                                           skipauth)
                 except Exception as e:
-                    tracelog.log(traceback.format_exc(),
-                                 ltype=log.DataTypes.event,
-                                 event=log.Events.stacktrace)
-                    await send_data(
-                        connection,
-                        {'errorcode': 500,
-                         'error': 'Unexpected error - ' + str(e)})
-                    await send_data(connection, {'_requestdone': 1})
+                    await send_request_error(connection, e)
                 continue
         if not consession:
             break
