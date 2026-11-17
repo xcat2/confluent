@@ -423,6 +423,14 @@ async def initialize(cmdset):
         initialize_genesis('aarch64')
     if cmdset.r:
         didsomething = True
+    if not os.path.exists('/var/lib/confluent/public/ipxe/x86_64/ipxe-shim.efi') and os.path.exists('/opt/confluent/lib/ipxe/ipxe-shim.efi'):
+        os.makedirs('/var/lib/confluent/public/ipxe/x86_64', exist_ok=True)
+        shutil.copy('/opt/confluent/lib/ipxe/ipxe-shim.efi', '/var/lib/confluent/public/ipxe/x86_64/ipxe-shim.efi')
+        shutil.copy('/opt/confluent/lib/ipxe/ipxe.efi', '/var/lib/confluent/public/ipxe/x86_64/ipxe.efi')
+    if not os.path.exists('/var/lib/confluent/public/ipxe/aarch64/ipxe-shim.efi') and os.path.exists('/opt/confluent/lib/ipxe/ipxe-aarch64-shim.efi'):
+        os.makedirs('/var/lib/confluent/public/ipxe/aarch64', exist_ok=True)
+        shutil.copy('/opt/confluent/lib/ipxe/ipxe-aarch64-shim.efi', '/var/lib/confluent/public/ipxe/aarch64/ipxe-shim.efi')
+        shutil.copy('/opt/confluent/lib/ipxe/ipxe-aarch64.efi', '/var/lib/confluent/public/ipxe/aarch64/ipxe.efi')
     if not didsomething and (cmdset.k or cmdset.l or cmdset.g or cmdset.p):
         if cmdset.g:
             if os.path.exists('/var/lib/confluent/public/os/genesis-x86_64'):
@@ -434,14 +442,6 @@ async def initialize(cmdset):
         sys.stderr.write('Nothing was done, use initialize -i for '
                         'interactive mode, or see initialize -h for more options\n')
         sys.exit(1)
-    if not os.path.exists('/var/lib/confluent/public/ipxe/x86_64/ipxe-shim.efi') and os.path.exists('/opt/confluent/lib/ipxe/ipxe-shim.efi'):
-        os.makedirs('/var/lib/confluent/public/ipxe/x86_64', exist_ok=True)
-        shutil.copy('/opt/confluent/lib/ipxe/ipxe-shim.efi', '/var/lib/confluent/public/ipxe/x86_64/ipxe-shim.efi')
-        shutil.copy('/opt/confluent/lib/ipxe/ipxe.efi', '/var/lib/confluent/public/ipxe/x86_64/ipxe.efi')
-    if not os.path.exists('/var/lib/confluent/public/ipxe/aarch64/ipxe-aarch64-shim.efi') and os.path.exists('/opt/confluent/lib/ipxe/ipxe-aarch64-shim.efi'):
-        os.makedirs('/var/lib/confluent/public/ipxe/aarch64', exist_ok=True)
-        shutil.copy('/opt/confluent/lib/ipxe/ipxe-aarch64-shim.efi', '/var/lib/confluent/public/ipxe/aarch64/ipxe-shim.efi')
-        shutil.copy('/opt/confluent/lib/ipxe/ipxe-aarch64.efi', '/var/lib/confluent/public/ipxe/aarch64/ipxe.efi')
     tmpname = '/var/lib/confluent/public/site/initramfs.cpio.'
     for x in bytearray(os.urandom(22)):
         tmpname += fnamechars[x >> 2]
