@@ -1147,27 +1147,36 @@ class Session(object):
         self.logged = 1
         self.maxtimeout = 4  # Switch quickly to the relogin recovery
         self.logontries = 1  # have one relogin waiting to heal
-        response = await self.raw_command(netfn=0x6, command=0x3b,
-                                    data=[self.privlevel])
-        if response['code']:
+        try:
+            response = await self.raw_command(netfn=0x6, command=0x3b,
+                                              data=[self.privlevel])
             if response['code'] in (0x80, 0x81) and self.privlevel == 4:
                 # some implementations will let us get this far,
                 # but suddenly get skiddish.  Try again in such a case
                 self.privlevel = 3
                 response = await self.raw_command(netfn=0x6, command=0x3b,
                                                   data=[self.privlevel])
-            if response['code']:
-                self.logged = 0
-                self.onlogpayload = None
-                self.logging = False
-                self.logoutexpiry = None
+        except exc.IpmiException as e:
+            # session torn down meanwhile, fail the logon rather than
+            # raising into the shared event loop
+            self.logged = 0
+            self.onlogpayload = None
+            self.logging = False
+            self.logoutexpiry = None
+            await self.onlogon({'error': str(e)})
+            return
+        if response['code']:
+            self.logged = 0
+            self.onlogpayload = None
+            self.logging = False
+            self.logoutexpiry = None
 
-                mysuffix = " while requesting privelege level %d for %s" % (
-                    self.privlevel, self.userid)
-                errstr = get_ipmi_error(response, suffix=mysuffix)
-                if errstr:
-                    await self.onlogon({'error': errstr})
-                    return
+            mysuffix = " while requesting privelege level %d for %s" % (
+                self.privlevel, self.userid)
+            errstr = get_ipmi_error(response, suffix=mysuffix)
+            if errstr:
+                await self.onlogon({'error': errstr})
+                return
         self.logging = False
         self.logoutexpiry = None
         global KEEPALIVE_SESSIONS

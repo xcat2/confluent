@@ -18,6 +18,7 @@ import confluent.exceptions as exc
 from confluent.exceptions import exc_text
 import confluent.firmwaremanager as firmwaremanager
 import confluent.interface.console as conapi
+import confluent.log as log
 import confluent.messages as msg
 import confluent.util as util
 import copy
@@ -33,7 +34,6 @@ import aiohmi.ipmi.console as console
 import aiohmi.ipmi.command as ipmicommand
 import socket
 import ssl
-import traceback
 import confluent.vinzmanager as vinzmanager
 
 
@@ -229,9 +229,8 @@ async def _ipmi_evtloop():
                 waiter.send()
         except asyncio.CancelledError:
             break
-        except:  # TODO(jbjohnso): log the trace into the log
-
-            traceback.print_exc()
+        except Exception:
+            log.logtrace()
 
 
 def get_conn_params(node, configdata):
@@ -495,7 +494,7 @@ async def perform_request(operator, node, element,
     except Exception as e:
         await results.put(msg.ConfluentNodeError(
             node, 'Unexpected Error: {0}'.format(exc_text(e))))
-        traceback.print_exc()
+        log.logtrace()
     finally:
         await results.put('Done')
 

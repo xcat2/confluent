@@ -55,6 +55,16 @@ async def address_is_somewhat_trusted(address, nodename, cfm):
                     return True
     return False
 
+async def _recv_exact(cloop, client, size):
+    data = b''
+    while len(data) < size:
+        chunk = await cloop.sock_recv(client, size - len(data))
+        if not chunk:
+            raise EOFError('Client closed connection')
+        data += chunk
+    return data
+
+
 class CredServer(object):
     def __init__(self):
         self.cfm = cfm.ConfigManager(None)
@@ -67,18 +77,18 @@ class CredServer(object):
             hmacval = None
             cloop = asyncio.get_running_loop()
             await cloop.sock_sendall(client, b'\xc2\xd1-\xa8\x80\xd8j\xba')
-            tlv = bytearray(await cloop.sock_recv(client, 2))
+            tlv = bytearray(await _recv_exact(cloop, client, 2))
             if tlv[0] != 1:
                 client.close()
                 return
-            nodename = util.stringify(await cloop.sock_recv(client, tlv[1]))
-            tlv = bytearray(await cloop.sock_recv(client, 2))  # should always be null
+            nodename = util.stringify(await _recv_exact(cloop, client, tlv[1]))
+            tlv = bytearray(await _recv_exact(cloop, client, 2))  # should always be null
             if tlv[0] == 6:
-                hmacval = await cloop.sock_recv(client, tlv[1])
+                hmacval = await _recv_exact(cloop, client, tlv[1])
                 hmackey = self.cfm.get_node_attributes(nodename, ['secret.selfapiarmtoken'], decrypt=True)
                 hmackey = hmackey.get(nodename, {}).get('secret.selfapiarmtoken', {}).get('value', None)
             elif tlv[1]:
-                await cloop.sock_recv(client, tlv[1])
+                await _recv_exact(cloop, client, tlv[1])
             apimats = self.cfm.get_node_attributes(nodename,
                     ['deployment.apiarmed', 'deployment.sealedapikey'])
             apiarmed = apimats.get(nodename, {}).get('deployment.apiarmed', {}).get(
@@ -109,19 +119,19 @@ class CredServer(object):
             rttoken = os.urandom(32)
             await cloop.sock_sendall(client, rttoken)
             await cloop.sock_sendall(client, b'\x00\x00')
-            tlv = bytearray(await cloop.sock_recv(client, 2))
+            tlv = bytearray(await _recv_exact(cloop, client, 2))
             if tlv[0] != 3:
                 client.close()
                 return
-            echotoken = await cloop.sock_recv(client, tlv[1])
+            echotoken = await _recv_exact(cloop, client, tlv[1])
             if echotoken != rttoken:
                 client.close()
                 return
-            tlv = bytearray(await cloop.sock_recv(client, 2))
+            tlv = bytearray(await _recv_exact(cloop, client, 2))
             if tlv[0] != 4:
                 client.close()
                 return
-            echotoken = util.stringify(await cloop.sock_recv(client, tlv[1]))
+            echotoken = util.stringify(await _recv_exact(cloop, client, tlv[1]))
             if hmackey:
                 etok = echotoken.encode('utf8')
                 if hmacval != hmac.new(hmackey, etok, hashlib.sha256).digest():
@@ -135,6 +145,9 @@ class CredServer(object):
                 await self.cfm.clear_node_attributes([nodename], ['secret.selfapiarmtoken'])
             if apiarmed != 'continuous':
                 disarm = {nodename: {'deployment.sealedapikey': '', 'deployment.apiarmed': ''}}
+        except (ConnectionError, EOFError):
+            # client went away mid-exchange, not a server fault
+            pass
         finally:
             try:
                 client.close()
