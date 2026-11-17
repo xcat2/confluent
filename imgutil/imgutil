@@ -102,6 +102,22 @@ def get_partition_info():
         }
         yield partinfo
 
+def check_capturable_root():
+    if any(part['mount'] == '/' for part in get_partition_info()):
+        return None
+    rootdev = rootfs = 'unknown'
+    with open('/proc/mounts') as procmounts:
+        for entry in procmounts.read().split('\n'):
+            fields = entry.split()
+            if len(fields) >= 3 and fields[1] == '/':
+                rootdev, rootfs = fields[0], fields[2]
+    if rootfs in ('overlay', 'tmpfs') or '/dev/zram' in rootdev:
+        return ('Capturing a diskless node is not supported (/ is {0} on {1}), '
+                'change a diskless image with imgutil unpack, exec and pack '
+                'instead'.format(rootfs, rootdev))
+    return ('Capture needs / on the top level of a local ext3, ext4, xfs, btrfs '
+            'or vfat filesystem, but / is {0} on {1}'.format(rootfs, rootdev))
+
 def sanitize_shadow(shadowfile):
     with open(shadowfile) as shadin:
         shadata = shadin.read()
@@ -1640,7 +1656,11 @@ def run_constrained(function, args, fakeuname=None):
 def main():
     firstarg = sys.argv[1] if len(sys.argv) > 1 else None
     if firstarg == 'getfingerprint':
-        print(fingerprint_host(None).get_json())
+        oshandler = fingerprint_host(None)
+        unsupported = check_capturable_root()
+        if unsupported:
+            oshandler.captureprereqs.append(unsupported)
+        print(oshandler.get_json())
         return
     elif firstarg == 'capturelocal':
         capture_system()
