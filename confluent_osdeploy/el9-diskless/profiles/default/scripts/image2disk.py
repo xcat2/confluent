@@ -278,6 +278,11 @@ def fixup(rootdir, vols):
                     else:
                         newcfgparts.append(cfgpart)
                 loadentout.write(' '.join(newcfgparts) + '\n')
+    # the logical volumes this install created, for the defaults below
+    lvmargs = ''
+    for lvdev in (newrootdev, newswapdev):
+        if lvdev and lvdev.startswith('/dev/{}/'.format(vgname)):
+            lvmargs += ' rd.lvm.lv={}'.format(lvdev[len('/dev/'):])
     if os.path.exists(grubsyscfg):
         with open(grubsyscfg) as defgrubin:
             defgrub = defgrubin.read().split('\n')
@@ -289,13 +294,13 @@ def fixup(rootdir, vols):
         'GRUB_DISABLE_SUBMENU=true',
         'GRUB_TERMINAL=""',
         'GRUB_SERIAL_COMMAND=""',
-        'GRUB_CMDLINE_LINUX="{} crashkernel=1G-4G:192M,4G-64G:256M,64G-:512M rd.lvm.lv=vg/root rd.lvm.lv=vg/swap"'.format(currcmdlinestr),
+        'GRUB_CMDLINE_LINUX="{} crashkernel=1G-4G:192M,4G-64G:256M,64G-:512M{}"'.format(currcmdlinestr, lvmargs),
         'GRUB_DISABLE_RECOVERY="true"',
         'GRUB_ENABLE_BLSCFG=true',
         ]
     if not os.path.exists(os.path.join(rootdir, "etc/kernel/cmdline")):
         with open(os.path.join(rootdir, "etc/kernel/cmdline"), "w") as cmdlineout:
-            cmdlineout.write("{} root=/dev/mapper/localstorage-root rd.lvm.lv=localstorage/root".format(currcmdlinestr))
+            cmdlineout.write("{} root={}{}".format(currcmdlinestr, newrootdev, lvmargs))
     with open(grubsyscfg, 'w') as defgrubout:
         for gline in defgrub:
             gline = gline.split()
