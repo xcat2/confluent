@@ -107,6 +107,11 @@ def set_machine_id(rootdir):
 
 swapdev = '/dev/mapper/localstorage-swap'
 
+def append_args(args, newargs):
+    # newargs go last, and an argument given twice keeps only its last place
+    merged = args + newargs
+    return [arg for idx, arg in enumerate(merged) if arg not in merged[idx + 1:]]
+
 def fixup(rootdir, vols):
     devbymount = {}
     for vol in vols:
@@ -196,16 +201,31 @@ def fixup(rootdir, vols):
             if arg == 'quiet' or arg.startswith(('console=', 'net.ifnames=', 'biosdevname=')):
                 currcmdline.append(arg)
     currcmdlinestr = ' '.join(currcmdline)
-    # deployment.installedargs, which the OS installers append to the
-    # kernel arguments of the installed system
-    nodeargs = []
+    # installedargs of the profile followed by deployment.installedargs,
+    # which the OS installers add to the kernel arguments of the installed
+    # system
+    profile = None
+    installedargs = []
     with open('/etc/confluent/confluent.deploycfg') as dcfgin:
         for line in dcfgin:
-            if line.startswith('installedargs: '):
+            if line.startswith('profile: '):
+                profile = line[len('profile: '):].strip()
+            elif line.startswith('installedargs: '):
                 argstr = line[len('installedargs: '):].strip()
                 if argstr[:1] == "'" and argstr[-1:] == "'":
                     argstr = argstr[1:-1].replace("''", "'")
-                nodeargs = argstr.split()
+                installedargs = argstr.split()
+    if profile:
+        try:
+            profileyaml = subprocess.check_output([
+                sys.executable, '/opt/confluent/bin/apiclient',
+                '/confluent-public/os/{}/profile.yaml'.format(profile)]).decode('utf8')
+        except (subprocess.CalledProcessError, OSError) as e:
+            sys.stderr.write('Unable to read the installedargs of profile {}: {}\n'.format(profile, e))
+            profileyaml = ''
+        for line in profileyaml.split('\n'):
+            if line.startswith('installedargs:'):
+                installedargs = line.split('#', 1)[0][len('installedargs:'):].split() + installedargs
     if os.path.exists(grubsyscfg):
         with open(grubsyscfg) as defgrubin:
             defgrub = defgrubin.read().split('\n')
@@ -223,7 +243,7 @@ def fixup(rootdir, vols):
         ]
     if not os.path.exists(os.path.join(rootdir, "etc/kernel/cmdline")):
         with open(os.path.join(rootdir, "etc/kernel/cmdline"), "w") as cmdlineout:
-            cmdlineout.write("{} root=/dev/mapper/localstorage-root rd.lvm.lv=localstorage/root".format(' '.join(currcmdline + nodeargs)))
+            cmdlineout.write("{} root=/dev/mapper/localstorage-root rd.lvm.lv=localstorage/root".format(' '.join(append_args(currcmdline, installedargs))))
     with open(grubsyscfg, 'w') as defgrubout:
         for gline in defgrub:
             gline = gline.split()
@@ -234,10 +254,10 @@ def fixup(rootdir, vols):
                         newline.append('"')
                     continue
                 newline.append(ent)
-            if nodeargs and newline and newline[0].startswith('GRUB_CMDLINE_LINUX=') and newline[-1].endswith('"'):
-                newline[-1] = newline[-1][:-1]
-                newline.extend(nodeargs)
-                newline[-1] += '"'
+            if installedargs and newline and newline[0].startswith('GRUB_CMDLINE_LINUX=') and newline[-1].endswith('"'):
+                # an image captured from an installed node may carry them already
+                present = ' '.join(newline)[len('GRUB_CMDLINE_LINUX="'):-1].split()
+                newline = ['GRUB_CMDLINE_LINUX="{}"'.format(' '.join(append_args(present, installedargs)))]
             defgrubout.write(' '.join(newline) + '\n')
     grubcfg = subprocess.check_output(['find', os.path.join(rootdir, 'boot'), '-name', 'grub.cfg']).decode('utf8').strip().replace(rootdir, '/').replace('//', '/')
     grubcfg = grubcfg.split('\n')
