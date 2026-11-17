@@ -135,6 +135,7 @@ if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
             confluent_profile=$(grep ^profile: /etc/confluent/confluent.deploycfg)
             confluent_profile=${confluent_profile#profile: }
             mgr=$deployer
+            echo EXTMGRINFO: $deployer'||1' >> /etc/confluent/confluent.info
             break
         fi
     done
