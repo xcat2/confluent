@@ -132,10 +132,10 @@ async def get_my_addresses(idx=0, family=0, matchlla=None):
         while True:
             pdata = await asyncio.get_running_loop().sock_recv(s, 65536)
             v = memoryview(pdata)
-            if struct.unpack('H', v[4:6])[0] == 3:  # netlink done message
-                break
             while len(v):
                 length, typ = struct.unpack('IH', v[:6])
+                if typ in (2, 3):  # netlink error or done message
+                    return addrs
                 if typ == 20:
                     fam, plen, _, scope, ridx = struct.unpack('BBBBI', v[nlhdrsz:nlhdrsz+ifaddrsz])
                     if matchlla:
