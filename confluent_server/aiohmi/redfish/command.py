@@ -841,6 +841,9 @@ class Command(object):
                 if len(targurl.get('Members', [])) == 1:
                     targurl = targurl['Members'][0]['@odata.id']
         if not targurl:
+            # may have to do it via chassis
+            targurl = await oem._get_chassis_url()
+        if not targurl:
             raise Exception("Unable to identify system url")
         targinfo = await self._do_web_request(targurl)
         if ('IndicatorLED' not in targinfo

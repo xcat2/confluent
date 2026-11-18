@@ -413,6 +413,8 @@ class OEMHandler(object):
     
     async def sysinfo(self):
         sysurl = await self.get_default_sysurl()
+        if not sysurl:
+            return None
         return await self._do_web_request(sysurl)
     
     async def get_bmc_csr(self, keytype=None, keylength=None, cn=None, city=None,
@@ -837,6 +839,8 @@ class OEMHandler(object):
 
     async def get_health(self, fishclient, verbose=True):
         sysinfo = await self.sysinfo()
+        if not sysinfo:  # might be a chassis only bmc
+            sysinfo = await self._get_chassis_info()
         health = sysinfo.get('Status', {})
         health = health.get('HealthRollup', health.get('Health', 'Unknown'))
         warnunknown = health == 'Unknown'
@@ -1286,26 +1290,38 @@ class OEMHandler(object):
         return await self._get_chassis_info()
 
     DEFAULT_CHASSIS_IDS = ()
+    async def _get_chassis_url(self):
+
+        if not hasattr(self, '_varchassisurl'):
+            self._varchassisurl = None
+        if not self._varchassisurl:
+            overview = await self._do_web_request('/redfish/v1/')
+            chassismembs = overview.get('Chassis', {}).get('@odata.id', None)
+            if chassismembs:
+                chassislist = await self._do_web_request(chassismembs)
+                chassismembs = chassislist.get('Members') or []
+                if len(chassismembs) == 1:
+                    self._varchassisurl = chassismembs[0]['@odata.id']
+                elif len(chassismembs) > 1:
+                    for chassis in chassismembs:
+                        chassisurl = chassis['@odata.id']
+                        if chassisurl.split('/')[-1] in self.DEFAULT_CHASSIS_IDS:
+                            self._varchassisurl = chassisurl
+                            break
+        return self._varchassisurl
+
+
+
+
     async def _get_chassis_info(self):
         nodeinfo = None
         if self._varchassisinfo:
             return self._varchassisinfo
         else:
-            overview = await self._do_web_request('/redfish/v1/')
-            chassismembs = overview.get('Chassis', {}).get('@odata.id', None)
-            if not chassismembs:
+            chassisurl = await self._get_chassis_url()
+            if not chassisurl:
                 return nodeinfo
-            chassislist = await self._do_web_request(chassismembs)
-            chassismembs = chassislist.get('Members', [])
-            if len(chassismembs) == 1:
-                chassisurl = chassismembs[0]['@odata.id']
-                nodeinfo = await self._do_web_request(chassisurl)
-            elif len(chassismembs) > 1:
-                for chassis in chassismembs:
-                    chassisurl = chassis['@odata.id']
-                    if chassisurl.split('/')[-1] in self.DEFAULT_CHASSIS_IDS:
-                        nodeinfo = await self._do_web_request(chassisurl)
-                        break
+            nodeinfo = await self._do_web_request(chassisurl)
         return nodeinfo
 
     async def _get_chassis_inventory(self):
