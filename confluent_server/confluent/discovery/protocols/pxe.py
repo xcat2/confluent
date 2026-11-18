@@ -800,9 +800,10 @@ async def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, 
     can302 = True
     proto = 'https' if insecuremode == 'never' else 'http'
     if isboot and httpboot:
+        shimarch = 'aarch64' if bootarch == 'uefi-httpboot-arm' else 'x86_64'
         if (proto in ('http', 'https')
                 and os.path.exists('/var/lib/confluent/public/os/{}/boot.ipxe.shim'.format(profile))
-                and os.path.exists('/var/lib/confluent/public/ipxe/x86_64/ipxe-shim.efi')):
+                and os.path.exists('/var/lib/confluent/public/ipxe/{}/ipxe-shim.efi'.format(shimarch))):
             if bootarch == 'uefi-httpboot':
                 bootfile = '{0}://{1}/confluent-public/ipxe/x86_64/ipxe-shim.efi'.format(
                     proto, myipn
