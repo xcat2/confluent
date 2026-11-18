@@ -44,6 +44,8 @@ else
 fi
 curl -f https://$mgr/confluent-public/os/$profile/profile.yaml > /tmp/instprofile.yaml
 blargs=$(grep ^installedargs: /tmp/instprofile.yaml | sed -e 's/#.*//' -e 's/^installedargs: //')
+nodeargs=$(sed -n "s/^installedargs: //p" /etc/confluent/confluent.deploycfg | sed -e "s/^'\(.*\)'\$/\1/" -e "s/''/'/g")
+if [ -n "$nodeargs" ]; then blargs="${blargs:+$blargs }$nodeargs"; fi
 if [ ! -z "$blargs" ]; then
 	blargs=' --append="'$blargs'"'
 fi

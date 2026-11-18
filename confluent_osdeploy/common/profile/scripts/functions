@@ -62,6 +62,12 @@ sys.stdout.write(value + '\n')
 EOF
 }
 
+# Print deployment.installedargs from a deploycfg, by default
+# /etc/confluent/confluent.deploycfg, undoing its yaml single quoting.
+function confluent_installedargs() {
+    sed -n "s/^installedargs: //p" "${1:-/etc/confluent/confluent.deploycfg}" | sed -e "s/^'\(.*\)'\$/\1/" -e "s/''/'/g"
+}
+
 function set_confluent_vars() {
     if [ -z "$nodename" ]; then
         nodename=$(grep ^NODENAME: /etc/confluent/confluent.info | awk '{print $2}')

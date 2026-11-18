@@ -49,7 +49,9 @@ def cleanup_inflight_sshcerts():
 
 
 def yamldump(input):
-    return yaml.dump_all([input], Dumper=SafeDumper, default_flow_style=False).encode()
+    # no line wrapping, the deployment scripts read values with grep. This is
+    # the largest width the libyaml emitter accepts
+    return yaml.dump_all([input], Dumper=SafeDumper, default_flow_style=False, width=2**31 - 1).encode()
 
 def jsondump(input):
     return json.dumps(input).encode()
@@ -319,6 +321,11 @@ async def handle_request(req, make_response, mimetype):
             'value', None)
         if ncfg['encryptboot'] in ('', 'none'):
             ncfg['encryptboot'] = None
+        # one line of arguments, the installers read it with grep
+        installedargs = ' '.join(str(deployinfo.get(
+            'deployment.installedargs', {}).get('value', None) or '').split())
+        if installedargs:
+            ncfg['installedargs'] = installedargs
         ncfg['profile'] = profile
         protocol = deployinfo.get('deployment.useinsecureprotocols', {}).get(
             'value', 'never')
