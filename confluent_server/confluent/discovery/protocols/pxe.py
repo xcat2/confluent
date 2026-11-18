@@ -483,6 +483,8 @@ async def process_dhcp6req(handler, rqv, addr, net, cfg, nodeguess):
     req, disco = v6opts_to_dict(bytearray(rqv[4:]))
     req['txid'] = rqv[1:4]
     req['rqtype'] = bytearray(rqv[:1])[0]
+    if req['rqtype'] == 3 and req.get(2, b'') != b'\x00\x04' + get_my_duid():
+        return  # request for another server
     if not disco.get('uuid', None) or not disco.get('arch', None):
         return
     if disco['uuid'] == '03000200-0400-0500-0006-000700080009':
