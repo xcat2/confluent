@@ -767,10 +767,32 @@ async def resourcehandler_backend(req, make_response):
             nodename = request[2]
         bootfile = request[3]
         cfg = configmanager.ConfigManager(None)
-        nodec = cfg.get_node_attributes(nodename, 'deployment.pendingprofile')
+        nodec = cfg.get_node_attributes(nodename, ('deployment.pendingprofile', 'deployment.kernelargs'))
         pprofile = nodec.get(nodename, {}).get('deployment.pendingprofile', {}).get('value', None)
         if not pprofile:
             return await make_response(mimetype, 404, 'Not Found')
+        kernelargs = nodec.get(nodename, {}).get('deployment.kernelargs', {}).get('value', None)
+        # one line of arguments, so nothing in the value becomes an iPXE command
+        kernelargs = ' '.join(str(kernelargs or '').split())
+        if kernelargs and bootfile in ('ipxe', 'ipxe.shim'):
+            # Serve the profile script with the node kernelargs appended,
+            # making paths absolute as it is no longer fetched from the profile
+            bootscript = []
+            appended = False
+            with open('/var/lib/confluent/public/os/{0}/boot.{1}'.format(pprofile, bootfile)) as ipxein:
+                for line in ipxein.read().split('\n'):
+                    cmd = line.split(' ', 2)
+                    if len(cmd) > 1 and cmd[0] in ('imgfetch', 'shim', 'chain'):
+                        if not cmd[1].startswith('/') and '://' not in cmd[1]:
+                            cmd[1] = '/confluent-public/os/{0}/{1}'.format(pprofile, cmd[1])
+                        if cmd[1].endswith('/boot/kernel'):
+                            cmd.append(kernelargs)
+                            appended = True
+                        line = ' '.join(cmd)
+                    bootscript.append(line)
+            if not appended:
+                log.log({'warning': 'deployment.kernelargs of {0} is not applied, the boot script of profile {1} does not load a Linux kernel'.format(nodename, pprofile)})
+            return await make_response('text/plain', 200, 'OK', body='\n'.join(bootscript))
         redir = '/confluent-public/os/{0}/boot.{1}'.format(pprofile, bootfile)
         rsp = await make_response(mimetype, 302, 'Found', {'Location': redir})
         return rsp

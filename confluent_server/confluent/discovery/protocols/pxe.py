@@ -354,10 +354,13 @@ async def proxydhcp(handler, nodeguess):
                     log.log({'info': 'No pending profile for {0}, skipping proxyDHCP reply'.format(node)})
                     continue
                 myip = socket.inet_ntoa(myipn)
+                bootbase = '{0}://{1}/confluent-public/os/{2}/boot.'.format(webproto, myip, profile)
+                if cfd.get(node, {}).get('deployment.kernelargs', {}).get('value', None):
+                    bootbase = '{0}://{1}/confluent-api/boot/by-node/{2}/'.format(webproto, myip, node)
                 if disco['arch'] == 'bios-x86' or not os.path.exists('/var/lib/confluent/public/os/{0}/boot.ipxe.shim'.format(profile)):
-                    bootfile = '{0}://{1}/confluent-public/os/{2}/boot.ipxe'.format(webproto, myip, profile).encode('utf8')
+                    bootfile = (bootbase + 'ipxe').encode('utf8')
                 else:
-                    bootfile = '{0}://{1}/confluent-public/os/{2}/boot.ipxe.shim'.format(webproto, myip, profile).encode('utf8')
+                    bootfile = (bootbase + 'ipxe.shim').encode('utf8')
             elif disco['arch'] == 'uefi-x64':
                 bootfile = b'confluent/x86_64/ipxe-shim.efi'
             elif disco['arch'] == 'bios-x86':
@@ -667,6 +670,10 @@ async def reply_dhcp6(node, addr, cfg, packet, cfd, profile, sock, niccfg=None):
         bootfile = '{0}://[{1}]/confluent-public/os/{2}/boot.ipxe'.format(
             proto, ipv6srvaddr, profile
         )
+        if cfd.get(node, {}).get('deployment.kernelargs', {}).get('value', None):
+            bootfile = '{0}://[{1}]/confluent-api/boot/by-node/{2}/ipxe'.format(
+                proto, ipv6srvaddr, node
+            )
         if hasshim and bootarch != 'bios-x86':
             bootfile += '.shim'
     elif hasshim and os.path.exists('/var/lib/confluent/public/ipxe/{}/ipxe-shim.efi'.format(shimarch)):
@@ -695,6 +702,9 @@ async def reply_dhcp6(node, addr, cfg, packet, cfd, profile, sock, niccfg=None):
             'HTTPClient:Arch:')):
         # do not send ip-less replies to anything but HTTPClient and iPXE
         return
+    if (packet['rqtype'] == 1 and bootfile.endswith(b'/boot.img')
+            and cfd.get(node, {}).get('deployment.kernelargs', {}).get('value', None)):
+        log.log({'warning': 'deployment.kernelargs of {0} is not applied, UEFI HTTP boot of profile {1} falls back to boot.img, run osdeploy initialize -r to install the iPXE shim'.format(node, profile)})
     # 1 msgtype
     # 3 txid
     # 22 - server ident
@@ -849,6 +859,8 @@ async def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, 
                 proto, myipn, profile
             )
             bootshorturl = '/confluent-public/os/{0}/boot.img'.format(profile)
+            if rqtype == 1 and cfd.get(node, {}).get('deployment.kernelargs', {}).get('value', None):
+                log.log({'warning': 'deployment.kernelargs of {0} is not applied, UEFI HTTP boot of profile {1} falls back to boot.img, run osdeploy initialize -r to install the iPXE shim'.format(node, profile)})
             bootfilename = '/var/lib/confluent/public/os/{0}/boot.img'.format(profile)
             can302 = False
         if not isinstance(bootfile, bytes):
@@ -871,10 +883,13 @@ async def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, 
             if not profile:
                 log.log({'info': 'No pending profile for {0}, skipping proxyDHCP reply'.format(node)})
                 return
+            bootbase = '{0}://{1}/confluent-public/os/{2}/boot.'.format(proto, myipn, profile)
+            if cfd.get(node, {}).get('deployment.kernelargs', {}).get('value', None):
+                bootbase = '{0}://{1}/confluent-api/boot/by-node/{2}/'.format(proto, myipn, node)
             if not os.path.exists('/var/lib/confluent/public/os/{0}/boot.ipxe.shim'.format(profile)):
-                bootfile = '{0}://{1}/confluent-public/os/{2}/boot.ipxe'.format(proto, myipn, profile).encode('utf8')
+                bootfile = (bootbase + 'ipxe').encode('utf8')
             else:
-                bootfile = '{0}://{1}/confluent-public/os/{2}/boot.ipxe.shim'.format(proto, myipn, profile).encode('utf8')
+                bootfile = (bootbase + 'ipxe.shim').encode('utf8')
             if len(bootfile) > 127:
                 if bootfile.startswith(b'http'):
                     bootfile = register_shorturl(bootfile.decode('utf8')).encode('utf8')
