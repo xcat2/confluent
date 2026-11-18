@@ -380,7 +380,7 @@ async def asyncrun(args):
         watchdogsecs = int(os.environ.get('WATCHDOG_USEC', '0')) / 1000000
         if not watchdogsecs:
             watchdogsecs = 200
-        watchdogsecs = watchdogsecs / 2
+        watchdogsecs = watchdogsecs / 4
         if notifysock.startswith('@'):
             notifysock = '\0' + notifysock[1:]
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)

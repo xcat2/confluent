@@ -6,7 +6,7 @@ Description=Confluent hardware manager
 [Service]
 Type=notify
 NotifyAccess=main
-WatchdogSec=30s
+WatchdogSec=300s
 RuntimeDirectory=confluent
 CacheDirectory=confluent
 LogsDirectory=confluent
