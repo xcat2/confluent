@@ -418,8 +418,18 @@ def new_dhcp6_packet(handler, net6, cfg, nodeguess):
     if len(pkt) < 64:
         return
     rqv = memoryview(pkt)
-    if rqv[0] in (1, 3):
+    if rqv[0] in (1, 3, 11):  # solicit, request, information-request
         tasks.spawn(process_dhcp6req(handler, rqv, addr, net6, cfg, nodeguess))
+    elif rqv[0] == 8:  # release, firmware retransmits it until answered
+        req, _ = v6opts_to_dict(bytearray(rqv[4:]))
+        serverid = b'\x00\x04' + get_my_duid()
+        if 1 in req and req.get(2, b'') == serverid:
+            reply = bytearray(rqv[:4])
+            reply[0] = 7
+            reply += struct.pack('!HH', 1, len(req[1])) + req[1]
+            reply += struct.pack('!HH', 2, len(serverid)) + serverid
+            reply += struct.pack('!HHH', 13, 2, 0)  # status code success
+            net6.sendto(reply, addr)
 
 
 async def snoop(handler, protocol=None, nodeguess=None):
@@ -619,7 +629,8 @@ async def check_reply(node, info, packet, sock, cfg, reqview, addr, requestor):
                 )})
             return
     if addr:
-        if packet['vci'] and packet['vci'].startswith('PXEClient'):
+        if (packet['vci'] and packet['vci'].startswith('PXEClient')
+                and packet.get(15, b'')[2:] != b'iPXE'):
             log.log({'info': 'IPv6 PXE boot attempt by {0}, but IPv6 PXE is not supported, try IPv6 HTTP boot or IPv4 boot'.format(node)})
             return
         return await reply_dhcp6(node, addr, cfg, packet, cfd, profile, sock)
@@ -646,15 +657,30 @@ async def reply_dhcp6(node, addr, cfg, packet, cfd, profile, sock, niccfg=None):
     if not insecuremode:
         insecuremode = 'never'
     proto = 'https' if insecuremode == 'never' else 'http'
-    bootfile = '{0}://[{1}]/confluent-public/os/{2}/boot.img'.format(
-        proto, ipv6srvaddr, profile
-    )
+    isipxe = packet.get(15, b'')[2:] == b'iPXE'
+    bootarch = pxearchs.get(bytes(packet[61]), None)
+    shimarch = 'aarch64' if bootarch in ('uefi-aarch64', 'uefi-httpboot-arm') else 'x86_64'
+    hasshim = os.path.exists('/var/lib/confluent/public/os/{}/boot.ipxe.shim'.format(profile))
+    if isipxe:
+        bootfile = '{0}://[{1}]/confluent-public/os/{2}/boot.ipxe'.format(
+            proto, ipv6srvaddr, profile
+        )
+        if hasshim and bootarch != 'bios-x86':
+            bootfile += '.shim'
+    elif hasshim and os.path.exists('/var/lib/confluent/public/ipxe/{}/ipxe-shim.efi'.format(shimarch)):
+        bootfile = '{0}://[{1}]/confluent-public/ipxe/{2}/ipxe-shim.efi'.format(
+            proto, ipv6srvaddr, shimarch
+        )
+    else:
+        bootfile = '{0}://[{1}]/confluent-public/os/{2}/boot.img'.format(
+            proto, ipv6srvaddr, profile
+        )
     if not isinstance(bootfile, bytes):
         bootfile = bootfile.encode('utf8')
     ipass = []
     if ipv6method == 'firmwarenone':
         return
-    if ipv6method not in ('dhcp', 'firmwaredhcp') and ipv6addr:
+    if ipv6method not in ('dhcp', 'firmwaredhcp') and ipv6addr and 3 in packet:
         if not ipv6prefix:
             log.log({'info': 'Unable to determine prefix to serve to address {} for node {}'.format(ipv6addr, node)})
             return
@@ -663,9 +689,9 @@ async def reply_dhcp6(node, addr, cfg, packet, cfd, profile, sock, niccfg=None):
         ipass[4:16] = b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x05\x00\x18'
         ipass[16:32] = socket.inet_pton(socket.AF_INET6, ipv6addr)
         ipass[32:40] = b'\x00\x00\x00\x78\x00\x00\x01\x2c'
-    elif (not packet['vci']) or not packet['vci'].startswith(
-            'HTTPClient:Arch:'):
-        # do not send ip-less replies to anything but HTTPClient specifically
+    elif not isipxe and ((not packet['vci']) or not packet['vci'].startswith(
+            'HTTPClient:Arch:')):
+        # do not send ip-less replies to anything but HTTPClient and iPXE
         return
     # 1 msgtype
     # 3 txid
