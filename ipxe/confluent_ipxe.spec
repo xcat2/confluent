@@ -1,6 +1,6 @@
 Name: confluent_ipxe
 Version: 2.0.0
-Release: 1
+Release: 2
 Summary: iPXE network boot roms for confluent
 
 License: GPL
@@ -32,7 +32,17 @@ cp arm64-sb/snponly.efi %{buildroot}/opt/confluent/lib/ipxe/ipxe-aarch64.efi
 /opt/confluent/lib/ipxe/ipxe-aarch64-shim.efi
 /opt/confluent/lib/ipxe/ipxe-aarch64.efi
 
-
+%post
+# UEFI HTTP boot chainloads the shim from the public tree. A fresh install
+# leaves it to osdeploy initialize, so public keeps the ownership the
+# server gives it.
+if [ -d /var/lib/confluent/public ]; then
+    mkdir -p /var/lib/confluent/public/ipxe/x86_64 /var/lib/confluent/public/ipxe/aarch64
+    cp /opt/confluent/lib/ipxe/ipxe-shim.efi /opt/confluent/lib/ipxe/ipxe.efi /var/lib/confluent/public/ipxe/x86_64/
+    cp /opt/confluent/lib/ipxe/ipxe-aarch64-shim.efi /var/lib/confluent/public/ipxe/aarch64/ipxe-shim.efi
+    cp /opt/confluent/lib/ipxe/ipxe-aarch64.efi /var/lib/confluent/public/ipxe/aarch64/ipxe.efi
+fi
+true
 
 
 %changelog
