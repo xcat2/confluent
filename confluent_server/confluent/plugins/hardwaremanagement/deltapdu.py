@@ -12,9 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#TODO: ASYNC asyncio conversion
 import asyncio
+import urllib.parse
 
+import aiohmi.util.webclient as wc
 import confluent.messages as msg
 import confluent.exceptions as exc
 import lxml.etree as etree
@@ -32,64 +33,26 @@ def fromstring(inputdata):
     return etree.fromstring(inputdata, parser=parser)  # nosec
 
 
-import http.client as httplib
-import http.cookies as Cookie
+_fixedheaders = {
+    'Host': 'pdu.cluster.net',
+    'Accept': '*/*',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Connection': 'close',
+    'Referer': 'http://pdu.cluster.net/setting_admin.htm',
+}
 
-# Delta PDU webserver always closes connection,
-# replace conditionals with always close
-class WebResponse(httplib.HTTPResponse):
-    def _check_close(self):
-        return True
 
-class WebConnection(httplib.HTTPConnection):
-    response_class = WebResponse
+class WebConnection(wc.WebConnection):
     def __init__(self, host):
-        httplib.HTTPConnection.__init__(self, host, 80)
-        self.cookies = {}
+        # port 80 makes webclient use plain http
+        wc.WebConnection.__init__(self, host, 80)
+        for header in _fixedheaders:
+            self.set_header(header, _fixedheaders[header])
 
-    def getresponse(self):
-        try:
-            rsp = super(WebConnection, self).getresponse()
-            try:
-                hdrs = [x.split(':', 1) for x in rsp.msg.headers]
-            except AttributeError:
-                hdrs = rsp.msg.items()
-            for hdr in hdrs:
-                if hdr[0] == 'Set-Cookie':
-                    c = Cookie.BaseCookie(hdr[1])
-                    for k in c:
-                        self.cookies[k] = c[k].value
-        except httplib.BadStatusLine:
-            self.broken = True
-            raise
-        return rsp
-
-    def request(self, method, url, body=None):
-        headers = {}
-        if body:
-            headers['Content-Length'] = len(body)
-        cookies = []
-        for cookie in self.cookies:
-            cookies.append('{0}={1}'.format(cookie, self.cookies[cookie]))
-        headers['Cookie'] = ';'.join(cookies)
-        headers['Host'] = 'pdu.cluster.net'
-        headers['Accept'] = '*/*'
-        headers['Accept-Language'] = 'en-US,en;q=0.9'
-        headers['Connection'] = 'close'
-        headers['Referer'] = 'http://pdu.cluster.net/setting_admin.htm'
-        return super(WebConnection, self).request(method, url, body, headers)
-
-    def grab_response(self, url, body=None, method=None):
-        if method is None:
-            method = 'GET' if body is None else 'POST'
-        if body:
-            self.request(method, url, body)
-        else:
-            self.request(method, url)
-        rsp = self.getresponse()
-        body = rsp.read()
-        return body, rsp.status
-
+    async def grab_response(self, url, body=None, method=None):
+        rsp, status, _ = await self.grab_response_with_status(
+            url, body, method=method)
+        return rsp, status
 
 
 class PDUClient(object):
@@ -97,31 +60,34 @@ class PDUClient(object):
         self.node = pdu
         self.configmanager = configmanager
         self._outletmap = {}
-        self._token = None
-        self._wc = None
-        self.username = None
+        self.wc = None
+        self.connectlock = asyncio.Lock()
 
-    @property
-    def wc(self):
-        if self._wc:
-            return self._wc
-        targcfg = self.configmanager.get_node_attributes(self.node,
-                                            ['hardwaremanagement.manager'],
-                                            decrypt=True)
-        targcfg = targcfg.get(self.node, {})
-        target = targcfg.get(
-            'hardwaremanagement.manager', {}).get('value', None)
-        if not target:
-            target = self.node
-        target = target.split('/', 1)[0]
-        self._wc = WebConnection(target)
-        self.login(self.configmanager)
-        return self._wc
+    async def connect(self):
+        async with self.connectlock:
+            if self.wc:
+                return self.wc
+            targcfg = self.configmanager.get_node_attributes(self.node,
+                                                ['hardwaremanagement.manager'],
+                                                decrypt=True)
+            targcfg = targcfg.get(self.node, {})
+            target = targcfg.get(
+                'hardwaremanagement.manager', {}).get('value', None)
+            if not target:
+                target = self.node
+            target = target.split('/', 1)[0]
+            self.wc = WebConnection(target)
+            try:
+                await self.login(self.configmanager)
+            except Exception:
+                self.wc = None
+                raise
+            return self.wc
 
-    @property
-    def map_outlets(self):
+    async def map_outlets(self):
         if not self._outletmap:
-            rsp, status = self.wc.grab_response('/setting_admin.htm')
+            await self.connect()
+            rsp, status = await self.wc.grab_response('/setting_admin.htm')
             if not isinstance(rsp, str):
                 rsp = rsp.decode('utf8')
             for line in rsp.split('\n'):
@@ -135,8 +101,7 @@ class PDUClient(object):
                     self._outletmap[idx] = ident
         return self._outletmap
 
-
-    def login(self, configmanager):
+    async def login(self, configmanager):
         credcfg = configmanager.get_node_attributes(self.node,
                                             ['secret.hardwaremanagementuser',
                                              'secret.hardwaremanagementpassword'],
@@ -152,17 +117,24 @@ class PDUClient(object):
             passwd = passwd.decode('utf8')
         if not username or not passwd:
             raise Exception('Missing username or password')
-        body = 'User={0}&Password={1}&B1=Login'.format(username, passwd)
-        rsp = self.wc.grab_response('/login.htm', body)
+        body = urllib.parse.urlencode({
+            'User': username,
+            'Password': passwd,
+            'B1': 'Login',
+        })
+        rsp = await self.wc.grab_response('/login.htm', body)
         if b'Incorrect User Name' in rsp[0]:
             raise exc.TargetEndpointBadCredentials()
 
-
     async def logout(self):
-        self.wc.grab_response('/logout_wait.htm')
+        async with self.connectlock:
+            if self.wc:
+                await self.wc.grab_response('/logout_wait.htm')
+                self.wc = None
 
     async def get_outlet(self, outlet):
-        rsp = self.wc.grab_response('/setting_admin4.xml')
+        await self.connect()
+        rsp = await self.wc.grab_response('/setting_admin4.xml')
         xd = fromstring(rsp[0])
         for ch in xd:
             if 'relay' not in ch.tag:
@@ -174,9 +146,11 @@ class PDUClient(object):
     async def set_outlet(self, outlet, state):
         state = 0 if state == 'off' else 1
         outlet = int(outlet)
-        ident = self.map_outlets[outlet]
+        outletmap = await self.map_outlets()
+        ident = outletmap[outlet]
         sitem = '/SetParm?item={}?content={}'.format(ident, state)
-        self.wc.grab_response(sitem)
+        await self.connect()
+        await self.wc.grab_response(sitem)
 
 async def retrieve(nodes, element, configmanager, inputdata):
     if 'outlets' not in element:
