@@ -99,7 +99,7 @@ dynamic behavior and replace with static configuration.
           <filename>preinstall.sh</filename>
           <source>
 <![CDATA[
-#!/bin/sh
+#!/bin/bash
 confluent_mgr=$(grep ^deploy_server /etc/confluent/confluent.deploycfg|awk '{print $2}')
 confluent_profile=$(grep ^profile: /etc/confluent/confluent.deploycfg|sed -e 's/^profile: //')
 proto=$(grep ^protocol: /etc/confluent/confluent.deploycfg |awk '{print $2}')
