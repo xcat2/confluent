@@ -43,8 +43,9 @@ if __name__ == '__main__':
     import confluent.snmputil as snmp
 
 import asyncio
-from confluent.networking.lldp import detect_backend, _handle_neighbor_query, get_fingerprint
+from confluent.networking.lldp import detect_backend, _handle_neighbor_query, get_fingerprint, get_neighbor_addresses
 from confluent.networking.switchutil import get_switchcreds, list_switches, get_portnamemap
+
 
 import socket
 
@@ -56,6 +57,7 @@ import confluent.noderange as noderange
 import confluent.tasks as tasks
 import confluent.networking.nxapi as nxapi
 import confluent.networking.srlinux as srlinux
+import confluent.netutil as netutil
 import confluent.util as util
 import msgpack
 import random
@@ -646,6 +648,31 @@ async def handle_api_request(configmanager, inputdata, operation, pathcomponents
     raise exc.NotImplementedException(
         'Operation {0} on {1} not implemented'.format(
             operation, '/'.join(pathcomponents)))
+
+
+async def get_possible_node_addresses(nodename, configmanager):
+    cfg = configmanager.get_node_attributes(nodename, ['net*.switch',
+                                                       'net*.switchport'])
+    addrs = set()
+    for attrkey in cfg[nodename]:
+        if attrkey.endswith('switch') and attrkey + 'port' in cfg[nodename]:
+            switch = cfg[nodename][attrkey]['value']
+            port = cfg[nodename][attrkey + 'port']['value']
+            for addr in await get_neighbor_addresses(switch, port, configmanager,
+                                                     _namesmatch):
+                if addr.startswith('fe80::'):
+                    addr = await netutil.add_zone(addr)
+                if addr not in addrs:
+                    addrs.add(addr)
+                    yield addr
+            if switch in _macsbyswitch:
+                for swport in _macsbyswitch[switch]:
+                    if _namesmatch(swport, port):
+                        for mac in _macsbyswitch[switch][swport]:
+                            ipaddr = await netutil.mac2ip(mac)
+                            if ipaddr and ipaddr not in addrs:
+                                addrs.add(ipaddr)
+                                yield ipaddr
 
 
 async def get_node_fingerprints(nodename, configmanager):

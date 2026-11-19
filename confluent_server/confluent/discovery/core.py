@@ -459,6 +459,14 @@ def number_to_addr(number):
     return addr
 
 def iterate_addrs(addrs, countonly=False):
+    if isinstance(addrs, list):
+        if countonly:
+            yield len(addrs)
+            return
+        for addr in addrs:
+            for a in iterate_addrs(addr, countonly=countonly):
+                yield a
+        return
     if ':' in addrs:
         if '-' in addrs or '/' in addrs:
             raise exc.InvalidArgumentException('IPv6 ranges not supported')
@@ -598,6 +606,17 @@ async def register_remote_addrs(addresses, configmanager):
             yield msg.ConfluentResourceNotFound(result[0])
 
 
+async def probe_noderange(configmanager, scannoderange):
+    nr = noderange.NodeRange(scannoderange, configmanager)
+    alladdrs = []
+    await macmap.rescan(configmanager)
+    for node in nr.nodes:
+        async for addr in macmap.get_possible_node_addresses(node, configmanager):
+            alladdrs.append(addr)
+    async for x in  register_remote_addrs(alladdrs, configmanager):
+        yield x
+    
+
 async def handle_api_request(configmanager, inputdata, operation, pathcomponents):
     if pathcomponents == ['discovery', 'autosense']:
         return handle_autosense_config(operation, inputdata)
@@ -635,6 +654,8 @@ async def handle_api_request(configmanager, inputdata, operation, pathcomponents
         return (msg.KeyValueData({'status': 'unsubscribed'}),)
     elif operation in ('update', 'create'):
         if pathcomponents == ['discovery', 'register']:
+            if 'noderange' in inputdata:
+                return probe_noderange(configmanager, inputdata['noderange'])
             if 'addresses' not in inputdata:
                 raise exc.InvalidArgumentException('Missing address in input')
             return register_remote_addrs(inputdata['addresses'], configmanager)

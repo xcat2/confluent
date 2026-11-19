@@ -131,6 +131,19 @@ def b64tohex(b64str):
     bd = bytearray(bd)
     return ''.join(['{0:02x}'.format(x) for x in bd])
 
+async def get_neighbor_addresses(switch, port, configmanager, portmatch):
+    await update_switch_data(switch, configmanager)
+    addresses = []
+    for neigh in _neighbypeerid:
+        info = _neighbypeerid[neigh]
+        if neigh == '!!vintage' or info.get('switch', None) != switch:
+            continue
+        if portmatch(info.get('portid', None), port):
+            addresses.extend(info.get('peeraddresses', []))
+        elif portmatch(info.get('port', None), port):
+            addresses.extend(info.get('peeraddresses', []))
+    return addresses
+
 async def get_fingerprint(switch, port, configmanager, portmatch):
     await update_switch_data(switch, configmanager)
     for neigh in _neighbypeerid:

@@ -53,6 +53,11 @@ async def register_endpoint(options, session, addr):
     neednewline = False
     current = 0
     total = 0
+    if options.node:
+        async for rsp in session.update('/discovery/register', {'noderange': options.node}):
+            if 'created' in rsp:
+                print('Registered: {0}'.format(rsp['created']))
+        return
     async for rsp in session.update('/discovery/register', {'addresses': addr}):
         if 'count' in rsp:
             total = rsp['count']
@@ -406,7 +411,7 @@ async def main():
     parser.add_option('-u', '--uuid', dest='uuid',
                       help='Operate against the system matching the specified '
                            'UUID', metavar='UUID')
-    parser.add_option('-n', '--node', help='Operate with the given nodename')
+    parser.add_option('-n', '--node', help='Operate with the given nodename or noderange')
     parser.add_option('-e', '--ethaddr', dest='mac',
                       help='Operate against the system with the specified MAC or IP '
                            'address if mac not available', metavar='MAC')
@@ -427,8 +432,8 @@ async def main():
     if len(args) == 0 or args[0] not in ('list', 'assign', 'reassign', 'rescan', 'clear', 'subscribe', 'unsubscribe', 'register'):
         parser.print_help()
         sys.exit(1)
-    if args[0] == 'register' and len(args) != 2:
-        sys.stderr.write('Register requires target address or range (e.g. 192.168.2.30, 192.168.2.0/24, or 192.168.2.1-192.168.2.30)\n')
+    if args[0] == 'register' and len(args) != 2 and not options.node:
+        sys.stderr.write('Register requires target address or range (e.g. 192.168.2.30, 192.168.2.0/24, or 192.168.2.1-192.168.2.30), or \'-n <nodename or noderange>\'\n')
         sys.exit(1)
     if 'subscribe' in args[0] and len(args) != 2:
         sys.stderr.write('subscribe/unsubscribe subcommands require switch name as argument\n')
@@ -443,7 +448,7 @@ async def main():
     if args[0] == 'reassign':
         await assign_discovery(options, session, False)
     if args[0] == 'register':
-        await register_endpoint(options, session, args[1])
+        await register_endpoint(options, session, args[1] if len(args) > 1 else None)
     if args[0] == 'subscribe':
         await subscribe_discovery(options, session, True, args[1])
     if args[0] == 'unsubscribe':
