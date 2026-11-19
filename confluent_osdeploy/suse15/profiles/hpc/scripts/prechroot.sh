@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # This script runs when install is finished, but while the installer
 # is still running, with the to-be-booted system mounted in /mnt

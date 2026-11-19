@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # This script runs at the end of install in the installed system
 # but still under the installer kernel.

@@ -116,7 +116,7 @@ curl $proto://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/pre.
           <filename>chroot.sh</filename>
           <source>
 <![CDATA[
-#!/bin/sh
+#!/bin/bash
 confluent_mgr=$(grep ^deploy_server /etc/confluent/confluent.deploycfg|awk '{print $2}')
 confluent_profile=$(grep ^profile: /etc/confluent/confluent.deploycfg|sed -e 's/^profile: //')
 proto=$(grep ^protocol: /etc/confluent/confluent.deploycfg |awk '{print $2}')
@@ -139,9 +139,12 @@ cp /mnt/etc/confluent/post.sh /mnt/var/adm/autoinstall/scripts/
       </chroot-scripts>
       <init-scripts config:type="list">
         <script>
-          <interpreter>/bin/bash</interpreter>
           <filename>firstboot.sh</filename>
-          <location>file:///etc/confluent/firstboot.sh</location>
+          <source>
+<![CDATA[
+exec /bin/bash /etc/confluent/firstboot.sh
+]]>
+          </source>
         </script>
      </init-scripts> 
 

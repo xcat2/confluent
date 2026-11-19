@@ -138,9 +138,12 @@ cp /mnt/etc/confluent/post.sh /mnt/var/adm/autoinstall/scripts/
       </chroot-scripts>
       <init-scripts config:type="list">
         <script>
-          <interpreter>/bin/bash</interpreter>
           <filename>firstboot.sh</filename>
-          <location>file:///etc/confluent/firstboot.sh</location>
+          <source>
+<![CDATA[
+exec /bin/bash /etc/confluent/firstboot.sh
+]]>
+          </source>
         </script>
      </init-scripts> 
 
