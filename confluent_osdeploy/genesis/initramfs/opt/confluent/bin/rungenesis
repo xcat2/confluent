@@ -239,7 +239,7 @@ echo search $dnsdomain >> /etc/resolv.conf
 echo -n "Initializing ssh..."
 ssh-keygen -A
 mkdir -p /usr/share/empty.sshd
-rm /etc/ssh/ssh_host_dsa_key*
+rm -f /etc/ssh/ssh_host_dsa_key*
 for pubkey in /etc/ssh/ssh_host*key.pub; do
     certfile=${pubkey/.pub/-cert.pub}
     privfile=${pubkey%.pub}
