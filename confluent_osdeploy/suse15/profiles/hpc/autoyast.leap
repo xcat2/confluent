@@ -89,6 +89,7 @@ dynamic behavior and replace with static configuration.
     <scripts>
          <pre-scripts config:type="list">
         <script>
+          <interpreter>/bin/bash</interpreter>
           <filename>preinstall.sh</filename>
           <source>
 <![CDATA[
@@ -104,6 +105,7 @@ curl $proto://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/pre.
       </pre-scripts>
          <chroot-scripts config:type="list">
         <script>
+          <interpreter>/bin/bash</interpreter>
           <filename>chroot.sh</filename>
           <source>
 <![CDATA[
@@ -122,6 +124,7 @@ cp /mnt/etc/confluent/post.sh /mnt/var/adm/autoinstall/scripts/
           </source>
         </script>
         <script>
+          <interpreter>/bin/bash</interpreter>
           <chrooted config:type="boolean">true</chrooted>
           <filename>post.sh</filename>
           <location>file:///etc/confluent/post.sh</location>
@@ -129,6 +132,7 @@ cp /mnt/etc/confluent/post.sh /mnt/var/adm/autoinstall/scripts/
       </chroot-scripts>
       <init-scripts config:type="list">
         <script>
+          <interpreter>/bin/bash</interpreter>
           <filename>firstboot.sh</filename>
           <location>file:///etc/confluent/firstboot.sh</location>
         </script>
