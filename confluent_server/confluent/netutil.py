@@ -861,6 +861,9 @@ async def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
                 ipmethod = cfgbyname[candidate].get('ipv{}_method'.format(nver), 'static')
                 leasetime = cfgbyname[candidate].get('lease_time', None)
                 if leasetime:
+                    cfgmac = cfgbyname[candidate].get('hwaddr')
+                    if mac and cfgmac and cfgmac.lower() != mac.lower():
+                        continue
                     cfgdata['lease_time'] = leasetime
                 if not ipmethod:
                     ipmethod = 'static'

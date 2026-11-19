@@ -619,7 +619,7 @@ async def check_reply(node, info, packet, sock, cfg, reqview, addr, requestor):
         if addr:
             niccfg = await netutil.get_nic_config(cfg, node, ifidx=addr[-1], onlyfamily=socket.AF_INET6)
         else:
-            niccfg = await netutil.get_nic_config(cfg, node, ifidx=info['netinfo']['ifidx'], onlyfamily=socket.AF_INET)
+            niccfg = await netutil.get_nic_config(cfg, node, ifidx=info['netinfo']['ifidx'], onlyfamily=socket.AF_INET, mac=info.get('hwaddr'))
         if not niccfg.get('lease_time'):
             return  # ignore DHCP from local non-PXE segment
     cfd = cfg.get_node_attributes(node, ('deployment.*', 'collective.managercandidates'))
@@ -763,6 +763,7 @@ async def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, 
         isboot = False
     bootarch = info.get('architecture', None)
     rqtype = packet[53][0]
+    insecuremode = 'never'  # needed here for non-boot case to keep code simpler
     if isboot:
         insecuremode = cfd.get(node, {}).get('deployment.useinsecureprotocols',
             {}).get('value', 'never')
@@ -802,7 +803,7 @@ async def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, 
         relayipa = socket.inet_ntoa(relayip)
     gateway = None
     netmask = None
-    niccfg = await netutil.get_nic_config(cfg, node, ifidx=info['netinfo']['ifidx'], relayipn=relayip, onlyfamily=socket.AF_INET)
+    niccfg = await netutil.get_nic_config(cfg, node, ifidx=info['netinfo']['ifidx'], relayipn=relayip, onlyfamily=socket.AF_INET, mac=info.get('hwaddr'))
     nicerr = niccfg.get('error_msg', False)
     if nicerr:
         log.log({'error': nicerr})
@@ -977,6 +978,8 @@ async def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, 
         del staticassigns[fulladdr]
     if httpboot:
         boottype = 'HTTP'
+    elif packet.get(77, None) == b'iPXE':
+        boottype = 'iPXE'
     else:
         boottype = 'PXE'
     deferanswer = None
@@ -1043,7 +1046,7 @@ async def ack_request_full(pkt, rq, info, sock, requestor, hwaddr, addr):
         return # TODO(jjohnson2): Handle IPv6 requests
         #niccfg = await netutil.get_nic_config(cfg, node, ifidx=addr[-1], onlyfamily=socket.AF_INET6)
     else:
-        niccfg = await netutil.get_nic_config(cfg, node, ifidx=info['netinfo']['ifidx'], onlyfamily=socket.AF_INET)
+        niccfg = await netutil.get_nic_config(cfg, node, ifidx=info['netinfo']['ifidx'], onlyfamily=socket.AF_INET, mac=hwaddr)
     leasetime = niccfg.get('lease_time')
     if not leasetime:
         return  # ignore open ended requests when we don't have lease_time
