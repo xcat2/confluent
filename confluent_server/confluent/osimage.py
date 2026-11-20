@@ -1323,7 +1323,7 @@ async def generate_stock_profiles(defprofile, distpath, targpath, osname,
         os.symlink(distpath, '{0}/distribution'.format(dirname))
         await util.check_call(
             'sh', '{0}/initprofile.sh'.format(dirname),
-             targpath, dirname)
+             targpath, dirname, preexec_fn=relax_umask)
         bootupdates.append(tasks.spawn_task(update_boot(dirname, True)))
         profilelist.append(profname)
     for upd in bootupdates:
