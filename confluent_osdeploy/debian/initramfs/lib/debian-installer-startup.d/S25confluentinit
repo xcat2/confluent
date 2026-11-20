@@ -10,8 +10,8 @@ reverse_uuid() {
     echo $1 | tail -c 18 | sed -e s/-//
 }
 setdebopt() {
-    debconf-set $1 $2
-    echo d-i $1 $3 $2 >> /preseed.cfg
+    debconf-set "$1" "$2"
+    echo "d-i $1 $3 $2" >> /preseed.cfg
 }
 
 mkdir -p /etc/confluent
@@ -78,16 +78,28 @@ if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
             done
         done
         #TODO: nameservers
-    elif [ "$v4cfgmeth" = "dhcp" ]; then
+    elif [ "$autoconfigmethod" = "dhcp" ]; then
         setdebopt netcfg/disable_dhcp false boolean
         setdebopt netcfg/confirm_static false boolean
-        for NICGUESS in $(ip link|grep LOWER_UP|grep -v LOOPBACK|cut -d ' ' -f 2 | sed -e 's/:$//'); do
-            udhcpc $NICGUESS
-        done
-        for dsrv in $deploysrvs; do
-            if wget https://$dsrv/confluent-public/ --tries=1 --timeout=1 -O /dev/null > /dev/null 2>&1; then
-                deploysrvs=$dsrv
-            fi
+        NIC=""
+        while [ -z "$NIC" ]; do
+            for NICGUESS in $(ip link|grep LOWER_UP|grep -v LOOPBACK|cut -d ' ' -f 2 | sed -e 's/:$//'); do
+                if udhcpc -i $NICGUESS -t 2 -T 2 -n -q; then
+                    for dsrv in $deploysrvs; do
+                        if wget https://$dsrv/confluent-public/ --tries=1 --timeout=1 -O /dev/null > /dev/null 2>&1; then
+                            deploysrvs=$dsrv
+                            NIC=$NICGUESS
+                            setdebopt netcfg/choose_interface $NIC select
+                            break
+                        fi
+                    done
+                fi
+                if [ -z "$NIC" ]; then
+                    ip -4 a flush dev $NICGUESS
+                else
+                    break
+                fi
+            done
         done
     fi
     mgr=$deploysrvs
@@ -156,9 +168,9 @@ cd $predir
 cp /etc/confluent/deploycfg /etc/confluent/confluent.deploycfg
 profile=$(grep ^profile: /etc/confluent/deploycfg|cut -d ' ' -f 2)
 namesrvs=$(sed -n '/^nameservers:/,/^[^-]/p' /etc/confluent/deploycfg|grep ^- | cut -d ' ' -f 2|sed -e 's/ //')
-for namesrv in "$namesrvs"; do
-    setdebopt netcfg/get_nameservers $namesrv string
-done
+if [ -n "$namesrvs" ]; then
+    setdebopt netcfg/get_nameservers "$(echo $namesrvs)" string
+fi
 rootpass=$(grep ^rootpassword: /etc/confluent/deploycfg|cut -d ' ' -f 2|sed -e 's/ //')
 if [ "$rootpass" = null ] || [ -z "$rootpass" ]; then
     setdebopt passwd/root-login false boolean
@@ -168,10 +180,11 @@ else
 fi
 setdebopt time/zone $(grep ^timezone: /etc/confluent/deploycfg|cut -d ' ' -f 2|sed -e 's/ //') string
 ntpsrvs=$(sed -n '/^ntpservers:/,/^[^-]/p' /etc/confluent/deploycfg|grep ^- | cut -d ' ' -f 2|sed -e 's/ //')
-for ntpsrv in "$ntpsrvs"; do
+ntpsrv=$(echo $ntpsrvs | cut -d ' ' -f 1)
+if [ -n "$ntpsrv" ]; then
     setdebopt clock-setup/ntp true boolean
     setdebopt clock-setup/ntp-server $ntpsrv string
-done
+fi
 setdebopt debian-installer/locale $(grep ^locale: /etc/confluent/deploycfg|cut -d ' ' -f 2) select
 domainname=$(grep ^dnsdomain: /etc/confluent/deploycfg|cut -d ' ' -f 2)
 if [ ! -z "$domainname" ] && [ "$domainname" != "null" ] && [ "$domainname" != "''" ]; then
@@ -225,10 +238,10 @@ if [ ! -e /dev/disk/by-label/CNFLNT_IDNT ]; then
             setdebopt netcfg/get_gateway $v4gw string
         fi
         namesrvs=$(sed -n '/^nameservers:/,/^[^-]/p' /etc/confluent/deploycfg|grep ^- | cut -d ' ' -f 2|sed -e 's/ //')
-        for namesrv in "$namesrvs"; do
-            setdebopt netcfg/get_nameservers $namesrv string
-        done
-    elif [ "$vpcfgmeth" = "dhcp" ]; then
+        if [ -n "$namesrvs" ]; then
+            setdebopt netcfg/get_nameservers "$(echo $namesrvs)" string
+        fi
+    elif [ "$v4cfgmeth" = "dhcp" ]; then
         setdebopt netcfg/disable_dhcp false boolean
         setdebopt netcfg/confirm_static false boolean
     fi
