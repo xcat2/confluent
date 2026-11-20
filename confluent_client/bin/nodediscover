@@ -52,7 +52,7 @@ columnmapping = {
 async def register_endpoint(options, session, addr):
     neednewline = False
     current = 0
-    total = 0
+    total: int = 0
     if options.node:
         async for rsp in session.update('/discovery/register', {'noderange': options.node}):
             if 'created' in rsp:
