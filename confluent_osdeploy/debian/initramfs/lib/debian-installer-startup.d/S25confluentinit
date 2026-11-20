@@ -78,16 +78,28 @@ if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
             done
         done
         #TODO: nameservers
-    elif [ "$v4cfgmeth" = "dhcp" ]; then
+    elif [ "$autoconfigmethod" = "dhcp" ]; then
         setdebopt netcfg/disable_dhcp false boolean
         setdebopt netcfg/confirm_static false boolean
-        for NICGUESS in $(ip link|grep LOWER_UP|grep -v LOOPBACK|cut -d ' ' -f 2 | sed -e 's/:$//'); do
-            udhcpc $NICGUESS
-        done
-        for dsrv in $deploysrvs; do
-            if wget https://$dsrv/confluent-public/ --tries=1 --timeout=1 -O /dev/null > /dev/null 2>&1; then
-                deploysrvs=$dsrv
-            fi
+        NIC=""
+        while [ -z "$NIC" ]; do
+            for NICGUESS in $(ip link|grep LOWER_UP|grep -v LOOPBACK|cut -d ' ' -f 2 | sed -e 's/:$//'); do
+                if udhcpc -i $NICGUESS -t 2 -T 2 -n -q; then
+                    for dsrv in $deploysrvs; do
+                        if wget https://$dsrv/confluent-public/ --tries=1 --timeout=1 -O /dev/null > /dev/null 2>&1; then
+                            deploysrvs=$dsrv
+                            NIC=$NICGUESS
+                            setdebopt netcfg/choose_interface $NIC select
+                            break
+                        fi
+                    done
+                fi
+                if [ -z "$NIC" ]; then
+                    ip -4 a flush dev $NICGUESS
+                else
+                    break
+                fi
+            done
         done
     fi
     mgr=$deploysrvs
@@ -210,7 +222,7 @@ if [ ! -e /dev/disk/by-label/CNFLNT_IDNT ]; then
         for namesrv in "$namesrvs"; do
             setdebopt netcfg/get_nameservers $namesrv string
         done
-    elif [ "$vpcfgmeth" = "dhcp" ]; then
+    elif [ "$v4cfgmeth" = "dhcp" ]; then
         setdebopt netcfg/disable_dhcp false boolean
         setdebopt netcfg/confirm_static false boolean
     fi
