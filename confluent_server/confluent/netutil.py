@@ -594,18 +594,24 @@ def add_netmask(ncfg):
 async def get_full_net_config(configmanager, node, serverip=None):
     cfd = configmanager.get_node_attributes(node, ['net.*'])
     cfd = cfd.get(node, {})
-    bmc = configmanager.get_node_attributes(
-        node, 'hardwaremanagement.manager').get(node, {}).get(
-            'hardwaremanagement.manager', {}).get('value', None)
+    bmcattribs = configmanager.get_node_attributes(node, 'hardwaremanagement.manager*').get(node, {})
+    bmc = bmcattribs.get('hardwaremanagement.manager', {}).get('value', None)
+    bmcname = bmcattribs.get('hardwaremanagement.manager_tls_name', {}).get('value', None)
     bmc4 = None
+    bmc4name = None
     bmc6 = None
+    bmc6name = None
     if bmc:
         try:
             bmc4 = (await asyncio.get_running_loop().getaddrinfo(bmc, 0, family=socket.AF_INET, type=socket.SOCK_DGRAM))[0][-1][0]
+            if bmcname:
+                bmc4name = (await asyncio.get_running_loop().getaddrinfo(bmcname, 0, family=socket.AF_INET, type=socket.SOCK_DGRAM))[0][-1][0]
         except Exception:
             pass
         try:
             bmc6 = (await asyncio.get_running_loop().getaddrinfo(bmc, 0, family=socket.AF_INET6, type=socket.SOCK_DGRAM))[0][-1][0]
+            if bmcname:
+                bmc6name = (await asyncio.get_running_loop().getaddrinfo(bmcname, 0, family=socket.AF_INET6, type=socket.SOCK_DGRAM))[0][-1][0]
         except Exception:
             pass
     attribs = {}
@@ -642,8 +648,15 @@ async def get_full_net_config(configmanager, node, serverip=None):
         if bmc4 and nm.myattribs[iface].get('ipv4_address', None) == bmc4:
             del nm.myattribs[iface]
             continue
+        if bmc4name and nm.myattribs[iface].get('ipv4_address', None) == bmc4name:
+            del nm.myattribs[iface]
+            continue
         if bmc6 and nm.myattribs[iface].get('ipv6_address', None) == bmc6:
             del nm.myattribs[iface]
+            continue
+        if bmc6name and nm.myattribs[iface].get('ipv6_address', None) == bmc6name:
+            del nm.myattribs[iface]
+            continue
     retattrs = {}
     if None in nm.myattribs:
         retattrs['default'] = nm.myattribs[None]
@@ -754,19 +767,27 @@ async def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
             clientipn = socket.inet_pton(clientfam, clientip)
     nodenetattribs = configmanager.get_node_attributes(
         node, 'net*').get(node, {})
-    bmc = configmanager.get_node_attributes(
-        node, 'hardwaremanagement.manager').get(node, {}).get('hardwaremanagement.manager', {}).get('value', None)
+    nodebmcattribs = configmanager.get_node_attributes(
+        node, 'hardwaremanagement.manager*').get(node, {})
+    bmc = nodebmcattribs.get('hardwaremanagement.manager', {}).get('value', None)
+    bmcname = nodebmcattribs.get('hardwaremanagement.manager_tls_name', {}).get('value', None)
     bmc4 = None
+    bmc4name = None
     bmc6 = None
+    bmc6name = None
     if bmc:
         try:
             if onlyfamily in (0, socket.AF_INET):
                 bmc4 = (await asyncio.get_running_loop().getaddrinfo(bmc, 0, family=socket.AF_INET, type=socket.SOCK_DGRAM))[0][-1][0]
+                if bmcname:
+                    bmc4name = (await asyncio.get_running_loop().getaddrinfo(bmcname, 0, family=socket.AF_INET, type=socket.SOCK_DGRAM))[0][-1][0]
         except Exception:
             pass
         try:
             if onlyfamily in (0, socket.AF_INET6):
                 bmc6 = (await asyncio.get_running_loop().getaddrinfo(bmc, 0, family=socket.AF_INET6, type=socket.SOCK_DGRAM))[0][-1][0]
+                if bmcname:
+                    bmc6name = (await asyncio.get_running_loop().getaddrinfo(bmcname, 0, family=socket.AF_INET6, type=socket.SOCK_DGRAM))[0][-1][0]
         except Exception:
             pass
     cfgbyname = {}
@@ -883,7 +904,11 @@ async def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
                 if candip:
                     if bmc4 and candip == bmc4:
                         continue
+                    if bmc4name and candip == bmc4name:
+                        continue
                     if bmc6 and candip == bmc6:
+                        continue
+                    if bmc6name and candip == bmc6name:
                         continue
                     try:
                         for inf in await asyncio.get_running_loop().getaddrinfo(candip, 0, family=fam, type=socket.SOCK_STREAM):
