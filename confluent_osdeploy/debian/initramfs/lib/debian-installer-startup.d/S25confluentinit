@@ -158,8 +158,10 @@ for ntpsrv in "$ntpsrvs"; do
 done
 setdebopt debian-installer/locale $(grep ^locale: /etc/confluent/deploycfg|cut -d ' ' -f 2) select
 domainname=$(grep ^dnsdomain: /etc/confluent/deploycfg|cut -d ' ' -f 2)
-if [ ! -z "$domainname" ] && [ "$domainname" != "null" ]; then
+if [ ! -z "$domainname" ] && [ "$domainname" != "null" ] && [ "$domainname" != "''" ]; then
     setdebopt netcfg/get_domain $domainname string
+else
+    setdebopt netcfg/get_domain "" string
 fi
 
 
