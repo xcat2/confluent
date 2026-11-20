@@ -110,10 +110,26 @@ else
     for nic in $(ip link | grep mtu|grep -v LOOPBACK|cut -d: -f 2|sed -e 's/ //'); do
         ip link set $nic up
     done
+    # For routed deployment, where SSDP cannot reach the server
+    confluentsrv=$(sed -n 's/.*confluent=\([^ ]*\).*/\1/p' /proc/cmdline)
+    myids=uuid=$(cat /sys/devices/virtual/dmi/id/product_uuid)
+    for mac in $(ip link | grep link/ether | sed -e 's/.*link\/ether //' -e 's/ .*//'); do
+        myids=$myids/mac=$mac
+    done
     nic=
     while [ -z "$nic" ]; do
         for nic in $(ip link | grep mtu|grep -v LOOPBACK|grep LOWER_UP|cut -d: -f 2|sed -e 's/ //'); do
             if udhcpc -i $nic -p $dhcpid -t 2 -T 2 -n -x 93:0007 -x 97:00$dhuuid -q; then
+                if [ -n "$confluentsrv" ]; then
+                    myname=$(wget --header="CONFLUENT_IDS: $myids" https://$confluentsrv/confluent-api/self/whoami --tries=1 --timeout=5 -O - --quiet)
+                    if [ -n "$myname" ]; then
+                        echo NODENAME: $myname > /etc/confluent/confluent.info
+                        echo MANAGER: $confluentsrv >> /etc/confluent/confluent.info
+                        echo EXTMGRINFO: $confluentsrv'||1' >> /etc/confluent/confluent.info
+                        break
+                    fi
+                    echo "Unable to identify this node through confluent=$confluentsrv on $nic"
+                fi
                 /opt/confluent/bin/copernicus > /etc/confluent/confluent.info
                 if grep ^MANAGER:.*\\. /etc/confluent/confluent.info ; then
                     break
