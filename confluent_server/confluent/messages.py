@@ -1861,6 +1861,7 @@ class Disk(ConfluentMessage):
     ])
     state_aliases = {
         'unconfigured bad': 'fault',
+        'unconfiguredbad': 'fault',
         'unconfigured good': 'unconfigured',
         '(foreign) unconfigured good': 'foreign',
         'unconfiguredgood': 'unconfigured',
