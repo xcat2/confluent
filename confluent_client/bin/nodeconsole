@@ -709,10 +709,14 @@ def determine_tile_size(numnodes):
     # then we don't know how much to move the cursor left after draw_image
     # Konsole won't scale at all with only partial scaling specified
     directed = direct_console()
-    cheight, cwidth, pixwidth, pixheight = sq.get_screengeom(escfallback=True)
+    cheight, cwidth, pixwidth, pixheight = sq.get_screengeom(escfallback=False)
     if directed:
         indirect_console()
     # 16:12 is to roughly account for the 'titles' of the tiles
+    if pixwidth < cwidth * 8:
+        pixwidth = cwidth * 8
+    if pixheight < cheight * 16:
+        pixheight = cheight * 16
     ratio = (pixwidth / 16) / (pixheight / 12)
     bestdeviation = None
     bestdims = []
@@ -795,11 +799,17 @@ def cursor_show():
 
 def get_pix_dimensions(width, height):
     directed = direct_console()
-    cheight, cwidth, pixwidth, pixheight = sq.get_screengeom(escfallback=True)
+    cheight, cwidth, pixwidth, pixheight = sq.get_screengeom(escfallback=False)
     if directed:
         indirect_console()
-    imgwidth = int(pixwidth / cwidth * width)
-    imgheight = int(pixheight / cheight * height)
+    cellwidth = pixwidth / cwidth
+    cellheight = pixheight / cheight
+    if cellwidth < 8:
+        cellwidth = 8
+    if cellheight < 16:
+        cellheight = 16
+    imgwidth = int(cellwidth * width)
+    imgheight = int(cellheight * height)
     return imgwidth, imgheight
 
 def draw_text(text, width, height):
@@ -862,6 +872,9 @@ def draw_image(bindata, width, height, doscale=True, node=None):
         else:
             rzwidth = int(img.width * vscalefact)
             rzheight = imgheight
+        if rzwidth < 32 or rzheight < 20:
+            rzwidth = 32
+            rzheight = 20
         if node is not None:
             imagegeometrybynode[node] = (canvaswidth, canvasheight, rzwidth, rzheight, width, height)
         img = img.resize((rzwidth, rzheight))
