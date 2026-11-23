@@ -142,6 +142,8 @@ async def send_grant(conn, nodename, rqtype):
             'secret.hardwaremanagementpassword', {}).get('value', None)
         host = c.get(nodename, {}).get(
             'hardwaremanagement.manager', {}).get('value', None)
+        if host:
+            host = host.split('/', 1)[0]
         if bmcuser and bmcpass and host:
             kv = util.TLSCertVerifier(cfg, nodename,
                                     'pubkeys.tls_hardwaremanager').verify_cert

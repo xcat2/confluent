@@ -296,7 +296,7 @@ class ConfluentResourceUnavailable(ConfluentNodeError):
     defaulterror = 'Unavailable'
 
     def strip_node(self, node):
-        raise exc.TargetResourceUnavailable()
+        raise exc.TargetResourceUnavailable(self.error)
 
 
 class ConfluentTargetTimeout(ConfluentNodeError):

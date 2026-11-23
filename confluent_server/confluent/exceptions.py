@@ -122,7 +122,7 @@ class GlobalConfigError(ConfluentException):
 class TargetResourceUnavailable(ConfluentException):
     # This is meant for scenarios like asking to read a sensor that is
     # currently unavailable.  This may be a persistent or transient state
-    apierrocode = 503
+    apierrorcode = 503
     _apierrorstr = 'Target Resource Unavailable'
 
 class PubkeyInvalid(ConfluentException):
