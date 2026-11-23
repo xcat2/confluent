@@ -17,6 +17,9 @@ as stderr, unlike psh which combines all stdout and stderr into stdout.
 * `-c COUNT`, `-f COUNT`, `--count=COUNT`
   Specify the maximum number of instances to run concurrently
 
+* `-e ENVVAR`, `--environmentpassword=ENVVAR`
+  Environment variable containing the password to use for ssh
+
 * `-l LOGINNAME`, `--loginname=LOGINNAME`
   Username to use when connecting, defaults to current user.
 
@@ -39,6 +42,9 @@ as stderr, unlike psh which combines all stdout and stderr into stdout.
 
 * `-t TIMEOUT`, `--timeout=TIMEOUT`
   Timeout in seconds for each node ssh connection attempt
+
+* `-x`, `--noexpression`
+  Suppress confluent attribute expression expansion of the command
 
 ## EXAMPLES
 

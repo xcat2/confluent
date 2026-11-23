@@ -107,6 +107,16 @@ class GeistClient(object):
             )
             self._token = None
 
+    async def get_outlet_ids(self):
+        rsp = await self.wc.grab_json_response('/api/dev')
+        dbt = data_by_type(rsp['data'])
+        if 't3hd' in dbt:
+            del dbt['t3hd']
+        if len(dbt) != 1:
+            raise Exception('Multiple PDUs not supported per pdu')
+        pdutype = list(dbt)[0]
+        return sorted(int(idx) + 1 for idx in dbt[pdutype].get('outlet', {}))
+
     async def get_outlet(self, outlet):
         rsp = await self.wc.grab_json_response('/api/dev')
         rsp = rsp['data']
@@ -238,6 +248,12 @@ async def read_sensors(element, node, configmanager):
         return msg.SensorReadings(readings, name=node)
 
 
+async def list_outlets(node, configmanager):
+    gc = GeistClient(node, configmanager)
+    for idx in await gc.get_outlet_ids():
+        yield msg.ChildCollection(str(idx))
+
+
 async def get_outlet(element, node, configmanager):
     gc = GeistClient(node, configmanager)
     state = await gc.get_outlet(element[-1])
@@ -302,6 +318,11 @@ async def read_inventory(element, node, configmanager):
 async def retrieve(nodes, element, configmanager, inputdata):
 
     if 'outlets' in element:
+        if element[-1] == 'outlets':
+            for node in nodes:
+                async for res in list_outlets(node, configmanager):
+                    yield res
+            return
         gp = tasks.TaskPile(pdupool)
         for node in nodes:
             gp.spawn(get_outlet, element, node, configmanager)

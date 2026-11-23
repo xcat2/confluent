@@ -776,9 +776,11 @@ async def _recheck_nodes_backend(nodeattribs, configmanager):
             continue
     # now we go through ones that were identified, but could not pass
     # policy or hadn't been able to verify key
-    for nodename in pending_nodes:
+    for nodename in list(pending_nodes):
         await asyncio.sleep(0)
-        info = pending_nodes[nodename]
+        info = pending_nodes.get(nodename, None)
+        if info is None:
+            continue
         try:
             if info['handler'] is None:
                 continue
