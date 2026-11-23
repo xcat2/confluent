@@ -386,6 +386,17 @@ class ConsoleHandler(object):
                 self._console = cns
         except (exc.NotImplementedException, exc.NotFoundException):
             self._console = None
+        except exc.ConfluentException as e:
+            # expected errors are shown in the console, no trace needed
+            strerror = exc.exc_text(e)
+            if (e.apierrorcode == 500 and
+                    not isinstance(e, exc.LockedCredentials)):
+                if _tracelog:
+                    _tracelog.log(traceback.format_exc(),
+                                  ltype=log.DataTypes.event,
+                                  event=log.Events.stacktrace)
+                else:
+                    print(traceback.format_exc())
         except Exception as e:
             strerror = str(e)
             if _tracelog:

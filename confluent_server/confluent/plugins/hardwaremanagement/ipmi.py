@@ -290,7 +290,7 @@ _configattributes = ('secret.hardwaremanagementuser',
                      'secret.ipmikg', 'hardwaremanagement.manager')
 
 
-def _donothing(data):
+async def _donothing(data):
     # a dummy function to avoid some awkward exceptions from
     # zombie pyghmi console objects
     pass

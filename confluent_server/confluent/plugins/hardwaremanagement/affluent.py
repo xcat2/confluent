@@ -45,7 +45,8 @@ class WebClient(object):
                 'target certificate fingerprint and '
                 'pubkeys.tls_hardwaremanager attribute'))
             return {}
-        except (socket.gaierror, socket.herror, TimeoutError) as e:
+        except (socket.gaierror, socket.herror, TimeoutError,
+                asyncio.TimeoutError) as e:
             results.put_nowait(
                 msg.ConfluentTargetTimeout(self.node, exc.exc_text(e)))
             return {}
@@ -152,7 +153,8 @@ async def retrieve(nodes, element, configmanager, inputdata):
                 if datum:
                     yield datum
                 datum = results.get_nowait()
-        except asyncio.QueueEmpty:
+        except (asyncio.QueueEmpty, asyncio.TimeoutError):
+            # nothing new yet, keep waiting
             pass
         await asyncio.sleep(0)
         for t in list(workers):

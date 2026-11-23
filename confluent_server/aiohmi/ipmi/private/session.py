@@ -660,11 +660,13 @@ class Session(object):
             await self._mark_broken(parameter['error'])
         elif self.onlogpayload:
             await self._cmdwait()
+            # payload may have been sent, dropped or requeued meanwhile
             payload = self.onlogpayload
-            payload_type = self.onlogpayloadtype
-            self.incommand = _monotonic_time() + self._getmaxtimeout()
-            self.onlogpayload = None
-            await self.send_payload(payload, payload_type)
+            if payload and self.logged:
+                payload_type = self.onlogpayloadtype
+                self.incommand = _monotonic_time() + self._getmaxtimeout()
+                self.onlogpayload = None
+                await self.send_payload(payload, payload_type)
         while self.logonwaiters:
             waiter = self.logonwaiters.pop()
             waiter(parameter)

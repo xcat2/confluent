@@ -1335,7 +1335,8 @@ class MediaImporter(object):
     async def init(self, media, cfm=None, customname=None, checkonly=False):
         self.worker = None
         if not os.path.exists('/var/lib/confluent/public'):
-            raise Exception('`osdeploy initialize` must be executed before importing any media')
+            raise exc.InvalidArgumentException(
+                '`osdeploy initialize` must be executed before importing any media')
         self.profiles = []
         self.errors = []
         medfile = None
