@@ -214,7 +214,7 @@ def set_extra_text(text):
     redraw()
 
 inhandler = None
-def clean_exit():
+def clean_exit(exitcode=0):
     sys.stdout.write('\x1b[?1006l')  # Disable SGR extended mode for mouse
     sys.stdout.write('\x1b[?1003l')  # Disable mouse movement tracking
     sys.stdout.write('\x1b[?1000l')  # Disable mouse click tracking
@@ -223,7 +223,7 @@ def clean_exit():
     if inhandler:
         # consume pending mouse actions rather than inflicting them on the prompt
         inhandler.drain_input()
-    sys.exit(0)
+    sys.exit(exitcode)
 
 async def watch_input():
     global focustext
@@ -303,9 +303,12 @@ class InputHandler:
         self.pendinginput.put_nowait(data)
 
     def drain_input(self):
-        asyncio.get_running_loop().remove_reader(self.fd)
-        while select.select([self.fd], [], [], 0.5)[0]:
-            os.read(self.fd, 1)
+        try:
+            asyncio.get_running_loop().remove_reader(self.fd)
+            while select.select([self.fd], [], [], 0.5)[0]:
+                os.read(self.fd, 1)
+        except Exception as e:
+            pass
 
     async def consume_input(self):
         # One consumer, so a keystroke that blocks relaying cannot be overtaken
@@ -1113,7 +1116,7 @@ async def do_screenshot():
                     doexit = 1
                 vnconly.add(node)
         if doexit:
-            sys.exit(1)
+            asyncio.get_running_loop().call_soon(clean_exit, 1)
     while dorefresh:
         if not streaming:
             async for res in sess.read('/noderange/{}/console/ikvm_screenshot'.format(args[0])):
@@ -1148,7 +1151,6 @@ async def do_screenshot():
         else:
             dorefresh = True
             await asyncio.sleep(options.interval)
-    sys.exit(0)
 
 async def grab_vncs(urlbynode):
     global streaming
@@ -1432,7 +1434,7 @@ if options.screenshot or options.video:
         cursor_show()
         cursor_down(numrows)
         sys.stdout.write('\n')
-    sys.exit(0)
+        clean_exit(0)
 
 async def kill(noderange):
     sess = client.Command()
