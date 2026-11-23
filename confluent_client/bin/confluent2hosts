@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/python3
 import argparse
 import os
 import re
@@ -128,7 +128,14 @@ def main():
     ap.add_argument('-i', '--ip', help='Expression to generate addresses (e.g. 172.16.1.{n1} or fd2b:246f:8a50::{n1:x})')
     ap.add_argument('-n', '--name', help='Expression for name to add ({node}-compute, etc). If unspecified, "{node} {node}.{dns.domain}" will be used', action='append')
     ap.add_argument('-f', '--fqdn-first', help='Put the FQDN first in the hosts entries', action='store_true')
+    ap.add_argument('-s', '--skip-nets', help='Network name(s) to skip when using -a, comma delimited, may be specified multiple times', action='append')
     args = ap.parse_args()
+    skipnets = set()
+    for skipent in args.skip_nets or ():
+        skipnets.update(x.strip() for x in skipent.split(',') if x.strip())
+    if skipnets and not args.attrib:
+        sys.stderr.write('-s/--skip-nets requires -a/--attrib\n')
+        sys.exit(1)
     c = client.Command()
     if args.name:
         names = ' '.join(args.name)
@@ -172,6 +179,8 @@ def main():
             mydomain = domainsbynode.get(node, None)
             for ipdb in (ip4bynode, ip6bynode):
                 for currnet in ipdb[node]:
+                    if currnet in skipnets:
+                        continue
                     if args.name:
                         sys.stderr.write('Custom name and attribute addresses not currently supported together\n')
                         sys.exit(1)
