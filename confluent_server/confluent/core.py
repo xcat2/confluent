@@ -543,6 +543,9 @@ def _init_core():
                     'pluginattrs': ['hardwaremanagement.method'],
                     'default': 'null',
                 }),
+                'redfish': {
+                    'all': PluginRoute({'handler': 'redfish'}),
+                },
                 'core': PluginCollection({
                     'pluginattrs': ['hardwaremanagement.method'],
                     'default': 'null',

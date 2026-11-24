@@ -1329,12 +1329,13 @@ class Command(object):
         proctype = procinfo.get('ProcessorType', None)
         return 'adapters' if proctype in self._acceleratortypes else 'core'
 
-    async def get_firmware(self, components=(), category=None):
+    async def get_firmware(self, components=(), category=None, allowoem=True):
         self._fwnamemap = {}
         oem = await self.oem()
         try:
-            async for firminfo in oem.get_firmware_inventory(components, self, category):
-                yield firminfo
+            if allowoem:
+                async for firminfo in oem.get_firmware_inventory(components, self, category):
+                    yield firminfo
         except exc.BypassGenericBehavior:
             return
         fwlist = await self._do_web_request(await self.get_fwinventory())
