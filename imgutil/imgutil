@@ -1,12 +1,14 @@
 #!/usr/bin/python3
 import asyncio
 import configparser
+import contextlib
 import ctypes
 import ctypes.util
 import datetime
 import enum
 import errno
 import inspect
+import io
 from shutil import copytree
 if hasattr(inspect, 'getfullargspec') and 'dirs_exist_ok' in inspect.getfullargspec(copytree).args:
     def copy_tree(src, dst):
@@ -20,6 +22,7 @@ import os
 import pwd
 import re
 import select
+import shlex
 import shutil
 import signal
 import stat
@@ -444,6 +447,189 @@ def capture_remote(args):
     print('Review {0} before deploying {1}'.format(os.path.join(outdir, 'profile.yaml'), profname))
 
 
+def remote_target(path):
+    """Split an rsync style host:/path scratch directory into (host, path),
+    return None for a local path"""
+    colon = path.find(':')
+    slash = path.find('/')
+    if colon < 0 or (0 <= slash < colon):
+        return None
+    host, rpath = path[:colon], path[colon + 1:]
+    if not host or host.startswith('-'):
+        raise ValueError('Invalid host in {0}'.format(path))
+    if rpath.startswith('/'):
+        rpath = os.path.normpath(rpath)
+    if not rpath.startswith('/') or not rpath.strip('/'):
+        raise ValueError('The directory on the remote host must be an absolute path '
+                         'other than /: {0}'.format(path))
+    return host, rpath
+
+
+def os_support_dirs():
+    """The per-OS directories that imgutil reads its package lists and
+    scripts from"""
+    mydir = os.path.dirname(os.path.realpath(__file__))
+    for libdir in (mydir, os.path.join(os.path.dirname(mydir), 'lib/imgutil'),
+                   '/opt/confluent/lib/imgutil'):
+        dirs = [x for x in glob.glob(os.path.join(glob.escape(libdir), '*'))
+                if os.path.isdir(x) and re.match(r'^(el|suse|ubuntu)', os.path.basename(x))]
+        if dirs:
+            return sorted(dirs)
+    raise Exception('Unable to find the imgutil OS support directories')
+
+
+def pkglist_files(listfile, found=None):
+    """The package list listfile and the files it includes, as far as they
+    exist on this system"""
+    if found is None:
+        found = []
+    listfile = os.path.abspath(listfile)
+    if listfile in found or not os.path.isfile(listfile):
+        return found
+    found.append(listfile)
+    with open(listfile) as listin:
+        for line in listin:
+            for token in line.split('#', 1)[0].split():
+                if token.startswith('<') and len(token) > 1:
+                    pkglist_files(os.path.join(os.path.dirname(listfile),
+                                               token[1:].rstrip('>')), found)
+    return found
+
+
+def replace_arg(parser, argv, dest, value, newvalue):
+    """Return argv with the token that sets value for dest replaced by
+    newvalue, another option or a command argument may have the same text"""
+    marker = 'imgutil-remote-marker'
+    # argv[0] is the subcommand
+    for idx, token in enumerate(argv[1:], 1):
+        # the value ends the token in -p value, -pvalue and --packagelist=value
+        if not token.endswith(value):
+            continue
+        prefix = token[:len(token) - len(value)]
+        if prefix and not (prefix.endswith('=') or (
+                len(prefix) > 1 and prefix[0] == '-' and prefix[1] != '-')):
+            continue
+        try:
+            with contextlib.redirect_stderr(io.StringIO()):
+                parsed = getattr(parser.parse_args(
+                    argv[:idx] + [prefix + marker] + argv[idx + 1:]), dest)
+        except SystemExit:
+            # the token was part of another option, e.g. -ys with value s
+            continue
+        if parsed == marker or (isinstance(parsed, list) and marker in parsed):
+            return argv[:idx] + [prefix + newvalue] + argv[idx + 1:]
+    raise Exception('Unable to find {0} in the arguments'.format(value))
+
+
+@contextlib.contextmanager
+def remote_env(host, files=()):
+    """Copy imgutil with its OS support directories to a temporary directory
+    on host, and files below its pkglists subdirectory with their full path,
+    yield the path of the copied imgutil"""
+    rdir = subprocess.check_output(
+        ['ssh', host, 'mkdir -p /run/imgutil && mktemp -d -p /run/imgutil remote.XXXXXX'],
+        stdin=subprocess.DEVNULL).decode('utf8').strip()
+    # the last line, a shell startup file of the host may print more
+    rdir = rdir.split('\n')[-1].strip()
+    if not re.match(r'^/run/imgutil/remote\.[A-Za-z0-9]+$', rdir):
+        raise Exception('Unexpected temporary directory on {0}: {1}'.format(host, rdir))
+    myself = os.path.realpath(__file__)
+    started = keep = False
+    try:
+        subprocess.check_call(
+            ['rsync', '-a', myself] + os_support_dirs() +
+            ['{0}:{1}/'.format(host, rdir)], stdin=subprocess.DEVNULL)
+        if files:
+            # -L: a list that is a symlink is copied as the file it points to
+            subprocess.check_call(['rsync', '-aRL'] + list(files) +
+                                  ['{0}:{1}/pkglists/'.format(host, rdir)],
+                                  stdin=subprocess.DEVNULL)
+        started = True
+        yield os.path.join(rdir, os.path.basename(myself))
+    except KeyboardInterrupt:
+        if started:
+            # without a tty the interrupt does not reach the remote command,
+            # which may still be running from rdir
+            sys.stderr.write('\nInterrupted, the command on {0} may keep running until it '
+                             'next writes output, {1} there is left in place\n'.format(host, rdir))
+            keep = True
+        else:
+            sys.stderr.write('\nInterrupted\n')
+        raise
+    finally:
+        if not keep and subprocess.call(['ssh', host, 'rm', '-rf', rdir], stdin=subprocess.DEVNULL):
+            sys.stderr.write('Warning: unable to remove {0} on {1}\n'.format(rdir, host))
+
+
+def run_remote(parser, args):
+    """Run this imgutil command on the host of the remote scratch directory,
+    return its exit code"""
+    host, rpath = args.remote
+    argv = replace_arg(parser, sys.argv[1:], 'scratchdir', args.scratchdir, rpath)
+    # package lists that exist here are used rather than paths on the host
+    pkglists = []
+    if args.subcommand == 'build':
+        for dest in ('packagelist', 'addpackagelist'):
+            values = getattr(args, dest)
+            for value in (values if isinstance(values, list) else [values]):
+                if value and os.path.isfile(value):
+                    pkglists.append((dest, value))
+    files = []
+    for _, value in pkglists:
+        pkglist_files(value, files)
+    try:
+        with remote_env(host, files) as rimgutil:
+            rcmd = ['python3', '-u', rimgutil]
+            if files:
+                shipped = os.path.join(os.path.dirname(rimgutil), 'pkglists')
+                for dest, value in pkglists:
+                    argv = replace_arg(parser, argv, dest, value,
+                                       shipped + os.path.abspath(value))
+                # absolute includes in them refer to the copies too
+                rcmd = ['env', 'IMGUTIL_PKGLISTS=' + shipped] + rcmd
+            sshcmd = ['ssh', '-o', 'LogLevel=ERROR']
+            # a tty for prompts and an interactive exec, not when output is piped
+            if sys.stdin.isatty() and sys.stdout.isatty():
+                sshcmd.append('-t')
+            rcmd = ' '.join(shlex.quote(x) for x in rcmd + argv)
+            exitcode = subprocess.call(sshcmd + [host, rcmd])
+    except KeyboardInterrupt:
+        # remote_env reported it
+        return 130
+    if exitcode < 0:
+        exitcode = 128 - exitcode
+    return exitcode
+
+
+def rsync_tree(source, dest):
+    """Copy the image tree source to dest, either may be host:/path"""
+    # SELinux labels are left out, the receiving system's policy may not
+    # know the types of the image, pack labels the tree with its own policy.
+    # The remote side needs the rule too, a receiver would otherwise try to
+    # remove the labels its policy gave the new files
+    xfilter = '--filter=-x security.selinux'
+    cmd = ['rsync', '-asHAX', '--numeric-ids', xfilter, '-M' + xfilter]
+    if sys.stdout.isatty():
+        cmd.append('--info=progress2')
+    subprocess.check_call(cmd + [source.rstrip('/') + '/', dest.rstrip('/') + '/'],
+                          stdin=subprocess.DEVNULL)
+
+
+def prepare_remote_target(host, rpath):
+    """Exit unless rpath on host is missing or an empty directory, and
+    create its parent directory"""
+    script = ('if [ -L {0} ] || {{ [ -e {0} ] && ! {{ [ -d {0} ] && [ -z "$(ls -A {0})" ]; }}; }}; '
+              'then exit 3; fi; mkdir -p {1}').format(
+        shlex.quote(rpath), shlex.quote(os.path.dirname(rpath)))
+    rc = subprocess.call(['ssh', host, script], stdin=subprocess.DEVNULL)
+    if rc == 3:
+        sys.stderr.write('{0}:{1} exists and is not an empty directory\n'.format(host, rpath))
+        sys.exit(1)
+    elif rc:
+        sys.stderr.write('Unable to prepare {0}:{1}\n'.format(host, rpath))
+        sys.exit(1)
+
+
 # Processes the initramfs starts before the policy loads keep kernel_t:
 # urlmount serves the root image of a tethered node over https, and
 # imageboot.sh later runs dd from the initramfs
@@ -784,8 +970,18 @@ class OsHandler(object):
                 subfilename = pkg[1:]
                 if subfilename[-1] == '>':
                     subfilename = subfilename[:-1]
-                if subfilename[0] != '/':
-                    subfilename = os.path.join(os.path.dirname(pkglistfile), subfilename)
+                subfilename = os.path.join(os.path.dirname(pkglistfile), subfilename)
+                shipped = os.environ.get('IMGUTIL_PKGLISTS')
+                if shipped:
+                    # lists copied from the management host for a remote build,
+                    # an include not copied is looked up on this host. The
+                    # copies are below normalized paths
+                    subfilename = os.path.normpath(subfilename)
+                    if subfilename.startswith(shipped + '/'):
+                        if not os.path.isfile(subfilename):
+                            subfilename = subfilename[len(shipped):]
+                    elif os.path.isfile(shipped + subfilename):
+                        subfilename = shipped + subfilename
                 retpkgs.extend(self.list_packages(subfilename))
             else:
                 retpkgs.append(pkg)
@@ -1675,7 +1871,7 @@ def main():
     sps = parser.add_subparsers(dest='subcommand')
     buildp = sps.add_parser('build', help='Build a new diskless image from scratch')
     buildp.add_argument('-r', '--addrepos', help='Repositories to add in addition to the main source', default=[], action='append')
-    buildp.add_argument('-p', '--packagelist', help='Filename of package list to replace default pkglist', default='')
+    buildp.add_argument('-p', '--packagelist', help='Filename of package list to replace default pkglist. For a build on another host, a package list on this system is copied there with the lists it includes', default='')
     buildp.add_argument('-a', '--addpackagelist', action='append', default=[],
                         help='A list of additional packages to include, may be specified multiple times')
     buildp.add_argument('-s', '--source', help='Directory to pull installation from, typically a subdirectory of /var/lib/confluent/distributions. By default, the repositories for the build system are used.  For Ubuntu, a distribution directory is not supported, the build system repositories are always used. '
@@ -1699,7 +1895,8 @@ def main():
     buildp.add_argument('-k', '--kernel', default=None,
                         help='Kernel version uname and /proc report in the image, by default the newest kernel '
                              'in the image, "host" for the kernel of this system')
-    buildp.add_argument('scratchdir', help='Directory to build new diskless root in, or with --containerfile the file to write, - for standard output')
+    buildp.add_argument('scratchdir', help='Directory to build new diskless root in, or with --containerfile the file to write, - for standard output. '
+                        'host:/path builds on that host over ssh, paths in the other options are then paths on that host')
     execp = sps.add_parser('exec', help='Start specified scratch directory as container')
     execp.add_argument('-v', '--volume',
         help='Directory to make available in the build environment.  -v / will '
@@ -1708,13 +1905,13 @@ def main():
     execp.add_argument('-k', '--kernel', default=None,
                        help='Kernel version uname and /proc report in the image, by default the newest kernel '
                             'in the image, "host" for the kernel of this system')
-    execp.add_argument('scratchdir', help='Directory of an unpacked diskless root')
+    execp.add_argument('scratchdir', help='Directory of an unpacked diskless root, host:/path for one on another host')
     execp.add_argument('cmd', nargs='*', help='Optional command to run (defaults to a shell)')
     unpackp = sps.add_parser('unpack', help='Unpack a diskless image to a scratch directory')
     unpackp.add_argument('profilename', help='The diskless OS profile to unpack')
-    unpackp.add_argument('scratchdir', help='Directory to extract diskless root to')
+    unpackp.add_argument('scratchdir', help='Directory to extract diskless root to, host:/path to copy it to another host, which must not exist or be empty')
     packp = sps.add_parser('pack', help='Pack a scratch directory to a diskless profile')
-    packp.add_argument('scratchdir', help='Directory containing diskless root')
+    packp.add_argument('scratchdir', help='Directory containing diskless root, host:/path to copy it from another host first')
     packp.add_argument('profilename', help='The desired diskless OS profile name to pack the root into')
     packp.add_argument('-b', '--baseprofile', help='Profile to copy extra info from, for example to make a new version of an existing profile, reference the previous one as baseprofile', default=None)
     packp.add_argument('-u', '--unencrypted', help='Pack an unencrypted image rather than encrypting', action='store_true')
@@ -1722,12 +1919,37 @@ def main():
     capturep.add_argument('node', help='Node to capture image from')
     capturep.add_argument('profilename', help='Profile name for captured image')
     args = parser.parse_args()
-    if hasattr(args, 'scratchdir') and args.scratchdir and not (
-            getattr(args, 'containerfile', False) and args.scratchdir == '-'):
-        args.scratchdir = os.path.abspath(args.scratchdir)
     if not args or not args.subcommand:
         parser.print_usage()
         sys.exit(1)
+    args.remote = None
+    # the file --containerfile writes is always local
+    if getattr(args, 'scratchdir', None) and not getattr(args, 'containerfile', False):
+        try:
+            args.remote = remote_target(args.scratchdir)
+        except ValueError as e:
+            sys.stderr.write('{0}\n'.format(e))
+            sys.exit(1)
+    if args.remote:
+        exitcode = 0
+        try:
+            if args.subcommand in ('build', 'exec'):
+                exitcode = run_remote(parser, args)
+            elif args.subcommand == 'pack':
+                pack_image(args)
+            else:
+                unpack_image(args)
+        except KeyboardInterrupt:
+            sys.stderr.write('\nInterrupted\n')
+            exitcode = 130
+        except subprocess.CalledProcessError as e:
+            cmd = e.cmd if isinstance(e.cmd, str) else ' '.join(shlex.quote(x) for x in e.cmd)
+            sys.stderr.write('Failed with exit code {0}: {1}\n'.format(e.returncode, cmd))
+            exitcode = 1
+        sys.exit(exitcode)
+    elif getattr(args, 'scratchdir', None) and not (
+            getattr(args, 'containerfile', False) and args.scratchdir == '-'):
+        args.scratchdir = os.path.abspath(args.scratchdir)
     if args.subcommand == 'build':
         if (args.apptainer or args.base) and not args.containerfile:
             sys.stderr.write('--apptainer and --from require --containerfile\n')
@@ -2567,13 +2789,42 @@ def prep_decrypt(indir):
     return '/dev/mapper/{0}'.format(dmname), loopdev
 
 
-def unpack_image(args):
-    scratchdir = args.scratchdir
-    indir = args.profilename
+def image_file(profilename):
+    """The rootimg.sfs of a profile name, profile directory or image file"""
+    indir = profilename
     if not os.path.exists(os.path.join(indir, 'rootimg.sfs')) and '/' not in indir:
         indir = os.path.join('/var/lib/confluent/public/os', indir)
     if os.path.isdir(indir):
         indir = os.path.join(indir, 'rootimg.sfs')
+    # absolute, unpack changes the working directory
+    return os.path.abspath(indir)
+
+
+def unpack_image(args):
+    if args.remote:
+        # unpack to a local staging directory and copy that to the host
+        host, rpath = args.remote
+        if not os.path.isfile(image_file(args.profilename)):
+            sys.stderr.write('No image found for {0}\n'.format(args.profilename))
+            sys.exit(1)
+        prepare_remote_target(host, rpath)
+        staging = tempfile.mkdtemp(prefix='imgutil-unpack-', dir='/var/tmp')
+        try:
+            stagedroot = os.path.join(staging, 'root')
+            unpack_image(argparse.Namespace(**dict(
+                vars(args), scratchdir=stagedroot, remote=None)))
+            try:
+                rsync_tree(stagedroot, '{0}:{1}'.format(host, rpath))
+            except (subprocess.CalledProcessError, KeyboardInterrupt):
+                sys.stderr.write('{0}:{1} is incomplete, remove it before unpacking '
+                                 'to it again\n'.format(host, rpath))
+                raise
+        finally:
+            os.chdir('/')
+            shutil.rmtree(staging)
+        return
+    scratchdir = args.scratchdir
+    indir = image_file(args.profilename)
     cleandmtable = None
     loopdev = None
     prepped = False
@@ -2649,6 +2900,20 @@ def pack_image(args):
     if os.path.exists(outdir):
         sys.stderr.write('Profile already exists, select a different name or delete existing {0}\n'.format(outdir))
         sys.exit(1)
+    packedfrom = getattr(args, 'packedfrom', args.scratchdir)
+    if args.remote:
+        # checked above before copying, packing the copy checks again
+        staging = tempfile.mkdtemp(prefix='imgutil-pack-', dir='/var/tmp')
+        try:
+            # below the private staging directory, rsync gives the top of the
+            # copy the mode of the image root
+            stagedroot = os.path.join(staging, 'root')
+            rsync_tree('{0}:{1}'.format(*args.remote), stagedroot)
+            pack_image(argparse.Namespace(**dict(
+                vars(args), scratchdir=stagedroot, remote=None, packedfrom=args.scratchdir)))
+        finally:
+            shutil.rmtree(staging)
+        return
     imginfofile = os.path.join(args.scratchdir, 'etc/confluentimg.buildinfo')
     distpath = None
     imgarch = None
@@ -2680,8 +2945,10 @@ def pack_image(args):
     if not os.path.exists(initrdname):
         initrdname = os.path.join(args.scratchdir, 'boot/initrd.img-{0}'.format(mostrecent))
     # Label with the policy of the image, which also covers changes made after
-    # the build, e.g. with imgutil exec. mksquashfs keeps the labels.
-    if not relabel_image(args.scratchdir):
+    # the build, e.g. with imgutil exec. mksquashfs keeps the labels. A copy
+    # from another host has no labels yet and gets full contexts, like a
+    # new build
+    if not relabel_image(args.scratchdir, force=packedfrom != args.scratchdir):
         sys.exit(1)
     oum = os.umask(0o077)
     for path in ('/var/lib/confluent', '/var/lib/confluent/private', '/var/lib/confluent/private/os'):
@@ -2709,7 +2976,7 @@ def pack_image(args):
         encrypt_image(tmploc, os.path.join(outdir, 'rootimg.sfs'), '{}/pending/rootimg.key'.format(privdir))
         os.remove(tmploc)
     with open(os.path.join(outdir, 'build-info'), 'w') as buildinfo:
-        buildinfo.write('PACKEDFROM={}\nPACKDATE={}\n'.format(args.scratchdir, datetime.datetime.now().strftime('%Y-%m-%dT%H:%M')))
+        buildinfo.write('PACKEDFROM={}\nPACKDATE={}\n'.format(packedfrom, datetime.datetime.now().strftime('%Y-%m-%dT%H:%M')))
         if args.baseprofile:
             buildinfo.write('BASEPROFILE={}\n'.format(args.baseprofile))
     if args.baseprofile:
@@ -2718,7 +2985,10 @@ def pack_image(args):
         recursecp(args.baseprofile, outdir)
         tryupdate = True
     else:
-        if distpath:
+        if distpath and packedfrom != args.scratchdir and not os.path.exists(distpath):
+            sys.stderr.write('Warning: {0}, the source of the image on the host it was built on, '
+                             'does not exist here, the profile gets no distribution link\n'.format(distpath))
+        elif distpath:
             os.symlink(distpath, os.path.join(outdir, 'distribution'))
         oshandler = fingerprint_host(args, args.scratchdir)
         tryupdate = False

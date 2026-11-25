@@ -45,6 +45,26 @@
 * `capture`:
   Capture an image for cloning from a running system.
 
+## BUILDING ON ANOTHER HOST
+
+For `build`, `exec`, `unpack` and `pack`, <scratchdir> can be `host:/path` (or
+`user@host:/path`), like with rsync, to work on a directory on another
+host. This runs the build natively on, for example, an aarch64 host when
+emulating it on the management host is too slow. A path with a `:` before
+the first `/` is remote, write `./name:x` for a local one.
+
+`build` and `exec` copy imgutil to a temporary directory on that host and
+run the whole command there over ssh. Paths in their options (`-s`, `-r`,
+`-v`) are then paths on that host, and without `-s` the image is built from
+the OS and repositories of that host. A `-p` or `-a` package list that
+exists on the management host is copied to the other host together with
+the lists it includes, otherwise it is looked up on the other host. `pack` copies
+the tree to a temporary directory under `/var/tmp` on the management host,
+packs it there and removes the copy. `unpack` unpacks to a temporary
+directory under `/var/tmp` and copies that to the other host, where the
+directory must not exist or be empty. The copies leave out SELinux labels,
+pack labels the tree with the policy of the image.
+
 ## BUILD OPTIONS
 
 * `-r`, `--addrepos` <repository>:
@@ -53,7 +73,8 @@
 * `-p`, `--packagelist` <file>:
   Filename of package list to replace default pkglist.
   A `<file>` entry in a package list includes another package list,
-  relative to the including file unless absolute.
+  relative to the including file unless absolute. For a build on
+  another host, see BUILDING ON ANOTHER HOST.
 
 * `-a`, `--addpackagelist` <file>:
   A list of additional packages to include. May be specified multiple times.
@@ -143,8 +164,9 @@
   Linux 5.0 or later on x86_64 or aarch64, otherwise a warning is printed.
 
 * <scratchdir>:
-  Directory to build new diskless root in. With `--containerfile`, the file
-  to write, or `-` for standard output.
+  Directory to build new diskless root in, or `host:/path` to build on
+  another host, see BUILDING ON ANOTHER HOST. With `--containerfile`, the
+  file to write, or `-` for standard output.
 
 ## EXEC OPTIONS
 
@@ -156,7 +178,8 @@
   Directory to make available in the build environment. `-v /` will cause it to be mounted in image as `/run/external/`. `-v /:/run/root` will override the target to be `/run/root`. May be specified multiple times.
 
 * <scratchdir>:
-  Directory of an unpacked diskless root.
+  Directory of an unpacked diskless root, or `host:/path` for one on
+  another host.
 
 * <cmd>:
   Optional command to run (defaults to a shell). Put `--` before a
@@ -168,7 +191,8 @@
   The diskless OS profile to unpack.
 
 * <scratchdir>:
-  Directory to extract diskless root to.
+  Directory to extract diskless root to, or `host:/path` to copy it to
+  another host.
 
 ## PACK OPTIONS
 
@@ -179,7 +203,8 @@
   Pack an unencrypted image rather than encrypting.
 
 * <scratchdir>:
-  Directory containing diskless root.
+  Directory containing diskless root, or `host:/path` to copy it from
+  another host first.
 
 * <profilename>:
   The desired diskless OS profile name to pack the root into.
@@ -206,6 +231,19 @@ detected from the source tree):
 Build an aarch64 Ubuntu diskless image on an amd64 Ubuntu host:
 
     imgutil build --arch aarch64 /tmp/myimage
+
+Build an aarch64 image natively on the aarch64 host arm01, customize it
+there and pack it on the management host:
+
+    imgutil build -y arm01:/var/tmp/myimage
+    imgutil exec arm01:/var/tmp/myimage -- dnf -y install vim
+    imgutil pack arm01:/var/tmp/myimage myprofile
+
+Update that profile later, after the tree on arm01 was removed:
+
+    imgutil unpack myprofile arm01:/var/tmp/myimage
+    imgutil exec arm01:/var/tmp/myimage -- dnf -y update
+    imgutil pack arm01:/var/tmp/myimage myprofile-v2
 
 Build from an image made from a Dockerfile and pack it:
 
