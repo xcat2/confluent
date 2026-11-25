@@ -27,3 +27,7 @@
 # MERGE:
 # /etc/passwd
 # /etc/group
+
+# Include entries from another file, relative to this file unless absolute. They go
+# to the current section, and the section in effect before the include is restored after it:
+# <common.syncfiles>
