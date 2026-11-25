@@ -1308,6 +1308,14 @@ class OEMHandler(object):
                         if chassisurl.split('/')[-1] in self.DEFAULT_CHASSIS_IDS:
                             self._varchassisurl = chassisurl
                             break
+                    else:
+                        # No well known chassis id, use the chassis the
+                        # system itself declares it is contained in
+                        syschassis = (self._varsysinfo or {}).get(
+                            'Links', {}).get('Chassis') or []
+                        if syschassis:
+                            self._varchassisurl = syschassis[0].get(
+                                '@odata.id', None)
         return self._varchassisurl
 
 
@@ -1327,17 +1335,19 @@ class OEMHandler(object):
     async def _get_chassis_inventory(self):
         chassisinfo = await self._get_chassis_info()
         retinfo = {}
-        snum = chassisinfo.get('SerialNumber', '').strip()
+        if not chassisinfo:
+            return retinfo
+        snum = (chassisinfo.get('SerialNumber') or '').strip()
         if snum:
             retinfo['Serial Number'] = snum
-        mfr = chassisinfo.get('Manufacturer', '').strip()
+        mfr = (chassisinfo.get('Manufacturer') or '').strip()
         if mfr:
             retinfo['Manufacturer'] = mfr
-        pname = chassisinfo.get('Model', '').strip()
+        pname = (chassisinfo.get('Model') or '').strip()
         if pname:
             retinfo['Product name'] = pname
-        model = chassisinfo.get('SKU', '').strip()
-        partnum = chassisinfo.get('PartNumber', '').strip()
+        model = (chassisinfo.get('SKU') or '').strip()
+        partnum = (chassisinfo.get('PartNumber') or '').strip()
         if model:
             retinfo['Model'] = model
             if partnum:
