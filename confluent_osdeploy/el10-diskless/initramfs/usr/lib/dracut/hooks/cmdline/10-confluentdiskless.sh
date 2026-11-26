@@ -99,8 +99,11 @@ mkdir /.ssh
 cat /ssh/*pubkey > /root/.ssh/authorized_keys 2>/dev/null
 cp /root/.ssh/authorized_keys /.ssh/
 cat /tls/*.pem > /etc/confluent/ca.pem
-mkdir -p /etc/pki/tls/certs
-cat /tls/*.pem > /etc/pki/tls/certs/ca-bundle.crt
+# libcurl in EL 10.3 and later reads tls-ca-bundle.pem by default, older
+# releases read ca-bundle.crt, so provide both like ca-certificates does
+mkdir -p /etc/pki/tls/certs /etc/pki/ca-trust/extracted/pem
+cat /tls/*.pem > /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
+ln -s /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem /etc/pki/tls/certs/ca-bundle.crt
 TRIES=0
 oldumask=$(umask)
 umask 0077
