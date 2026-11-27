@@ -80,10 +80,10 @@ echo -n "Loading drivers..."
 udevadm trigger
 udevadm trigger --type=devices --action=add
 udevadm settle
-modprobe ib_ipoib
-modprobe ib_umad
-modprobe hfi1
-modprobe mlx5_ib
+modprobe -q ib_ipoib
+modprobe -q ib_umad
+modprobe -q hfi1
+modprobe -q mlx5_ib
 echo "done"
 cat > /etc/ssh/sshd_config << EOF
 Port 2222
