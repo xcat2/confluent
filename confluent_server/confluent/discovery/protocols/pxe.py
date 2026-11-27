@@ -809,7 +809,7 @@ async def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, 
         log.log({'error': nicerr})
     if niccfg.get('ipv4_broken', False):
         # Received a request over a nic with no ipv4 configured, ignore it
-        log.log({'error': 'Skipping boot reply to {0} due to no viable IPv4 configuration on deployment system on interface index "{1}"'.format(node, info['netinfo']['ifidx'])})
+        log.log({'error': 'Skipping boot reply to {0} ({1}): no IPv4 address on {2}'.format(node, info.get('hwaddr'), idxtoname(info['netinfo']['ifidx']))})
         return
     clipn = None
     if niccfg['ipv4_method'] == 'firmwarenone':
