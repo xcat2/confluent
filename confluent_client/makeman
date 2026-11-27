@@ -12,8 +12,10 @@ for ronn in *.ronn; do
     section=`echo "$header" | sed -E 's/^#* *([A-Za-z0-9._-]+)\(([0-9]+)\).*/\2/'`
     # Strip the ronn title heading (and any setext underline) and promote the
     # remaining section headings so pandoc emits them as man .SH sections.
+    # Without raw_html, placeholders like <noderange> stay text instead of
+    # being read as HTML tags and dropped.
     sed -E '/\([0-9]+\) *--+ /d; /^=+$/d' "$ronn" | \
-        pandoc --standalone --from markdown --to man \
+        pandoc --standalone --from markdown-raw_html --to man \
             --shift-heading-level-by=-1 \
             --metadata title="$name" \
             --metadata section="$section" \
