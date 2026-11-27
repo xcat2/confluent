@@ -1,3 +1,5 @@
+# Include another package list, relative to this file unless absolute:
+# <site.pkglist>
 linux-generic
 ubuntu-minimal
 shim-signed

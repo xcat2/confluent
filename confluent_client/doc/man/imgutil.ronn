@@ -52,6 +52,8 @@
 
 * `-p`, `--packagelist` <file>:
   Filename of package list to replace default pkglist.
+  A `<file>` entry in a package list includes another package list,
+  relative to the including file unless absolute.
 
 * `-a`, `--addpackagelist` <file>:
   A list of additional packages to include. May be specified multiple times.

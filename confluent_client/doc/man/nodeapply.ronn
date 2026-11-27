@@ -17,7 +17,9 @@ rerunning syncfiles, and executing specified postscripts.
   Refresh SSH configuration (hosts.equiv and node SSH certificates)
   
 * `-F`, `--sync`
-  Rerun syncfiles from deployed profile
+  Rerun syncfiles from deployed profile. A `<file>` line in syncfiles includes
+  another file, relative to the including file unless absolute. Its entries go to
+  the current section, and the section in effect before the include is restored after it.
   
 * `-P SCRIPTS`, `--scripts=SCRIPTS`
   Re-run specified scripts, with full path under scripts specified, e.g. post.d/scriptname,firstboot.d/otherscriptname

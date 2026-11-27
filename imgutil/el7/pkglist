@@ -1,3 +1,5 @@
+# Include another package list, relative to this file unless absolute:
+# <site.pkglist>
 yum
 hostname
 irqbalance
