@@ -50,7 +50,8 @@ modprobe zram
 memtot=$(grep ^MemTotal: /proc/meminfo|awk '{print $2}')
 memtot=$((memtot/2))$(grep ^MemTotal: /proc/meminfo | awk '{print $3'})
 echo $memtot > /sys/block/zram0/disksize
-mkfs.xfs /dev/zram0 > /dev/null
+# page sized blocks avoid https://git.kernel.org/torvalds/c/e3668b371329
+mkfs.xfs -b size=$(cat /sys/block/zram0/queue/physical_block_size) /dev/zram0 > /dev/null
 mount -o discard /dev/zram0 /mnt/overlay
 if [ ! -f /tmp/mountparts.sh ]; then
     mkdir -p /mnt/overlay/upper /mnt/overlay/work

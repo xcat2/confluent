@@ -89,7 +89,8 @@ if [ "$imagemethod" != uncompressed ]; then
     memtot=$((memtot/2))$(grep ^MemTotal: /proc/meminfo | awk '{print $3'})
     echo $memtot > /sys/block/zram0/disksize
     modprobe xfs
-    mkfs.xfs /dev/zram0 > /dev/null
+    # page sized blocks avoid https://git.kernel.org/torvalds/c/e3668b371329
+    mkfs.xfs -b size=$(cat /sys/block/zram0/queue/physical_block_size) /dev/zram0 > /dev/null
     if [ "$TETHERED" = 1 ]; then
          mount -o discard /dev/zram0 /mnt/overlay
     else
