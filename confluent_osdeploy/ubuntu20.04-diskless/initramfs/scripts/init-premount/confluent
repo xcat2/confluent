@@ -90,10 +90,10 @@ if ! grep console= /proc/cmdline > /dev/null; then
     fi
 fi
 echo sshd:x:30:30:SSH User:/var/empty/sshd:/sbin/nologin >> /etc/passwd
-modprobe ib_ipoib
-modprobe ib_umad
-modprobe hfi1
-modprobe mlx5_ib
+modprobe -q ib_ipoib
+modprobe -q ib_umad
+modprobe -q hfi1
+modprobe -q mlx5_ib
 cd /sys/class/net
 for nic in *; do
     ip link set $nic up
